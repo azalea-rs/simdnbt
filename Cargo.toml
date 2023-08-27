@@ -16,8 +16,7 @@ criterion = { version = "^0.5.1", features = ["html_reports"] }
 graphite_binary = "0.1.0"
 valence_nbt = "0.6.1"
 fastnbt = "2.4.4"
-azalea-nbt = { path = "../azalea/azalea-nbt" }
-azalea-buf = { path = "../azalea/azalea-buf" }
+azalea-nbt = { git = "https://github.com/mat-1/azalea" }
 
 [profile.release]
 lto = true
