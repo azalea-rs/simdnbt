@@ -29,7 +29,6 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
         b.iter(|| {
             let input = black_box(input);
             let nbt = black_box(azalea_nbt::Nbt::read(&mut Cursor::new(input)).unwrap());
-            // black_box(nbt);
             black_box(
                 nbt.as_compound()
                     .unwrap()

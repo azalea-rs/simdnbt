@@ -149,61 +149,61 @@ impl<'a> CompoundTag<'a> {
     // pub const COMPOUND_ID: u8 = 10;
     // pub const INT_ARRAY_ID: u8 = 11;
     // pub const LONG_ARRAY_ID: u8 = 12;
-    pub fn byte(&self, name: &str) -> Option<&i8> {
+    pub fn byte(&self, name: &str) -> Option<i8> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
         for (key, value) in &self.values {
             if key == &name {
                 if let Tag::Byte(value) = value {
-                    return Some(value);
+                    return Some(*value);
                 }
             }
         }
         None
     }
-    pub fn short(&self, name: &str) -> Option<&i16> {
+    pub fn short(&self, name: &str) -> Option<i16> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
         for (key, value) in &self.values {
             if key == &name {
                 if let Tag::Short(value) = value {
-                    return Some(value);
+                    return Some(*value);
                 }
             }
         }
         None
     }
-    pub fn int(&self, name: &str) -> Option<&i32> {
+    pub fn int(&self, name: &str) -> Option<i32> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
         for (key, value) in &self.values {
             if key == &name {
                 if let Tag::Int(value) = value {
-                    return Some(value);
+                    return Some(*value);
                 }
             }
         }
         None
     }
-    pub fn long(&self, name: &str) -> Option<&i64> {
+    pub fn long(&self, name: &str) -> Option<i64> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
         for (key, value) in &self.values {
             if key == &name {
                 if let Tag::Long(value) = value {
-                    return Some(value);
+                    return Some(*value);
                 }
             }
         }
         None
     }
-    pub fn float(&self, name: &str) -> Option<&f32> {
+    pub fn float(&self, name: &str) -> Option<f32> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
         for (key, value) in &self.values {
             if key == &name {
                 if let Tag::Float(value) = value {
-                    return Some(value);
+                    return Some(*value);
                 }
             }
         }
@@ -390,7 +390,10 @@ impl<'a> ListTag<'a> {
     pub fn new(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
         let tag_type = data.read_u8()?;
         Ok(match tag_type {
-            END_ID => ListTag::Empty,
+            END_ID => {
+                let _length = data.read_u32::<BE>()?;
+                ListTag::Empty
+            }
             BYTE_ID => ListTag::Byte(read_i8_array(data)?),
             SHORT_ID => ListTag::Short(read_short_array(data)?),
             INT_ID => ListTag::Int(read_int_array(data)?),
@@ -521,60 +524,50 @@ impl<'a> ListTag<'a> {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use std::io::Read;
+#[cfg(test)]
+mod tests {
+    use std::io::Read;
 
-//     use flate2::read::GzDecoder;
+    use flate2::read::GzDecoder;
 
-//     use super::*;
+    use super::*;
 
-//     #[test]
-//     fn hello_world() {
-//         let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../tests/hello_world.nbt")))
-//             .unwrap()
-//             .unwrap();
+    #[test]
+    fn hello_world() {
+        let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../tests/hello_world.nbt")))
+            .unwrap()
+            .unwrap();
 
-//         assert_eq!(nbt.string("name"), Some("Bananrama".into()));
-//         assert_eq!(nbt.name(), "hello world");
-//     }
+        assert_eq!(
+            nbt.string("name"),
+            Some(Mutf8Str::from_str("Bananrama").as_ref())
+        );
+        assert_eq!(nbt.name().to_str(), "hello world");
+    }
 
-//     #[test]
-//     fn simple_player() {
-//         let src = include_bytes!("../tests/simple_player.dat").to_vec();
-//         let mut src_slice = src.as_slice();
-//         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
-//         let mut decoded_src = Vec::new();
-//         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-//         let nbt = Nbt::new(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+    #[test]
+    fn simple_player() {
+        let src = include_bytes!("../tests/simple_player.dat").to_vec();
+        let mut src_slice = src.as_slice();
+        let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
+        let mut decoded_src = Vec::new();
+        decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
+        let nbt = Nbt::new(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
 
-//         assert_eq!(nbt.int("PersistentId"), Some(&1946940766));
-//         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
-//     }
+        assert_eq!(nbt.int("PersistentId"), Some(1946940766));
+        assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
+    }
 
-//     // #[test]
-//     // fn complex_player() {
-//     //     let src = include_bytes!("../tests/complex_player.dat").to_vec();
-//     //     let mut src_slice = src.as_slice();
-//     //     let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
-//     //     let mut decoded_src = Vec::new();
-//     //     decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-//     //     let nbt = Nbt::new(&decoded_src);
+    #[test]
+    fn complex_player() {
+        let src = include_bytes!("../tests/complex_player.dat").to_vec();
+        let mut src_slice = src.as_slice();
+        let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
+        let mut decoded_src = Vec::new();
+        decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
+        let nbt = Nbt::new(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
 
-//     //     assert_eq!(
-//     //         nbt.compound()
-//     //             .unwrap()
-//     //             .float("foodExhaustionLevel")
-//     //             .unwrap() as u32,
-//     //         2
-//     //     );
-//     //     assert_eq!(
-//     //         nbt.compound()
-//     //             .unwrap()
-//     //             .float_list("Rotation")
-//     //             .unwrap()
-//     //             .len(),
-//     //         2
-//     //     );
-//     // }
-// }
+        assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
+        assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
+    }
+}
