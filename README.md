@@ -10,4 +10,5 @@ simdnbt might be the fastest nbt decoder currently in existence. however to achi
 
 here's a benchmark with the two other fastest nbt crates (one of which was also made by me):
 ![simdnbt is ~3x faster than the second fastest nbt crate](https://github.com/mat-1/simdnbt/assets/27899617/4800c672-2800-4b7d-a56a-dcd57d70f094)
-Take this with a grain of salt as they're not all doing the same work.
+
+take this with a grain of salt as they're not all doing the same work. regardless, you can still see it's very fast.
