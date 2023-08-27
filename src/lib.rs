@@ -1,7 +1,3 @@
-#![feature(vec_push_within_capacity)]
-#![feature(anonymous_lifetime_in_impl_trait)]
-#![feature(portable_simd)]
-
 mod error;
 mod mutf8;
 
