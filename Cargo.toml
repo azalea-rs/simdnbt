@@ -1,0 +1,40 @@
+[package]
+name = "simdnbt"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byteorder = "1.4.3"
+flate2 = "1.0.27"
+residua-mutf8 = "2.0.0"
+thiserror = "1.0.47"
+
+[dev-dependencies]
+criterion = { version = "^0.5.1", features = ["html_reports"] }
+graphite_binary = "0.1.0"
+valence_nbt = "0.6.1"
+fastnbt = "2.4.4"
+azalea-nbt = { path = "../azalea/azalea-nbt" }
+azalea-buf = { path = "../azalea/azalea-buf" }
+
+[profile.release]
+lto = true
+debug = true
+
+[profile.bench]
+lto = true
+debug = true
+
+[[bench]]
+harness = false
+name = "nbt"
+
+[[bench]]
+harness = false
+name = "compare"
+
+[[bench]]
+harness = false
+name = "mutf8"
