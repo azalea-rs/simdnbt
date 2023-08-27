@@ -3,6 +3,7 @@ mod mutf8;
 
 use std::{io::Cursor, ops::Deref, slice};
 
+pub use crate::error::Error;
 pub use crate::mutf8::Mutf8Str;
 use byteorder::{ReadBytesExt, BE};
 use error::Error;
