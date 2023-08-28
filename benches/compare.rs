@@ -7,7 +7,7 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughpu
 use flate2::read::GzDecoder;
 
 pub fn bench_read_file(filename: &str, c: &mut Criterion) {
-    let mut file = File::open(filename).unwrap();
+    let mut file = File::open(format!("tests/{filename}")).unwrap();
     let mut contents = Vec::new();
     file.read_to_end(&mut contents).unwrap();
     let mut src = &contents[..];
@@ -21,54 +21,70 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     }
     let input = input.as_slice();
 
-    let mut group = c.benchmark_group(filename);
+    let mut group = c.benchmark_group(format!("compare/{filename}"));
     group.throughput(Throughput::Bytes(input.len() as u64));
 
     group.bench_function("azalea_parse", |b| {
         b.iter(|| {
             let input = black_box(input);
-            let nbt = black_box(azalea_nbt::Nbt::read(&mut Cursor::new(input)).unwrap());
-            black_box(
-                nbt.as_compound()
-                    .unwrap()
-                    .get("")
-                    .unwrap()
-                    .as_compound()
-                    .unwrap()
-                    .get("PersistentId")
-                    .unwrap()
-                    .as_int()
-                    .unwrap(),
-            );
+            let nbt = azalea_nbt::Nbt::read(&mut Cursor::new(input)).unwrap();
+            black_box(nbt);
+            // black_box(
+            //     nbt.as_compound()
+            //         .unwrap()
+            //         .get("")
+            //         .unwrap()
+            //         .as_compound()
+            //         .unwrap()
+            //         .get("PersistentId")
+            //         .unwrap()
+            //         .as_int()
+            //         .unwrap(),
+            // );
         })
     });
 
     group.bench_function("graphite_parse", |b| {
         b.iter(|| {
             let input = black_box(input);
-            let nbt = black_box(graphite_binary::nbt::decode::read(&mut &input[..]).unwrap());
-            // black_box(nbt);
-            black_box(nbt.find_root("PersistentId").unwrap().as_int());
+            let nbt = graphite_binary::nbt::decode::read(&mut &input[..]).unwrap();
+            black_box(nbt);
+            // black_box(nbt.find_root("PersistentId").unwrap().as_int());
         })
     });
 
     group.bench_function("simdnbt_parse", |b| {
         b.iter(|| {
             let input = black_box(input);
-            let nbt = black_box(simdnbt::Nbt::new(&mut Cursor::new(input)));
-            let nbt = nbt.unwrap().unwrap();
-            // black_box(nbt);
-            black_box(nbt.int("PersistentId").unwrap());
+            let nbt = simdnbt::Nbt::new(&mut Cursor::new(input)).unwrap().unwrap();
+            black_box(nbt);
+            // black_box(nbt.int("PersistentId").unwrap());
         })
     });
 
-    // group.bench_function("valence_parse", |b| {
-    //     b.iter(|| {
-    //         let input = black_box(input);
-    //         let nbt = valence_nbt::from_binary_slice(&mut &input[..]).unwrap();
-    //         black_box(nbt);
-    //     })
-    // });
+    group.bench_function("valence_parse", |b| {
+        b.iter(|| {
+            let input = black_box(input);
+            let nbt = valence_nbt::Compound::from_binary(&mut &input[..]).unwrap();
+            black_box(nbt);
+        })
+    });
+
+    group.bench_function("fastnbt_parse", |b| {
+        b.iter(|| {
+            let input = black_box(input);
+            let nbt: fastnbt::Value = fastnbt::from_bytes(input).unwrap();
+            black_box(nbt);
+        })
+    });
+
+    group.bench_function("hematite_parse", |b| {
+        b.iter(|| {
+            let input = black_box(input);
+            let nbt = nbt::Blob::from_reader(&mut Cursor::new(input)).unwrap();
+            black_box(nbt);
+        })
+    });
 
     // // writing
 
@@ -103,14 +119,14 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
 }
 
 fn bench(c: &mut Criterion) {
-    // bench_read_file("tests/hello_world.nbt", c);
-    // bench_read_file("tests/bigtest.nbt", c);
-    bench_read_file("tests/simple_player.dat", c);
-    // bench_read_file("tests/complex_player.dat", c);
-    // bench_read_file("tests/level.dat", c);
-    // bench_read_file("tests/stringtest.nbt", c);
-    // bench_read_file("tests/inttest.nbt", c);
+    // bench_read_file("hello_world.nbt", c);
+    // bench_read_file("bigtest.nbt", c);
+    bench_read_file("simple_player.dat", c);
+    // bench_read_file("complex_player.dat", c);
+    // bench_read_file("level.dat", c);
+    // bench_read_file("stringtest.nbt", c);
+    // bench_read_file("inttest.nbt", c);
 }
 
-criterion_group!(benches, bench);
-criterion_main!(benches);
+criterion_group!(compare, bench);
+criterion_main!(compare);

@@ -1,3 +1,12 @@
+/// an unnecessarily fast nbt decoder.
+///
+/// ```
+/// use simdnbt::Nbt;
+///
+/// let nbt = Nbt::new(&mut std::io::Cursor::new(include_bytes!("../tests/hello_world.nbt"))).unwrap().unwrap();
+/// assert_eq!(nbt.name().to_str(), "hello world");
+/// assert_eq!(nbt.string("name").unwrap().to_str().as_ref(), "Bananrama");
+/// ```
 mod error;
 mod mutf8;
 
@@ -25,10 +34,7 @@ impl<'a> Deref for Nbt<'a> {
     }
 }
 
-pub fn read_with_u16_length<'a>(
-    data: &mut Cursor<&'a [u8]>,
-    width: usize,
-) -> Result<&'a [u8], Error> {
+fn read_with_u16_length<'a>(data: &mut Cursor<&'a [u8]>, width: usize) -> Result<&'a [u8], Error> {
     let length = data.read_u16::<BE>()?;
     let length_in_bytes = length as usize * width;
     // make sure we don't read more than the length
@@ -40,10 +46,7 @@ pub fn read_with_u16_length<'a>(
     Ok(&data.get_ref()[start_position..start_position + length_in_bytes])
 }
 
-pub fn read_with_u32_length<'a>(
-    data: &mut Cursor<&'a [u8]>,
-    width: usize,
-) -> Result<&'a [u8], Error> {
+fn read_with_u32_length<'a>(data: &mut Cursor<&'a [u8]>, width: usize) -> Result<&'a [u8], Error> {
     let length = data.read_u32::<BE>()?;
     let length_in_bytes = length as usize * width;
     // make sure we don't read more than the length
@@ -55,7 +58,7 @@ pub fn read_with_u32_length<'a>(
     Ok(&data.get_ref()[start_position..start_position + length_in_bytes])
 }
 
-pub fn read_string<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a Mutf8Str, Error> {
+fn read_string<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a Mutf8Str, Error> {
     let data = read_with_u16_length(data, 1)?;
     Ok(Mutf8Str::from_slice(data))
 }
@@ -76,26 +79,26 @@ impl<'a> Nbt<'a> {
     }
 }
 
-pub const END_ID: u8 = 0;
-pub const BYTE_ID: u8 = 1;
-pub const SHORT_ID: u8 = 2;
-pub const INT_ID: u8 = 3;
-pub const LONG_ID: u8 = 4;
-pub const FLOAT_ID: u8 = 5;
-pub const DOUBLE_ID: u8 = 6;
-pub const BYTE_ARRAY_ID: u8 = 7;
-pub const STRING_ID: u8 = 8;
-pub const LIST_ID: u8 = 9;
-pub const COMPOUND_ID: u8 = 10;
-pub const INT_ARRAY_ID: u8 = 11;
-pub const LONG_ARRAY_ID: u8 = 12;
+const END_ID: u8 = 0;
+const BYTE_ID: u8 = 1;
+const SHORT_ID: u8 = 2;
+const INT_ID: u8 = 3;
+const LONG_ID: u8 = 4;
+const FLOAT_ID: u8 = 5;
+const DOUBLE_ID: u8 = 6;
+const BYTE_ARRAY_ID: u8 = 7;
+const STRING_ID: u8 = 8;
+const LIST_ID: u8 = 9;
+const COMPOUND_ID: u8 = 10;
+const INT_ARRAY_ID: u8 = 11;
+const LONG_ARRAY_ID: u8 = 12;
+
+const MAX_DEPTH: usize = 512;
 
 #[derive(Debug, Default)]
 pub struct CompoundTag<'a> {
     values: Vec<(&'a Mutf8Str, Tag<'a>)>,
 }
-
-const MAX_DEPTH: usize = 512;
 
 impl<'a> CompoundTag<'a> {
     fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
@@ -133,6 +136,7 @@ impl<'a> CompoundTag<'a> {
         Ok(Self { values })
     }
 
+    #[inline]
     pub fn get(&self, name: &str) -> Option<&Tag<'a>> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
@@ -157,148 +161,76 @@ impl<'a> CompoundTag<'a> {
     }
 
     pub fn byte(&self, name: &str) -> Option<i8> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::Byte(value) = value {
-                    return Some(*value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::Byte(byte)) => Some(*byte),
+            _ => None,
         }
-        None
     }
     pub fn short(&self, name: &str) -> Option<i16> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::Short(value) = value {
-                    return Some(*value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::Short(short)) => Some(*short),
+            _ => None,
         }
-        None
     }
     pub fn int(&self, name: &str) -> Option<i32> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::Int(value) = value {
-                    return Some(*value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::Int(int)) => Some(*int),
+            _ => None,
         }
-        None
     }
     pub fn long(&self, name: &str) -> Option<i64> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::Long(value) = value {
-                    return Some(*value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::Long(long)) => Some(*long),
+            _ => None,
         }
-        None
     }
     pub fn float(&self, name: &str) -> Option<f32> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::Float(value) = value {
-                    return Some(*value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::Float(float)) => Some(*float),
+            _ => None,
         }
-        None
     }
     pub fn double(&self, name: &str) -> Option<&f64> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::Double(value) = value {
-                    return Some(value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::Double(double)) => Some(double),
+            _ => None,
         }
-        None
     }
     pub fn byte_array(&self, name: &str) -> Option<&[u8]> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::ByteArray(value) = value {
-                    return Some(value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::ByteArray(byte_array)) => Some(byte_array),
+            _ => None,
         }
-        None
     }
     pub fn string(&self, name: &str) -> Option<&Mutf8Str> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::String(value) = value {
-                    return Some(value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::String(string)) => Some(string),
+            _ => None,
         }
-        None
     }
     pub fn list(&self, name: &str) -> Option<&ListTag<'a>> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::List(value) = value {
-                    return Some(value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::List(list)) => Some(list),
+            _ => None,
         }
-        None
     }
     pub fn compound(&self, name: &str) -> Option<&CompoundTag<'a>> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::Compound(value) = value {
-                    return Some(value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::Compound(compound)) => Some(compound),
+            _ => None,
         }
-        None
     }
     pub fn int_array(&self, name: &str) -> Option<&[i32]> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::IntArray(value) = value {
-                    return Some(value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::IntArray(int_array)) => Some(int_array),
+            _ => None,
         }
-        None
     }
     pub fn long_array(&self, name: &str) -> Option<&[i64]> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                if let Tag::LongArray(value) = value {
-                    return Some(value);
-                }
-            }
+        match self.get(name) {
+            Some(Tag::LongArray(long_array)) => Some(long_array),
+            _ => None,
         }
-        None
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &Tag<'a>)> {

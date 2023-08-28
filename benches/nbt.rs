@@ -1,4 +1,3 @@
-use azalea_nbt::Nbt;
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use flate2::read::GzDecoder;
 use std::{
@@ -7,7 +6,7 @@ use std::{
 };
 
 fn bench_file(filename: &str, c: &mut Criterion) {
-    let mut file = File::open(filename).unwrap();
+    let mut file = File::open(format!("tests/{filename}")).unwrap();
     let mut contents = Vec::new();
     file.read_to_end(&mut contents).unwrap();
     let mut src = &contents[..];
@@ -22,23 +21,14 @@ fn bench_file(filename: &str, c: &mut Criterion) {
 
     let mut decoded_src_stream = Cursor::new(&decoded_src[..]);
 
-    let nbt = Nbt::read(&mut decoded_src_stream).unwrap();
-    decoded_src_stream.set_position(0);
-
-    let mut group = c.benchmark_group(filename);
+    let mut group = c.benchmark_group(format!("nbt/{filename}"));
 
     group.throughput(Throughput::Bytes(decoded_src.len() as u64));
 
     group.bench_function("Decode", |b| {
         b.iter(|| {
-            black_box(Nbt::read(&mut decoded_src_stream).unwrap());
+            black_box(simdnbt::Nbt::new(&mut decoded_src_stream).unwrap());
             decoded_src_stream.set_position(0);
-        })
-    });
-
-    group.bench_function("Encode", |b| {
-        b.iter(|| {
-            nbt.write(&mut black_box(Vec::new()));
         })
     });
 
@@ -60,16 +50,16 @@ fn bench_file(filename: &str, c: &mut Criterion) {
 }
 
 fn bench(c: &mut Criterion) {
-    // bench_file("tests/bigtest.nbt", c);
-    // bench_file("tests/simple_player.dat", c);
-    // bench_file("tests/complex_player.dat", c);
-    // bench_file("tests/level.dat", c);
-    // bench_file("tests/stringtest.nbt", c);
-    // bench_file("tests/inttest16.nbt", c);
+    // bench_file("bigtest.nbt", c);
+    // bench_file("simple_player.dat", c);
+    bench_file("complex_player.dat", c);
+    // bench_file("level.dat", c);
+    // bench_file("stringtest.nbt", c);
+    // bench_file("inttest16.nbt", c);
 
-    // bench_file("tests/inttest1023.nbt", c);
-    // bench_file("tests/inttest3.nbt", c);
+    // bench_file("inttest1023.nbt", c);
+    // bench_file("inttest3.nbt", c);
 }
 
-criterion_group!(benches, bench);
-criterion_main!(benches);
+criterion_group!(nbt, bench);
+criterion_main!(nbt);
