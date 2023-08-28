@@ -70,7 +70,7 @@ impl<'a> Nbt<'a> {
             return Err(Error::InvalidRootType(root_type));
         }
         let name = read_string(data)?;
-        let tag = CompoundTag::new(data)?;
+        let tag = CompoundTag::new(data, 0)?;
 
         Ok(Some(Nbt { name, tag }))
     }
@@ -95,8 +95,13 @@ pub struct CompoundTag<'a> {
     values: Vec<(&'a Mutf8Str, Tag<'a>)>,
 }
 
+const MAX_DEPTH: usize = 512;
+
 impl<'a> CompoundTag<'a> {
-    fn new(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
+    fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+        if depth > MAX_DEPTH {
+            return Err(Error::MaxDepthExceeded);
+        }
         let mut values = Vec::with_capacity(4);
         loop {
             let tag_type = data.read_u8()?;
@@ -116,8 +121,10 @@ impl<'a> CompoundTag<'a> {
                     values.push((tag_name, Tag::ByteArray(read_with_u32_length(data, 1)?)))
                 }
                 STRING_ID => values.push((tag_name, Tag::String(read_string(data)?))),
-                LIST_ID => values.push((tag_name, Tag::List(ListTag::new(data)?))),
-                COMPOUND_ID => values.push((tag_name, Tag::Compound(CompoundTag::new(data)?))),
+                LIST_ID => values.push((tag_name, Tag::List(ListTag::new(data, depth + 1)?))),
+                COMPOUND_ID => {
+                    values.push((tag_name, Tag::Compound(CompoundTag::new(data, depth + 1)?)))
+                }
                 INT_ARRAY_ID => values.push((tag_name, Tag::IntArray(read_int_array(data)?))),
                 LONG_ARRAY_ID => values.push((tag_name, Tag::LongArray(read_long_array(data)?))),
                 _ => return Err(Error::UnknownTagId(tag_type)),
@@ -137,18 +144,18 @@ impl<'a> CompoundTag<'a> {
         None
     }
 
-    // pub const BYTE_ID: u8 = 1;
-    // pub const SHORT_ID: u8 = 2;
-    // pub const INT_ID: u8 = 3;
-    // pub const LONG_ID: u8 = 4;
-    // pub const FLOAT_ID: u8 = 5;
-    // pub const DOUBLE_ID: u8 = 6;
-    // pub const BYTE_ARRAY_ID: u8 = 7;
-    // pub const STRING_ID: u8 = 8;
-    // pub const LIST_ID: u8 = 9;
-    // pub const COMPOUND_ID: u8 = 10;
-    // pub const INT_ARRAY_ID: u8 = 11;
-    // pub const LONG_ARRAY_ID: u8 = 12;
+    /// Returns whether there is a tag with the given name.
+    pub fn contains(&self, name: &str) -> bool {
+        let name = Mutf8Str::from_str(name);
+        let name = name.as_ref();
+        for (key, _) in &self.values {
+            if key == &name {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn byte(&self, name: &str) -> Option<i8> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
@@ -370,8 +377,9 @@ pub enum Tag<'a> {
     IntArray(Vec<i32>),
     LongArray(Vec<i64>),
 }
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum ListTag<'a> {
+    #[default]
     Empty,
     Byte(&'a [i8]),
     Short(Vec<i16>),
@@ -387,7 +395,10 @@ pub enum ListTag<'a> {
     LongArray(Vec<Vec<i64>>),
 }
 impl<'a> ListTag<'a> {
-    pub fn new(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
+    pub fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+        if depth > MAX_DEPTH {
+            return Err(Error::MaxDepthExceeded);
+        }
         let tag_type = data.read_u8()?;
         Ok(match tag_type {
             END_ID => {
@@ -415,7 +426,7 @@ impl<'a> ListTag<'a> {
                 // arbitrary number to prevent big allocations
                 let mut lists = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    lists.push(ListTag::new(data)?)
+                    lists.push(ListTag::new(data, depth + 1)?)
                 }
                 lists
             }),
@@ -424,7 +435,7 @@ impl<'a> ListTag<'a> {
                 // arbitrary number to prevent big allocations
                 let mut compounds = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    compounds.push(CompoundTag::new(data)?)
+                    compounds.push(CompoundTag::new(data, depth + 1)?)
                 }
                 compounds
             }),

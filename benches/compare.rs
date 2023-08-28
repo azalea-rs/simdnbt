@@ -5,7 +5,6 @@ use std::{
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use flate2::read::GzDecoder;
-use simdnbt::Mutf8Str;
 
 pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     let mut file = File::open(filename).unwrap();

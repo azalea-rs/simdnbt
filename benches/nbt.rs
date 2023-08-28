@@ -60,7 +60,7 @@ fn bench_file(filename: &str, c: &mut Criterion) {
 }
 
 fn bench(c: &mut Criterion) {
-    bench_file("tests/bigtest.nbt", c);
+    // bench_file("tests/bigtest.nbt", c);
     // bench_file("tests/simple_player.dat", c);
     // bench_file("tests/complex_player.dat", c);
     // bench_file("tests/level.dat", c);

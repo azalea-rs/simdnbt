@@ -10,6 +10,8 @@ pub enum Error {
     UnknownTagId(u8),
     #[error("Unexpected end of data")]
     UnexpectedEof,
+    #[error("Tried to read NBT tag with too high complexity, depth > 512")]
+    MaxDepthExceeded,
     #[error(transparent)]
     Io(#[from] io::Error),
 }
