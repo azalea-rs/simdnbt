@@ -40,8 +40,37 @@ impl<'a> Deref for Nbt<'a> {
     }
 }
 
+#[inline(always)]
+fn read_u32(data: &mut Cursor<&[u8]>) -> Result<u32, Error> {
+    let remaining_slice = &data.get_ref()[data.position() as usize..data.get_ref().len()];
+    if remaining_slice.len() < 4 {
+        return Err(Error::UnexpectedEof);
+    }
+
+    data.set_position(data.position() + 4);
+
+    Ok(u32::from_be_bytes([
+        remaining_slice[0],
+        remaining_slice[1],
+        remaining_slice[2],
+        remaining_slice[3],
+    ]))
+}
+#[inline(always)]
+fn read_u16(data: &mut Cursor<&[u8]>) -> Result<u16, Error> {
+    let remaining_slice = &data.get_ref()[data.position() as usize..data.get_ref().len()];
+    if remaining_slice.len() < 2 {
+        return Err(Error::UnexpectedEof);
+    }
+
+    data.set_position(data.position() + 2);
+
+    Ok(u16::from_be_bytes([remaining_slice[0], remaining_slice[1]]))
+}
+
+#[inline(always)]
 fn read_with_u16_length<'a>(data: &mut Cursor<&'a [u8]>, width: usize) -> Result<&'a [u8], Error> {
-    let length = data.read_u16::<BE>()?;
+    let length: u16 = read_u16(data)?;
     let length_in_bytes = length as usize * width;
     // make sure we don't read more than the length
     if data.get_ref().len() < data.position() as usize + length_in_bytes {
@@ -52,8 +81,9 @@ fn read_with_u16_length<'a>(data: &mut Cursor<&'a [u8]>, width: usize) -> Result
     Ok(&data.get_ref()[start_position..start_position + length_in_bytes])
 }
 
+#[inline(never)]
 fn read_with_u32_length<'a>(data: &mut Cursor<&'a [u8]>, width: usize) -> Result<&'a [u8], Error> {
-    let length = data.read_u32::<BE>()?;
+    let length = read_u32(data)?;
     let length_in_bytes = length as usize * width;
     // make sure we don't read more than the length
     if data.get_ref().len() < data.position() as usize + length_in_bytes {
@@ -423,7 +453,7 @@ impl<'a> ListTag<'a> {
         let tag_type = data.read_u8()?;
         Ok(match tag_type {
             END_ID => {
-                let _length = data.read_u32::<BE>()?;
+                data.set_position(data.position() + 4);
                 ListTag::Empty
             }
             BYTE_ID => ListTag::Byte(read_i8_array(data)?),
@@ -434,7 +464,7 @@ impl<'a> ListTag<'a> {
             DOUBLE_ID => ListTag::Double(read_double_array(data)?),
             BYTE_ARRAY_ID => ListTag::ByteArray(read_u8_array(data)?),
             STRING_ID => ListTag::String({
-                let length = data.read_u32::<BE>()?;
+                let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
                 let mut strings = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -443,7 +473,7 @@ impl<'a> ListTag<'a> {
                 strings
             }),
             LIST_ID => ListTag::List({
-                let length = data.read_u32::<BE>()?;
+                let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
                 let mut lists = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -452,7 +482,7 @@ impl<'a> ListTag<'a> {
                 lists
             }),
             COMPOUND_ID => ListTag::Compound({
-                let length = data.read_u32::<BE>()?;
+                let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
                 let mut compounds = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -461,7 +491,7 @@ impl<'a> ListTag<'a> {
                 compounds
             }),
             INT_ARRAY_ID => ListTag::IntArray({
-                let length = data.read_u32::<BE>()?;
+                let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
                 let mut arrays = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -470,7 +500,7 @@ impl<'a> ListTag<'a> {
                 arrays
             }),
             LONG_ARRAY_ID => ListTag::LongArray({
-                let length = data.read_u32::<BE>()?;
+                let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
                 let mut arrays = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -602,4 +632,23 @@ mod tests {
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
     }
+
+    // #[test]
+    // fn generate_inttest() {
+    //     use byteorder::WriteBytesExt;
+
+    //     let mut out = Vec::new();
+    //     out.write_u8(COMPOUND_ID).unwrap();
+    //     out.write_u16::<BE>(0).unwrap();
+    //     out.write_u8(LIST_ID).unwrap();
+    //     out.write_u16::<BE>(0).unwrap();
+    //     out.write_u8(INT_ID).unwrap();
+    //     out.write_i32::<BE>(1023).unwrap();
+    //     for i in 0..1023 {
+    //         out.write_i32::<BE>(i).unwrap();
+    //     }
+    //     out.write_u8(END_ID).unwrap();
+
+    //     std::fs::write("tests/inttest1023.nbt", out).unwrap();
+    // }
 }
