@@ -1,12 +1,16 @@
-/// an unnecessarily fast nbt decoder.
-///
-/// ```
-/// use simdnbt::Nbt;
-///
-/// let nbt = Nbt::new(&mut std::io::Cursor::new(include_bytes!("../tests/hello_world.nbt"))).unwrap().unwrap();
-/// assert_eq!(nbt.name().to_str(), "hello world");
-/// assert_eq!(nbt.string("name").unwrap().to_str().as_ref(), "Bananrama");
-/// ```
+//! an unnecessarily fast nbt decoder.
+//!
+//! afaik, this is currently the fastest nbt decoder in existence.
+//!
+//! ```
+//! use simdnbt::Nbt;
+//! use std::io::Cursor;
+//!
+//! let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../tests/hello_world.nbt"))).unwrap().unwrap();
+//! assert_eq!(nbt.name().to_str(), "hello world");
+//! assert_eq!(nbt.string("name").unwrap().to_str(), "Bananrama");
+//! ```
+
 mod error;
 mod mutf8;
 
@@ -16,12 +20,14 @@ use byteorder::{ReadBytesExt, BE};
 pub use error::Error;
 pub use mutf8::Mutf8Str;
 
+/// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug)]
 pub struct Nbt<'a> {
     name: &'a Mutf8Str,
     tag: CompoundTag<'a>,
 }
 impl<'a> Nbt<'a> {
+    /// Get the name of the NBT compound. This is often an empty string.
     pub fn name(&self) -> &'a Mutf8Str {
         self.name
     }
@@ -64,6 +70,7 @@ fn read_string<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a Mutf8Str, Error> {
 }
 
 impl<'a> Nbt<'a> {
+    /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
     pub fn new(data: &mut Cursor<&'a [u8]>) -> Result<Option<Nbt<'a>>, Error> {
         let root_type = data.read_u8()?;
         if root_type == END_ID {
@@ -95,6 +102,7 @@ const LONG_ARRAY_ID: u8 = 12;
 
 const MAX_DEPTH: usize = 512;
 
+/// A list of named tags. The order of the tags is preserved.
 #[derive(Debug, Default)]
 pub struct CompoundTag<'a> {
     values: Vec<(&'a Mutf8Str, Tag<'a>)>,
@@ -298,6 +306,7 @@ fn slice_u8_into_i8(s: &[u8]) -> &[i8] {
     unsafe { slice::from_raw_parts(s.as_ptr() as *const i8, s.len()) }
 }
 
+/// A single NBT tag.
 #[derive(Debug)]
 pub enum Tag<'a> {
     Byte(i8),
@@ -387,6 +396,8 @@ impl<'a> Tag<'a> {
         }
     }
 }
+
+/// A list of NBT tags of a single type.
 #[derive(Debug, Default)]
 pub enum ListTag<'a> {
     #[default]

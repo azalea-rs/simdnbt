@@ -6,7 +6,7 @@ use std::{
     ops::Deref,
 };
 
-/// A M-UTF8 string slice.
+/// A M-UTF8 string slice. This is how strings are represented internally in NBT.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Mutf8Str {
     pub(crate) slice: [u8],
@@ -26,11 +26,6 @@ impl Mutf8Str {
     pub fn from_slice(slice: &[u8]) -> &Mutf8Str {
         // SAFETY: &[u8] and &Mutf8Str are the same layout.
         unsafe { mem::transmute(slice) }
-    }
-
-    /// Returns whether the given byte slice is a valid M-UTF-8 string.
-    pub fn is_valid(_slice: &[u8]) -> bool {
-        true
     }
 
     pub fn from_str(s: &str) -> Cow<Mutf8Str> {
