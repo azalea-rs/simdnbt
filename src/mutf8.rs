@@ -33,7 +33,7 @@ impl Mutf8Str {
         true
     }
 
-    pub fn from_str<'a>(s: &'a str) -> Cow<'a, Mutf8Str> {
+    pub fn from_str(s: &str) -> Cow<Mutf8Str> {
         match mutf8::encode(s) {
             Cow::Borrowed(b) => Cow::Borrowed(Mutf8Str::from_slice(b)),
             Cow::Owned(o) => Cow::Owned(Mutf8String { vec: o }),

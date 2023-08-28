@@ -90,7 +90,7 @@ pub const COMPOUND_ID: u8 = 10;
 pub const INT_ARRAY_ID: u8 = 11;
 pub const LONG_ARRAY_ID: u8 = 12;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CompoundTag<'a> {
     values: Vec<(&'a Mutf8Str, Tag<'a>)>,
 }
@@ -300,10 +300,14 @@ impl<'a> CompoundTag<'a> {
         }
         None
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &Tag<'a>)> {
+        self.values.iter().map(|(k, v)| (*k, v))
+    }
 }
 
 fn read_u8_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a [u8], Error> {
-    Ok(read_with_u32_length(data, 1)?)
+    read_with_u32_length(data, 1)
 }
 fn read_i8_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a [i8], Error> {
     Ok(slice_u8_into_i8(read_u8_array(data)?))
@@ -376,6 +380,80 @@ pub enum Tag<'a> {
     Compound(CompoundTag<'a>),
     IntArray(Vec<i32>),
     LongArray(Vec<i64>),
+}
+impl<'a> Tag<'a> {
+    pub fn byte(&self) -> Option<i8> {
+        match self {
+            Tag::Byte(byte) => Some(*byte),
+            _ => None,
+        }
+    }
+    pub fn short(&self) -> Option<i16> {
+        match self {
+            Tag::Short(short) => Some(*short),
+            _ => None,
+        }
+    }
+    pub fn int(&self) -> Option<i32> {
+        match self {
+            Tag::Int(int) => Some(*int),
+            _ => None,
+        }
+    }
+    pub fn long(&self) -> Option<i64> {
+        match self {
+            Tag::Long(long) => Some(*long),
+            _ => None,
+        }
+    }
+    pub fn float(&self) -> Option<f32> {
+        match self {
+            Tag::Float(float) => Some(*float),
+            _ => None,
+        }
+    }
+    pub fn double(&self) -> Option<f64> {
+        match self {
+            Tag::Double(double) => Some(*double),
+            _ => None,
+        }
+    }
+    pub fn byte_array(&self) -> Option<&[u8]> {
+        match self {
+            Tag::ByteArray(byte_array) => Some(byte_array),
+            _ => None,
+        }
+    }
+    pub fn string(&self) -> Option<&Mutf8Str> {
+        match self {
+            Tag::String(string) => Some(string),
+            _ => None,
+        }
+    }
+    pub fn list(&self) -> Option<&ListTag<'a>> {
+        match self {
+            Tag::List(list) => Some(list),
+            _ => None,
+        }
+    }
+    pub fn compound(&self) -> Option<&CompoundTag<'a>> {
+        match self {
+            Tag::Compound(compound) => Some(compound),
+            _ => None,
+        }
+    }
+    pub fn int_array(&self) -> Option<&[i32]> {
+        match self {
+            Tag::IntArray(int_array) => Some(int_array),
+            _ => None,
+        }
+    }
+    pub fn long_array(&self) -> Option<&[i64]> {
+        match self {
+            Tag::LongArray(long_array) => Some(long_array),
+            _ => None,
+        }
+    }
 }
 #[derive(Debug, Default)]
 pub enum ListTag<'a> {
