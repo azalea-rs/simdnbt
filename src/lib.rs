@@ -104,7 +104,7 @@ fn read_string<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a Mutf8Str, Error> {
 impl<'a> Nbt<'a> {
     /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
     pub fn new(data: &mut Cursor<&'a [u8]>) -> Result<Option<Nbt<'a>>, Error> {
-        let root_type = data.read_u8()?;
+        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(None);
         }
@@ -147,19 +147,37 @@ impl<'a> CompoundTag<'a> {
         }
         let mut values = Vec::with_capacity(4);
         loop {
-            let tag_type = data.read_u8()?;
+            let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
             if tag_type == END_ID {
                 break;
             }
             let tag_name = read_string(data)?;
 
             match tag_type {
-                BYTE_ID => values.push((tag_name, Tag::Byte(data.read_i8()?))),
-                SHORT_ID => values.push((tag_name, Tag::Short(data.read_i16::<BE>()?))),
-                INT_ID => values.push((tag_name, Tag::Int(data.read_i32::<BE>()?))),
-                LONG_ID => values.push((tag_name, Tag::Long(data.read_i64::<BE>()?))),
-                FLOAT_ID => values.push((tag_name, Tag::Float(data.read_f32::<BE>()?))),
-                DOUBLE_ID => values.push((tag_name, Tag::Double(data.read_f64::<BE>()?))),
+                BYTE_ID => values.push((
+                    tag_name,
+                    Tag::Byte(data.read_i8().map_err(|_| Error::UnexpectedEof)?),
+                )),
+                SHORT_ID => values.push((
+                    tag_name,
+                    Tag::Short(data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                )),
+                INT_ID => values.push((
+                    tag_name,
+                    Tag::Int(data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                )),
+                LONG_ID => values.push((
+                    tag_name,
+                    Tag::Long(data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                )),
+                FLOAT_ID => values.push((
+                    tag_name,
+                    Tag::Float(data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                )),
+                DOUBLE_ID => values.push((
+                    tag_name,
+                    Tag::Double(data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                )),
                 BYTE_ARRAY_ID => {
                     values.push((tag_name, Tag::ByteArray(read_with_u32_length(data, 1)?)))
                 }
@@ -290,7 +308,11 @@ fn read_short_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i16>, Error> {
     let length = array_bytes.len() / 2;
     let mut shorts = Vec::with_capacity(length);
     for _ in 0..length {
-        shorts.push(array_bytes_cursor.read_i16::<BE>()?);
+        shorts.push(
+            array_bytes_cursor
+                .read_i16::<BE>()
+                .map_err(|_| Error::UnexpectedEof)?,
+        );
     }
     Ok(shorts)
 }
@@ -368,9 +390,9 @@ fn read_double_array(data: &mut Cursor<&[u8]>) -> Result<Vec<f64>, Error> {
     Ok(doubles)
 }
 
-fn swap_endianness_i32(bytes: &mut Vec<u8>, num: usize) {
+fn swap_endianness_i32(bytes: &mut [u8], num: usize) {
     for i in 0..num / 16 {
-        let simd: u8x64 = Simd::from_slice(&bytes[i * 16 * 4..(i + 1) * 16 * 4].as_ref());
+        let simd: u8x64 = Simd::from_slice(bytes[i * 16 * 4..(i + 1) * 16 * 4].as_ref());
         #[rustfmt::skip]
         let simd = simd_swizzle!(simd, [
             3, 2, 1, 0,
@@ -432,7 +454,7 @@ fn swap_endianness_i32(bytes: &mut Vec<u8>, num: usize) {
         bytes[i * 4..i * 4 + 8].copy_from_slice(simd.as_array());
         i += 2;
     }
-    if i + 1 <= num {
+    if i < num {
         let simd: u8x4 = Simd::from_slice(bytes[i * 4..i * 4 + 4].as_ref());
         #[rustfmt::skip]
         let simd = simd_swizzle!(simd, [
@@ -442,9 +464,9 @@ fn swap_endianness_i32(bytes: &mut Vec<u8>, num: usize) {
     }
 }
 
-fn swap_endianness_i64(bytes: &mut Vec<u8>, num: usize) {
+fn swap_endianness_i64(bytes: &mut [u8], num: usize) {
     for i in 0..num / 8 {
-        let simd: u8x64 = Simd::from_slice(&bytes[i * 64..i * 64 + 64].as_ref());
+        let simd: u8x64 = Simd::from_slice(bytes[i * 64..i * 64 + 64].as_ref());
         #[rustfmt::skip]
             let simd = simd_swizzle!(simd, [
                 7, 6, 5, 4, 3, 2, 1, 0,
@@ -482,7 +504,7 @@ fn swap_endianness_i64(bytes: &mut Vec<u8>, num: usize) {
         bytes[i * 8..i * 8 + 16].copy_from_slice(simd.as_array());
         i += 2;
     }
-    if i + 1 <= num {
+    if i < num {
         let simd: u8x8 = Simd::from_slice(bytes[i * 8..i * 8 + 8].as_ref());
         #[rustfmt::skip]
             let simd = simd_swizzle!(simd, [
@@ -610,7 +632,7 @@ impl<'a> ListTag<'a> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
-        let tag_type = data.read_u8()?;
+        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         Ok(match tag_type {
             END_ID => {
                 data.set_position(data.position() + 4);

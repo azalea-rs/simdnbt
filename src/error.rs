@@ -1,5 +1,3 @@
-use std::io;
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -12,6 +10,4 @@ pub enum Error {
     UnexpectedEof,
     #[error("Tried to read NBT tag with too high complexity, depth > 512")]
     MaxDepthExceeded,
-    #[error(transparent)]
-    Io(#[from] io::Error),
 }
