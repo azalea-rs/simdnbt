@@ -11,10 +11,12 @@
 //! assert_eq!(nbt.string("name").unwrap().to_str(), "Bananrama");
 //! ```
 
+#![feature(portable_simd)]
+
 mod error;
 mod mutf8;
 
-use std::{io::Cursor, ops::Deref, slice};
+use std::{io::Cursor, ops::Deref, simd::prelude::*, slice};
 
 use byteorder::{ReadBytesExt, BE};
 pub use error::Error;
@@ -70,7 +72,7 @@ fn read_u16(data: &mut Cursor<&[u8]>) -> Result<u16, Error> {
 
 #[inline(always)]
 fn read_with_u16_length<'a>(data: &mut Cursor<&'a [u8]>, width: usize) -> Result<&'a [u8], Error> {
-    let length: u16 = read_u16(data)?;
+    let length = read_u16(data)?;
     let length_in_bytes = length as usize * width;
     // make sure we don't read more than the length
     if data.get_ref().len() < data.position() as usize + length_in_bytes {
@@ -294,12 +296,88 @@ fn read_short_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i16>, Error> {
 }
 fn read_int_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i32>, Error> {
     let array_bytes = read_with_u32_length(data, 4)?;
-    let mut array_bytes_cursor = Cursor::new(array_bytes);
+    assert!(array_bytes.len() % 4 == 0);
     let length = array_bytes.len() / 4;
-    let mut ints = Vec::with_capacity(length);
-    for _ in 0..length {
-        ints.push(array_bytes_cursor.read_i32::<BE>()?);
+    let mut ints = array_bytes.to_vec();
+
+    for i in 0..length / 16 {
+        let simd: u8x64 = Simd::from_slice(&ints[i * 16 * 4..(i + 1) * 16 * 4].as_ref());
+        #[rustfmt::skip]
+        let simd = simd_swizzle!(simd, [
+            3, 2, 1, 0,
+            7, 6, 5, 4,
+            11, 10, 9, 8,
+            15, 14, 13, 12,
+            19, 18, 17, 16,
+            23, 22, 21, 20,
+            27, 26, 25, 24,
+            31, 30, 29, 28,
+            35, 34, 33, 32,
+            39, 38, 37, 36,
+            43, 42, 41, 40,
+            47, 46, 45, 44,
+            51, 50, 49, 48,
+            55, 54, 53, 52,
+            59, 58, 57, 56,
+            63, 62, 61, 60,
+        ]);
+        ints[i * 16 * 4..(i + 1) * 16 * 4].copy_from_slice(simd.as_array());
     }
+
+    let mut i = length / 16 * 16;
+    if i >= 8 {
+        let simd: u8x32 = Simd::from_slice(array_bytes[i * 4..i * 4 + 32].as_ref());
+        #[rustfmt::skip]
+        let simd = simd_swizzle!(simd, [
+            3, 2, 1, 0,
+            7, 6, 5, 4,
+            11, 10, 9, 8,
+            15, 14, 13, 12,
+            19, 18, 17, 16,
+            23, 22, 21, 20,
+            27, 26, 25, 24,
+            31, 30, 29, 28,
+        ]);
+        ints[i * 4..i * 4 + 32].copy_from_slice(simd.as_array());
+        i += 8;
+    }
+    if i >= 4 {
+        let simd: u8x16 = Simd::from_slice(array_bytes[i * 4..i * 4 + 16].as_ref());
+        #[rustfmt::skip]
+        let simd = simd_swizzle!(simd, [
+            3, 2, 1, 0,
+            7, 6, 5, 4,
+            11, 10, 9, 8,
+            15, 14, 13, 12,
+        ]);
+        ints[i * 4..i * 4 + 16].copy_from_slice(simd.as_array());
+        i += 4;
+    }
+    if i >= 2 {
+        let simd: u8x8 = Simd::from_slice(array_bytes[i * 4..i * 4 + 8].as_ref());
+        #[rustfmt::skip]
+        let simd = simd_swizzle!(simd, [
+            3, 2, 1, 0,
+            7, 6, 5, 4,
+        ]);
+        ints[i * 4..i * 4 + 8].copy_from_slice(simd.as_array());
+        i += 2;
+    }
+    if i >= 1 {
+        let simd: u8x4 = Simd::from_slice(array_bytes[i * 4..i * 4 + 4].as_ref());
+        #[rustfmt::skip]
+        let simd = simd_swizzle!(simd, [
+            3, 2, 1, 0,
+        ]);
+        ints[i * 4..i * 4 + 4].copy_from_slice(simd.as_array());
+    }
+
+    let ints = {
+        let ptr = ints.as_ptr() as *const i32;
+        std::mem::forget(ints);
+        unsafe { Vec::from_raw_parts(ptr as *mut i32, length, length) }
+    };
+
     Ok(ints)
 }
 fn read_long_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i64>, Error> {
@@ -631,6 +709,20 @@ mod tests {
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn inttest() {
+        let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../tests/inttest1023.nbt")))
+            .unwrap()
+            .unwrap();
+
+        let ints = nbt.list("").unwrap().ints().unwrap();
+
+        for (i, &item) in ints.iter().enumerate() {
+            assert_eq!(i as i32, item);
+        }
+        assert_eq!(ints.len(), 1023);
     }
 
     // #[test]
