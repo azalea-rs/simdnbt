@@ -296,12 +296,81 @@ fn read_short_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i16>, Error> {
 }
 fn read_int_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i32>, Error> {
     let array_bytes = read_with_u32_length(data, 4)?;
-    assert!(array_bytes.len() % 4 == 0);
     let length = array_bytes.len() / 4;
     let mut ints = array_bytes.to_vec();
 
-    for i in 0..length / 16 {
-        let simd: u8x64 = Simd::from_slice(&ints[i * 16 * 4..(i + 1) * 16 * 4].as_ref());
+    if cfg!(target_endian = "little") {
+        swap_endianness_i32(&mut ints, length);
+    }
+
+    let ints = {
+        let ptr = ints.as_ptr() as *const i32;
+        std::mem::forget(ints);
+        // SAFETY: the width provided to read_with_u32_length guarantees that it'll be a multiple of 4
+        unsafe { Vec::from_raw_parts(ptr as *mut i32, length, length) }
+    };
+
+    Ok(ints)
+}
+
+fn read_long_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i64>, Error> {
+    let array_bytes = read_with_u32_length(data, 8)?;
+    let length = array_bytes.len() / 8;
+    let mut ints = array_bytes.to_vec();
+
+    if cfg!(target_endian = "little") {
+        swap_endianness_i64(&mut ints, length);
+    }
+
+    let ints = {
+        let ptr = ints.as_ptr() as *const i64;
+        std::mem::forget(ints);
+        // SAFETY: the width provided to read_with_u32_length guarantees that it'll be a multiple of 8
+        unsafe { Vec::from_raw_parts(ptr as *mut i64, length, length) }
+    };
+
+    Ok(ints)
+}
+fn read_float_array(data: &mut Cursor<&[u8]>) -> Result<Vec<f32>, Error> {
+    let array_bytes = read_with_u32_length(data, 4)?;
+    let length = array_bytes.len() / 4;
+    let mut floats = array_bytes.to_vec();
+
+    if cfg!(target_endian = "little") {
+        swap_endianness_i32(&mut floats, length);
+    }
+
+    let floats = {
+        let ptr = floats.as_ptr() as *const f32;
+        std::mem::forget(floats);
+        // SAFETY: the width provided to read_with_u32_length guarantees that it'll be a multiple of 4
+        unsafe { Vec::from_raw_parts(ptr as *mut f32, length, length) }
+    };
+
+    Ok(floats)
+}
+fn read_double_array(data: &mut Cursor<&[u8]>) -> Result<Vec<f64>, Error> {
+    let array_bytes = read_with_u32_length(data, 8)?;
+    let length = array_bytes.len() / 8;
+    let mut doubles = array_bytes.to_vec();
+
+    if cfg!(target_endian = "little") {
+        swap_endianness_i64(&mut doubles, length);
+    }
+
+    let doubles = {
+        let ptr = doubles.as_ptr() as *const f64;
+        std::mem::forget(doubles);
+        // SAFETY: the width provided to read_with_u32_length guarantees that it'll be a multiple of 8
+        unsafe { Vec::from_raw_parts(ptr as *mut f64, length, length) }
+    };
+
+    Ok(doubles)
+}
+
+fn swap_endianness_i32(bytes: &mut Vec<u8>, num: usize) {
+    for i in 0..num / 16 {
+        let simd: u8x64 = Simd::from_slice(&bytes[i * 16 * 4..(i + 1) * 16 * 4].as_ref());
         #[rustfmt::skip]
         let simd = simd_swizzle!(simd, [
             3, 2, 1, 0,
@@ -321,12 +390,12 @@ fn read_int_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i32>, Error> {
             59, 58, 57, 56,
             63, 62, 61, 60,
         ]);
-        ints[i * 16 * 4..(i + 1) * 16 * 4].copy_from_slice(simd.as_array());
+        bytes[i * 16 * 4..(i + 1) * 16 * 4].copy_from_slice(simd.as_array());
     }
 
-    let mut i = length / 16 * 16;
-    if i >= 8 {
-        let simd: u8x32 = Simd::from_slice(array_bytes[i * 4..i * 4 + 32].as_ref());
+    let mut i = num / 16 * 16;
+    if i + 8 <= num {
+        let simd: u8x32 = Simd::from_slice(bytes[i * 4..i * 4 + 32].as_ref());
         #[rustfmt::skip]
         let simd = simd_swizzle!(simd, [
             3, 2, 1, 0,
@@ -338,11 +407,11 @@ fn read_int_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i32>, Error> {
             27, 26, 25, 24,
             31, 30, 29, 28,
         ]);
-        ints[i * 4..i * 4 + 32].copy_from_slice(simd.as_array());
+        bytes[i * 4..i * 4 + 32].copy_from_slice(simd.as_array());
         i += 8;
     }
-    if i >= 4 {
-        let simd: u8x16 = Simd::from_slice(array_bytes[i * 4..i * 4 + 16].as_ref());
+    if i + 4 <= num {
+        let simd: u8x16 = Simd::from_slice(bytes[i * 4..i * 4 + 16].as_ref());
         #[rustfmt::skip]
         let simd = simd_swizzle!(simd, [
             3, 2, 1, 0,
@@ -350,66 +419,79 @@ fn read_int_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i32>, Error> {
             11, 10, 9, 8,
             15, 14, 13, 12,
         ]);
-        ints[i * 4..i * 4 + 16].copy_from_slice(simd.as_array());
+        bytes[i * 4..i * 4 + 16].copy_from_slice(simd.as_array());
         i += 4;
     }
-    if i >= 2 {
-        let simd: u8x8 = Simd::from_slice(array_bytes[i * 4..i * 4 + 8].as_ref());
+    if i + 2 <= num {
+        let simd: u8x8 = Simd::from_slice(bytes[i * 4..i * 4 + 8].as_ref());
         #[rustfmt::skip]
         let simd = simd_swizzle!(simd, [
             3, 2, 1, 0,
             7, 6, 5, 4,
         ]);
-        ints[i * 4..i * 4 + 8].copy_from_slice(simd.as_array());
+        bytes[i * 4..i * 4 + 8].copy_from_slice(simd.as_array());
         i += 2;
     }
-    if i >= 1 {
-        let simd: u8x4 = Simd::from_slice(array_bytes[i * 4..i * 4 + 4].as_ref());
+    if i + 1 <= num {
+        let simd: u8x4 = Simd::from_slice(bytes[i * 4..i * 4 + 4].as_ref());
         #[rustfmt::skip]
         let simd = simd_swizzle!(simd, [
             3, 2, 1, 0,
         ]);
-        ints[i * 4..i * 4 + 4].copy_from_slice(simd.as_array());
+        bytes[i * 4..i * 4 + 4].copy_from_slice(simd.as_array());
+    }
+}
+
+fn swap_endianness_i64(bytes: &mut Vec<u8>, num: usize) {
+    for i in 0..num / 8 {
+        let simd: u8x64 = Simd::from_slice(&bytes[i * 64..i * 64 + 64].as_ref());
+        #[rustfmt::skip]
+            let simd = simd_swizzle!(simd, [
+                7, 6, 5, 4, 3, 2, 1, 0,
+                15, 14, 13, 12, 11, 10, 9, 8,
+                23, 22, 21, 20, 19, 18, 17, 16,
+                31, 30, 29, 28, 27, 26, 25, 24,
+                39, 38, 37, 36, 35, 34, 33, 32,
+                47, 46, 45, 44, 43, 42, 41, 40,
+                55, 54, 53, 52, 51, 50, 49, 48,
+                63, 62, 61, 60, 59, 58, 57, 56,
+            ]);
+        bytes[i * 64..i * 64 + 64].copy_from_slice(simd.as_array());
     }
 
-    let ints = {
-        let ptr = ints.as_ptr() as *const i32;
-        std::mem::forget(ints);
-        unsafe { Vec::from_raw_parts(ptr as *mut i32, length, length) }
-    };
+    let mut i = num / 8 * 8;
+    if i + 4 <= num {
+        let simd: u8x32 = Simd::from_slice(bytes[i * 8..i * 8 + 32].as_ref());
+        #[rustfmt::skip]
+            let simd = simd_swizzle!(simd, [
+                7, 6, 5, 4, 3, 2, 1, 0,
+                15, 14, 13, 12, 11, 10, 9, 8,
+                23, 22, 21, 20, 19, 18, 17, 16,
+                31, 30, 29, 28, 27, 26, 25, 24,
+            ]);
+        bytes[i * 8..i * 8 + 32].copy_from_slice(simd.as_array());
+        i += 4;
+    }
+    if i + 2 <= num {
+        let simd: u8x16 = Simd::from_slice(bytes[i * 8..i * 8 + 16].as_ref());
+        #[rustfmt::skip]
+            let simd = simd_swizzle!(simd, [
+                7, 6, 5, 4, 3, 2, 1, 0,
+                15, 14, 13, 12, 11, 10, 9, 8,
+            ]);
+        bytes[i * 8..i * 8 + 16].copy_from_slice(simd.as_array());
+        i += 2;
+    }
+    if i + 1 <= num {
+        let simd: u8x8 = Simd::from_slice(bytes[i * 8..i * 8 + 8].as_ref());
+        #[rustfmt::skip]
+            let simd = simd_swizzle!(simd, [
+                7, 6, 5, 4, 3, 2, 1, 0,
+            ]);
+        bytes[i * 8..i * 8 + 8].copy_from_slice(simd.as_array());
+    }
+}
 
-    Ok(ints)
-}
-fn read_long_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i64>, Error> {
-    let array_bytes = read_with_u32_length(data, 8)?;
-    let mut array_bytes_cursor = Cursor::new(array_bytes);
-    let length = array_bytes.len() / 8;
-    let mut longs = Vec::with_capacity(length);
-    for _ in 0..length {
-        longs.push(array_bytes_cursor.read_i64::<BE>()?);
-    }
-    Ok(longs)
-}
-fn read_float_array(data: &mut Cursor<&[u8]>) -> Result<Vec<f32>, Error> {
-    let array_bytes = read_with_u32_length(data, 4)?;
-    let mut array_bytes_cursor = Cursor::new(array_bytes);
-    let length = array_bytes.len() / 4;
-    let mut floats = Vec::with_capacity(length);
-    for _ in 0..length {
-        floats.push(array_bytes_cursor.read_f32::<BE>()?);
-    }
-    Ok(floats)
-}
-fn read_double_array(data: &mut Cursor<&[u8]>) -> Result<Vec<f64>, Error> {
-    let array_bytes = read_with_u32_length(data, 8)?;
-    let mut array_bytes_cursor = Cursor::new(array_bytes);
-    let length = array_bytes.len() / 8;
-    let mut doubles = Vec::with_capacity(length);
-    for _ in 0..length {
-        doubles.push(array_bytes_cursor.read_f64::<BE>()?);
-    }
-    Ok(doubles)
-}
 fn slice_u8_into_i8(s: &[u8]) -> &[i8] {
     unsafe { slice::from_raw_parts(s.as_ptr() as *const i8, s.len()) }
 }
@@ -712,7 +794,7 @@ mod tests {
     }
 
     #[test]
-    fn inttest() {
+    fn inttest_1023() {
         let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../tests/inttest1023.nbt")))
             .unwrap()
             .unwrap();
@@ -721,6 +803,75 @@ mod tests {
 
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
+        }
+        assert_eq!(ints.len(), 1023);
+    }
+
+    #[test]
+    fn inttest_1024() {
+        use byteorder::WriteBytesExt;
+        let mut data = Vec::new();
+        data.write_u8(COMPOUND_ID).unwrap();
+        data.write_u16::<BE>(0).unwrap();
+        data.write_u8(LIST_ID).unwrap();
+        data.write_u16::<BE>(0).unwrap();
+        data.write_u8(INT_ID).unwrap();
+        data.write_i32::<BE>(1024).unwrap();
+        for i in 0..1024 {
+            data.write_i32::<BE>(i).unwrap();
+        }
+        data.write_u8(END_ID).unwrap();
+
+        let nbt = Nbt::new(&mut Cursor::new(&data)).unwrap().unwrap();
+        let ints = nbt.list("").unwrap().ints().unwrap();
+        for (i, &item) in ints.iter().enumerate() {
+            assert_eq!(i as i32, item);
+        }
+        assert_eq!(ints.len(), 1024);
+    }
+
+    #[test]
+    fn inttest_1021() {
+        use byteorder::WriteBytesExt;
+        let mut data = Vec::new();
+        data.write_u8(COMPOUND_ID).unwrap();
+        data.write_u16::<BE>(0).unwrap();
+        data.write_u8(LIST_ID).unwrap();
+        data.write_u16::<BE>(0).unwrap();
+        data.write_u8(INT_ID).unwrap();
+        data.write_i32::<BE>(1021).unwrap();
+        for i in 0..1021 {
+            data.write_i32::<BE>(i).unwrap();
+        }
+        data.write_u8(END_ID).unwrap();
+
+        let nbt = Nbt::new(&mut Cursor::new(&data)).unwrap().unwrap();
+        let ints = nbt.list("").unwrap().ints().unwrap();
+        for (i, &item) in ints.iter().enumerate() {
+            assert_eq!(i as i32, item);
+        }
+        assert_eq!(ints.len(), 1021);
+    }
+
+    #[test]
+    fn longtest_1023() {
+        use byteorder::WriteBytesExt;
+        let mut data = Vec::new();
+        data.write_u8(COMPOUND_ID).unwrap();
+        data.write_u16::<BE>(0).unwrap();
+        data.write_u8(LIST_ID).unwrap();
+        data.write_u16::<BE>(0).unwrap();
+        data.write_u8(LONG_ID).unwrap();
+        data.write_i32::<BE>(1023).unwrap();
+        for i in 0..1023 {
+            data.write_i64::<BE>(i).unwrap();
+        }
+        data.write_u8(END_ID).unwrap();
+
+        let nbt = Nbt::new(&mut Cursor::new(&data)).unwrap().unwrap();
+        let ints = nbt.list("").unwrap().longs().unwrap();
+        for (i, &item) in ints.iter().enumerate() {
+            assert_eq!(i as i64, item);
         }
         assert_eq!(ints.len(), 1023);
     }
