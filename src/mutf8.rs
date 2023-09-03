@@ -35,7 +35,8 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         }
     }
     if remainder.len() > 8 {
-        let (chunk, remainder) = remainder.split_array_ref::<8>();
+        let chunk;
+        (chunk, remainder) = remainder.split_array_ref::<8>();
         let mask = u8x8::splat(0b10000000);
         let zero = u8x8::splat(0);
         let simd = u8x8::from_array(*chunk);
@@ -43,10 +44,10 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         if xor != zero {
             is_plain_ascii = false;
         }
-        for &byte in remainder {
-            if byte & 0b10000000 != 0 {
-                is_plain_ascii = false;
-            }
+    }
+    for &byte in remainder {
+        if byte & 0b10000000 != 0 {
+            is_plain_ascii = false;
         }
     }
 
