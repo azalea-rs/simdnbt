@@ -11,8 +11,10 @@ simdnbt might be the fastest nbt decoder currently in existence. however to achi
 2. it doesn't validate/decode the mutf-8 strings at decode-time
 
 here's a benchmark comparing simdnbt against a few of the other fastest nbt crates (though without actually accessing the data):
+
 ![simdnbt is ~3x faster than the second fastest nbt crate](https://github.com/mat-1/simdnbt/assets/27899617/03a4f916-d162-4a23-aa1a-12f1b11dc903)
 
 
 and here's a benchmark where it accesses the data and makes it owned:
+
 ![simdnbt is only about 50% faster than the second fastest in this one](https://github.com/mat-1/simdnbt/assets/27899617/9d716c39-3bff-4703-99d7-2bec91c6b205)

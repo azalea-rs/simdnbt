@@ -62,60 +62,29 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
         })
     });
 
-    // group.bench_function("valence_parse", |b| {
-    //     b.iter(|| {
-    //         let input = black_box(input);
-    //         let nbt = valence_nbt::Compound::from_binary(&mut &input[..]).unwrap();
-    //         black_box(nbt);
-    //     })
-    // });
+    group.bench_function("valence_parse", |b| {
+        b.iter(|| {
+            let input = black_box(input);
+            let nbt = valence_nbt::Compound::from_binary(&mut &input[..]).unwrap();
+            black_box(nbt);
+        })
+    });
 
-    // group.bench_function("fastnbt_parse", |b| {
-    //     b.iter(|| {
-    //         let input = black_box(input);
-    //         let nbt: fastnbt::Value = fastnbt::from_bytes(input).unwrap();
-    //         black_box(nbt);
-    //     })
-    // });
+    group.bench_function("fastnbt_parse", |b| {
+        b.iter(|| {
+            let input = black_box(input);
+            let nbt: fastnbt::Value = fastnbt::from_bytes(input).unwrap();
+            black_box(nbt);
+        })
+    });
 
-    // group.bench_function("hematite_parse", |b| {
-    //     b.iter(|| {
-    //         let input = black_box(input);
-    //         let nbt = nbt::Blob::from_reader(&mut Cursor::new(input)).unwrap();
-    //         black_box(nbt);
-    //     })
-    // });
-
-    // // writing
-
-    // let nbt = azalea_nbt::Nbt::read_from(&mut Cursor::new(input)).unwrap();
-    // group.bench_function("azalea_write", |b| {
-    //     b.iter(|| {
-    //         let nbt = black_box(&nbt);
-    //         let mut written = Vec::new();
-    //         nbt.write(&mut written);
-    //         black_box(written);
-    //     })
-    // });
-
-    // let nbt = graphite_binary::nbt::decode::read(&mut &input[..]).unwrap();
-    // group.bench_function("graphite_write", |b| {
-    //     b.iter(|| {
-    //         let nbt = black_box(&nbt);
-    //         let written = graphite_binary::nbt::encode::write(nbt);
-    //         black_box(written);
-    //     })
-    // });
-
-    // let nbt = valence_nbt::from_binary_slice(&mut &input[..]).unwrap();
-    // group.bench_function("valence_write", |b| {
-    //     b.iter(|| {
-    //         let nbt = black_box(&nbt);
-    //         let mut written = Vec::new();
-    //         valence_nbt::to_binary_writer(&mut written, &nbt.0,
-    // &nbt.1).unwrap();         black_box(written);
-    //     })
-    // });
+    group.bench_function("hematite_parse", |b| {
+        b.iter(|| {
+            let input = black_box(input);
+            let nbt = nbt::Blob::from_reader(&mut Cursor::new(input)).unwrap();
+            black_box(nbt);
+        })
+    });
 }
 
 fn bench(c: &mut Criterion) {
