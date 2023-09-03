@@ -4,6 +4,7 @@ use std::{
     borrow::{Borrow, Cow},
     fmt, mem,
     ops::Deref,
+    simd::prelude::*,
 };
 
 /// A M-UTF8 string slice. This is how strings are represented internally in NBT.
@@ -20,19 +21,22 @@ pub struct Mutf8String {
 #[inline]
 fn is_plain_ascii(slice: &[u8]) -> bool {
     let mut is_plain_ascii = true;
-    let chunks_exact = slice.array_chunks::<4>();
-    let remainder = chunks_exact.remainder();
-    for &byte in remainder {
-        if byte & 0b1000_0000 != 0 {
+    let chunks_exact = slice.array_chunks::<32>();
+    for &byte in chunks_exact.remainder() {
+        if byte & 0b10000000 != 0 {
             is_plain_ascii = false;
         }
     }
+    let mask = u8x32::splat(0b10000000);
+    let zero = u8x32::splat(0);
     for &chunk in chunks_exact {
-        let chunk = u32::from_be_bytes(chunk);
-        if chunk & 0b10000000_10000000_10000000_10000000 != 0 {
+        let simd = u8x32::from_array(chunk);
+        let xor = simd & mask;
+        if xor != zero {
             is_plain_ascii = false;
         }
     }
+
     is_plain_ascii
 }
 

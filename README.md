@@ -2,7 +2,9 @@
 
 an unnecessarily fast nbt decoder. like seriously you probably don't need this unless you're trying to win benchmarks.
 
-simdnbt currently only makes use of simd instructions for swapping the endianness of arrays, and tbh that's really only there so i can call it "simdnbt" without lying. the name is mostly a play on simdjson.
+simdnbt currently makes use of simd instructions for two things:
+- swapping the endianness of int arrays
+- checking if a string is plain ascii for faster mutf8 to utf8 conversion
 
 simdnbt might be the fastest nbt decoder currently in existence. however to achieve this silly speed, it takes a couple of shortcuts:
 1. it requires a reference to the original data (to avoid cloning)

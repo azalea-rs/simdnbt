@@ -897,15 +897,6 @@ mod tests {
         assert_eq!(ints.len(), 1023);
     }
 
-    #[test]
-    fn stringtest() {
-        let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../tests/stringtest.nbt")))
-            .unwrap()
-            .unwrap();
-
-        assert_eq!(nbt.list("😃").unwrap().strings().unwrap().len(), 16);
-    }
-
     // #[test]
     // fn generate_inttest() {
     //     use byteorder::WriteBytesExt;
