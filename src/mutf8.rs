@@ -21,15 +21,38 @@ pub struct Mutf8String {
 #[inline]
 fn is_plain_ascii(slice: &[u8]) -> bool {
     let mut is_plain_ascii = true;
-    let chunks_exact = slice.array_chunks::<32>();
-    for &byte in chunks_exact.remainder() {
-        if byte & 0b10000000 != 0 {
+    let chunks_32_exact = slice.array_chunks::<32>();
+    let mut remainder = chunks_32_exact.remainder();
+    if remainder.len() > 16 {
+        let chunk;
+        (chunk, remainder) = remainder.split_array_ref::<16>();
+        let mask = u8x16::splat(0b10000000);
+        let zero = u8x16::splat(0);
+        let simd = u8x16::from_array(*chunk);
+        let xor = simd & mask;
+        if xor != zero {
             is_plain_ascii = false;
         }
     }
-    let mask = u8x32::splat(0b10000000);
-    let zero = u8x32::splat(0);
-    for &chunk in chunks_exact {
+    if remainder.len() > 8 {
+        let (chunk, remainder) = remainder.split_array_ref::<8>();
+        let mask = u8x8::splat(0b10000000);
+        let zero = u8x8::splat(0);
+        let simd = u8x8::from_array(*chunk);
+        let xor = simd & mask;
+        if xor != zero {
+            is_plain_ascii = false;
+        }
+        for &byte in remainder {
+            if byte & 0b10000000 != 0 {
+                is_plain_ascii = false;
+            }
+        }
+    }
+
+    for &chunk in chunks_32_exact {
+        let mask = u8x32::splat(0b10000000);
+        let zero = u8x32::splat(0);
         let simd = u8x32::from_array(chunk);
         let xor = simd & mask;
         if xor != zero {

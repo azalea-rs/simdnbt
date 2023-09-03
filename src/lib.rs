@@ -13,6 +13,7 @@
 
 #![feature(portable_simd)]
 #![feature(array_chunks)]
+#![feature(split_array)]
 
 mod error;
 mod mutf8;
