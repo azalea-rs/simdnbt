@@ -772,6 +772,7 @@ impl<'a> ListTag<'a> {
 mod tests {
     use std::io::Read;
 
+    use byteorder::WriteBytesExt;
     use flate2::read::GzDecoder;
 
     use super::*;
@@ -831,7 +832,6 @@ mod tests {
 
     #[test]
     fn inttest_1024() {
-        use byteorder::WriteBytesExt;
         let mut data = Vec::new();
         data.write_u8(COMPOUND_ID).unwrap();
         data.write_u16::<BE>(0).unwrap();
@@ -854,7 +854,6 @@ mod tests {
 
     #[test]
     fn inttest_1021() {
-        use byteorder::WriteBytesExt;
         let mut data = Vec::new();
         data.write_u8(COMPOUND_ID).unwrap();
         data.write_u16::<BE>(0).unwrap();
@@ -877,7 +876,6 @@ mod tests {
 
     #[test]
     fn longtest_1023() {
-        use byteorder::WriteBytesExt;
         let mut data = Vec::new();
         data.write_u8(COMPOUND_ID).unwrap();
         data.write_u16::<BE>(0).unwrap();
@@ -898,6 +896,15 @@ mod tests {
         assert_eq!(ints.len(), 1023);
     }
 
+    #[test]
+    fn stringtest() {
+        let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../tests/stringtest.nbt")))
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(nbt.list("😃").unwrap().strings().unwrap().len(), 16);
+    }
+
     // #[test]
     // fn generate_inttest() {
     //     use byteorder::WriteBytesExt;
@@ -915,5 +922,19 @@ mod tests {
     //     out.write_u8(END_ID).unwrap();
 
     //     std::fs::write("tests/inttest1023.nbt", out).unwrap();
+    // }
+
+    // #[test]
+    // fn generate_stringtest() {
+    //     let mut out = Vec::new();
+    //     out.write_u8(COMPOUND_ID).unwrap();
+    //     out.write_u16::<BE>(0).unwrap();
+    //     out.write_u8(LIST_ID).unwrap();
+    //     out.write_u16::<BE>(0).unwrap();
+    //     out.write_u8(STRING_ID).unwrap();
+    //     out.write_i32::<BE>(16).unwrap();
+    //     out.extend_from_slice(&std::fs::read("tests/stringtest.nbt").unwrap().as_slice()[13..]);
+    //     out.write_u8(END_ID).unwrap();
+    //     std::fs::write("tests/stringtest2.nbt", out).unwrap();
     // }
 }

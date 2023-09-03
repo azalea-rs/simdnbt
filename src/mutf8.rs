@@ -35,9 +35,22 @@ impl Mutf8Str {
         }
     }
     pub fn to_str(&self) -> Cow<str> {
-        match mutf8::decode(&self.slice).expect("Mutf8Str must alwaus be valid MUTF-8") {
-            Cow::Borrowed(b) => Cow::Borrowed(b),
-            Cow::Owned(o) => Cow::Owned(o),
+        // fast check to skip if none of the bytes have the top bit set or are null
+        let mut is_not_ascii = false;
+        for &byte in self.slice.into_iter() {
+            if byte & 0b1000_0000 != 0 || byte == 0 {
+                is_not_ascii = true;
+            }
+        }
+
+        if is_not_ascii {
+            return match mutf8::decode(&self.slice).expect("Mutf8Str must alwaus be valid MUTF-8") {
+                Cow::Borrowed(b) => Cow::Borrowed(b),
+                Cow::Owned(o) => Cow::Owned(o),
+            };
+        } else {
+            // SAFETY: &[u8] and &str are the same layout.
+            unsafe { Cow::Borrowed(mem::transmute(self.slice.as_ref())) }
         }
     }
 }
