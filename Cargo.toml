@@ -23,7 +23,7 @@ hematite-nbt = { version = "0.5.2", default-features = false }
 
 [profile.release]
 lto = true
-# debug = true
+debug = true
 
 [profile.bench]
 lto = true
@@ -36,6 +36,10 @@ name = "nbt"
 [[bench]]
 harness = false
 name = "compare"
+
+[[bench]]
+harness = false
+name = "compare_realworld"
 
 [[bench]]
 harness = false

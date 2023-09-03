@@ -12,6 +12,7 @@
 //! ```
 
 #![feature(portable_simd)]
+#![feature(array_chunks)]
 
 mod error;
 mod mutf8;
@@ -322,7 +323,7 @@ fn read_int_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i32>, Error> {
     let mut ints = array_bytes.to_vec();
 
     if cfg!(target_endian = "little") {
-        swap_endianness_i32(&mut ints, length);
+        swap_endianness_32bit(&mut ints, length);
     }
 
     let ints = {
@@ -341,7 +342,7 @@ fn read_long_array(data: &mut Cursor<&[u8]>) -> Result<Vec<i64>, Error> {
     let mut ints = array_bytes.to_vec();
 
     if cfg!(target_endian = "little") {
-        swap_endianness_i64(&mut ints, length);
+        swap_endianness_64bit(&mut ints, length);
     }
 
     let ints = {
@@ -359,7 +360,7 @@ fn read_float_array(data: &mut Cursor<&[u8]>) -> Result<Vec<f32>, Error> {
     let mut floats = array_bytes.to_vec();
 
     if cfg!(target_endian = "little") {
-        swap_endianness_i32(&mut floats, length);
+        swap_endianness_32bit(&mut floats, length);
     }
 
     let floats = {
@@ -377,7 +378,7 @@ fn read_double_array(data: &mut Cursor<&[u8]>) -> Result<Vec<f64>, Error> {
     let mut doubles = array_bytes.to_vec();
 
     if cfg!(target_endian = "little") {
-        swap_endianness_i64(&mut doubles, length);
+        swap_endianness_64bit(&mut doubles, length);
     }
 
     let doubles = {
@@ -390,7 +391,7 @@ fn read_double_array(data: &mut Cursor<&[u8]>) -> Result<Vec<f64>, Error> {
     Ok(doubles)
 }
 
-fn swap_endianness_i32(bytes: &mut [u8], num: usize) {
+fn swap_endianness_32bit(bytes: &mut [u8], num: usize) {
     for i in 0..num / 16 {
         let simd: u8x64 = Simd::from_slice(bytes[i * 16 * 4..(i + 1) * 16 * 4].as_ref());
         #[rustfmt::skip]
@@ -464,7 +465,7 @@ fn swap_endianness_i32(bytes: &mut [u8], num: usize) {
     }
 }
 
-fn swap_endianness_i64(bytes: &mut [u8], num: usize) {
+fn swap_endianness_64bit(bytes: &mut [u8], num: usize) {
     for i in 0..num / 8 {
         let simd: u8x64 = Simd::from_slice(bytes[i * 64..i * 64 + 64].as_ref());
         #[rustfmt::skip]

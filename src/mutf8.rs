@@ -17,6 +17,25 @@ pub struct Mutf8String {
     vec: Vec<u8>,
 }
 
+#[inline]
+fn is_plain_ascii(slice: &[u8]) -> bool {
+    let mut is_plain_ascii = true;
+    let chunks_exact = slice.array_chunks::<4>();
+    let remainder = chunks_exact.remainder();
+    for &byte in remainder {
+        if byte & 0b1000_0000 != 0 {
+            is_plain_ascii = false;
+        }
+    }
+    for &chunk in chunks_exact {
+        let chunk = u32::from_be_bytes(chunk);
+        if chunk & 0b10000000_10000000_10000000_10000000 != 0 {
+            is_plain_ascii = false;
+        }
+    }
+    is_plain_ascii
+}
+
 impl Mutf8Str {
     pub fn to_string_lossy(&self) -> Cow<str> {
         String::from_utf8_lossy(&self.slice)
@@ -25,40 +44,35 @@ impl Mutf8Str {
     #[inline]
     pub fn from_slice(slice: &[u8]) -> &Mutf8Str {
         // SAFETY: &[u8] and &Mutf8Str are the same layout.
-        unsafe { mem::transmute(slice) }
+        unsafe { mem::transmute::<&[u8], &Mutf8Str>(slice) }
     }
 
+    // we can't implement FromStr on Cow<Mutf8Str>
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Cow<Mutf8Str> {
         match mutf8::encode(s) {
             Cow::Borrowed(b) => Cow::Borrowed(Mutf8Str::from_slice(b)),
             Cow::Owned(o) => Cow::Owned(Mutf8String { vec: o }),
         }
     }
+
     pub fn to_str(&self) -> Cow<str> {
         // fast check to skip if none of the bytes have the top bit set or are null
-        let mut is_not_ascii = false;
-        for &byte in self.slice.into_iter() {
-            if byte & 0b1000_0000 != 0 || byte == 0 {
-                is_not_ascii = true;
-            }
-        }
-
-        if is_not_ascii {
-            return match mutf8::decode(&self.slice).expect("Mutf8Str must alwaus be valid MUTF-8") {
+        if is_plain_ascii(&self.slice) {
+            // SAFETY: &[u8] and &str are the same layout.
+            unsafe { Cow::Borrowed(std::str::from_utf8_unchecked(&self.slice)) }
+        } else {
+            match mutf8::decode(&self.slice).expect("Mutf8Str must alwaus be valid MUTF-8") {
                 Cow::Borrowed(b) => Cow::Borrowed(b),
                 Cow::Owned(o) => Cow::Owned(o),
-            };
-        } else {
-            // SAFETY: &[u8] and &str are the same layout.
-            unsafe { Cow::Borrowed(mem::transmute(self.slice.as_ref())) }
+            }
         }
     }
 }
 
 impl fmt::Display for Mutf8Str {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let self_as_str = self.to_str();
-        self_as_str.fmt(f)
+        f.write_str(&self.to_str())
     }
 }
 
@@ -81,6 +95,18 @@ impl Mutf8String {
     #[inline]
     pub fn as_str(&self) -> &Mutf8Str {
         Mutf8Str::from_slice(self.vec.as_slice())
+    }
+
+    pub fn into_string(self) -> String {
+        if is_plain_ascii(&self.vec) {
+            // SAFETY: &[u8] and &str are the same layout.
+            unsafe { String::from_utf8_unchecked(self.vec) }
+        } else {
+            match mutf8::decode(&self.vec).expect("Mutf8Str must alwaus be valid MUTF-8") {
+                Cow::Borrowed(b) => b.to_owned(),
+                Cow::Owned(o) => o,
+            }
+        }
     }
 }
 impl Deref for Mutf8String {

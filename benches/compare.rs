@@ -62,29 +62,29 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
         })
     });
 
-    group.bench_function("valence_parse", |b| {
-        b.iter(|| {
-            let input = black_box(input);
-            let nbt = valence_nbt::Compound::from_binary(&mut &input[..]).unwrap();
-            black_box(nbt);
-        })
-    });
+    // group.bench_function("valence_parse", |b| {
+    //     b.iter(|| {
+    //         let input = black_box(input);
+    //         let nbt = valence_nbt::Compound::from_binary(&mut &input[..]).unwrap();
+    //         black_box(nbt);
+    //     })
+    // });
 
-    group.bench_function("fastnbt_parse", |b| {
-        b.iter(|| {
-            let input = black_box(input);
-            let nbt: fastnbt::Value = fastnbt::from_bytes(input).unwrap();
-            black_box(nbt);
-        })
-    });
+    // group.bench_function("fastnbt_parse", |b| {
+    //     b.iter(|| {
+    //         let input = black_box(input);
+    //         let nbt: fastnbt::Value = fastnbt::from_bytes(input).unwrap();
+    //         black_box(nbt);
+    //     })
+    // });
 
-    group.bench_function("hematite_parse", |b| {
-        b.iter(|| {
-            let input = black_box(input);
-            let nbt = nbt::Blob::from_reader(&mut Cursor::new(input)).unwrap();
-            black_box(nbt);
-        })
-    });
+    // group.bench_function("hematite_parse", |b| {
+    //     b.iter(|| {
+    //         let input = black_box(input);
+    //         let nbt = nbt::Blob::from_reader(&mut Cursor::new(input)).unwrap();
+    //         black_box(nbt);
+    //     })
+    // });
 
     // // writing
 
