@@ -10,7 +10,8 @@ simdnbt might be the fastest nbt decoder currently in existence. however to achi
 1. it requires a reference to the original data (to avoid cloning)
 2. it doesn't validate/decode the mutf-8 strings at decode-time
 
-here's a benchmark with the two other fastest nbt crates (azalea-nbt was also made by me):
-![simdnbt is ~3x faster than the second fastest nbt crate](https://github.com/mat-1/simdnbt/assets/27899617/4c252b98-628c-4d81-92cd-3c8e1a7bd023)
+here's a benchmark where it only deserializes the data but keeps it as references:
+![simdnbt is ~3x faster than the second fastest nbt crate](https://github.com/mat-1/simdnbt/assets/27899617/8e69f817-f99c-4305-8447-51d63cee6108)
 
-take this with a grain of salt as they're not all doing the same work. regardless, you can still see it's very fast.
+and here's a benchmark where it actually accesses the data and makes it owned:
+![simdnbt is only about 50% faster than the second fastest in this one](https://github.com/mat-1/simdnbt/assets/27899617/9d716c39-3bff-4703-99d7-2bec91c6b205)
