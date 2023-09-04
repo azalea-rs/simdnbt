@@ -12,8 +12,14 @@ fn bench(c: &mut Criterion) {
             black_box(input.to_str());
         })
     });
-    group.bench_function("to_string", |b| {
+    group.bench_function("to_string long", |b| {
         let input = black_box(Mutf8Str::from_slice(b"asgwjiebrtiowuubrtiowerthb8qwertyuwerpotihnqwiortuhbweinoqwner9opiquwehuiowrtjbwerioltubnwrioutunqweol;rkinqweuiorbqweruiqvbwefP;WOEJ  Q0OEPWRIYGYUIEDRYASZTFHGC Ijkbuiljfn qwilrtb qsokjladfnqiowugrtbquiowerbq   we;roiqwerghqwioerhd5rtea456etrsdyutrioutyopuipjklhkjfgghjdffghasdgxvncm,bn,.bnioug78yufvukyhfyutdyf"));
+        b.iter(|| {
+            black_box(input.to_string());
+        })
+    });
+    group.bench_function("to_string short", |b| {
+        let input = black_box(Mutf8Str::from_slice(b"hello world"));
         b.iter(|| {
             black_box(input.to_string());
         })

@@ -29,18 +29,6 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
             let input = black_box(input);
             let nbt = azalea_nbt::Nbt::read(&mut Cursor::new(input)).unwrap();
             black_box(nbt);
-            // black_box(
-            //     nbt.as_compound()
-            //         .unwrap()
-            //         .get("")
-            //         .unwrap()
-            //         .as_compound()
-            //         .unwrap()
-            //         .get("PersistentId")
-            //         .unwrap()
-            //         .as_int()
-            //         .unwrap(),
-            // );
         })
     });
 
@@ -49,7 +37,6 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
             let input = black_box(input);
             let nbt = graphite_binary::nbt::decode::read(&mut &input[..]).unwrap();
             black_box(nbt);
-            // black_box(nbt.find_root("PersistentId").unwrap().as_int());
         })
     });
 
@@ -57,34 +44,34 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
         b.iter(|| {
             let input = black_box(input);
             let nbt = simdnbt::Nbt::new(&mut Cursor::new(input)).unwrap().unwrap();
-            black_box(nbt);
-            // black_box(nbt.int("PersistentId").unwrap());
-        })
-    });
-
-    group.bench_function("valence_parse", |b| {
-        b.iter(|| {
-            let input = black_box(input);
-            let nbt = valence_nbt::Compound::from_binary(&mut &input[..]).unwrap();
+            let _ = black_box(nbt.list("").unwrap().ints());
             black_box(nbt);
         })
     });
 
-    group.bench_function("fastnbt_parse", |b| {
-        b.iter(|| {
-            let input = black_box(input);
-            let nbt: fastnbt::Value = fastnbt::from_bytes(input).unwrap();
-            black_box(nbt);
-        })
-    });
+    // group.bench_function("valence_parse", |b| {
+    //     b.iter(|| {
+    //         let input = black_box(input);
+    //         let nbt = valence_nbt::Compound::from_binary(&mut &input[..]).unwrap();
+    //         black_box(nbt);
+    //     })
+    // });
 
-    group.bench_function("hematite_parse", |b| {
-        b.iter(|| {
-            let input = black_box(input);
-            let nbt = nbt::Blob::from_reader(&mut Cursor::new(input)).unwrap();
-            black_box(nbt);
-        })
-    });
+    // group.bench_function("fastnbt_parse", |b| {
+    //     b.iter(|| {
+    //         let input = black_box(input);
+    //         let nbt: fastnbt::Value = fastnbt::from_bytes(input).unwrap();
+    //         black_box(nbt);
+    //     })
+    // });
+
+    // group.bench_function("hematite_parse", |b| {
+    //     b.iter(|| {
+    //         let input = black_box(input);
+    //         let nbt = nbt::Blob::from_reader(&mut Cursor::new(input)).unwrap();
+    //         black_box(nbt);
+    //     })
+    // });
 }
 
 fn bench(c: &mut Criterion) {
@@ -92,9 +79,9 @@ fn bench(c: &mut Criterion) {
     // bench_read_file("bigtest.nbt", c);
     // bench_read_file("simple_player.dat", c);
     bench_read_file("complex_player.dat", c);
-    // bench_read_file("level.dat", c);
+    bench_read_file("level.dat", c);
     // bench_read_file("stringtest.nbt", c);
-    // bench_read_file("inttest.nbt", c);
+    bench_read_file("inttest1023.nbt", c);
 }
 
 criterion_group!(compare, bench);
