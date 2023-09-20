@@ -27,7 +27,7 @@ fn bench_file(filename: &str, c: &mut Criterion) {
 
     group.bench_function("Decode", |b| {
         b.iter(|| {
-            black_box(simdnbt::Nbt::new(&mut decoded_src_stream).unwrap());
+            black_box(simdnbt::borrow::Nbt::new(&mut decoded_src_stream).unwrap());
             decoded_src_stream.set_position(0);
         })
     });

@@ -43,7 +43,9 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     group.bench_function("simdnbt_parse", |b| {
         b.iter(|| {
             let input = black_box(input);
-            let nbt = simdnbt::Nbt::new(&mut Cursor::new(input)).unwrap().unwrap();
+            let nbt = simdnbt::borrow::Nbt::new(&mut Cursor::new(input))
+                .unwrap()
+                .unwrap();
             let _ = black_box(nbt.list("").unwrap().ints());
             black_box(nbt);
         })

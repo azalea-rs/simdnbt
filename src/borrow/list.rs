@@ -3,10 +3,14 @@ use std::{io::Cursor, marker::PhantomData, simd::prelude::*, slice};
 use byteorder::ReadBytesExt;
 
 use crate::{
-    read_string, read_u32, read_with_u32_length, CompoundTag, Error, Mutf8Str, BYTE_ARRAY_ID,
-    BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
-    LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
+    common::{
+        BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
+        LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
+    },
+    Error, Mutf8Str,
 };
+
+use super::{read_string, read_u32, read_with_u32_length, CompoundTag, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[derive(Debug, Default)]

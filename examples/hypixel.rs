@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hint::black_box, io::Cursor};
 
-use simdnbt::Nbt;
+use simdnbt::borrow::Nbt;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Item {
@@ -29,7 +29,7 @@ pub struct ItemDisplay {
     pub color: Option<i32>,
 }
 
-fn simdnbt_items_from_nbt(nbt: simdnbt::Nbt) -> Option<Vec<Option<Item>>> {
+fn simdnbt_items_from_nbt(nbt: Nbt) -> Option<Vec<Option<Item>>> {
     let mut items = Vec::new();
     for item_nbt in nbt
         .list("i")
@@ -101,7 +101,7 @@ fn simdnbt_items_from_nbt(nbt: simdnbt::Nbt) -> Option<Vec<Option<Item>>> {
 
 fn main() {
     let input = black_box(include_bytes!("../tests/realworld.nbt"));
-    for _ in 0..100000 {
+    for _ in 0..10000 {
         let nbt = Nbt::new(&mut Cursor::new(input));
         let nbt = black_box(nbt.unwrap().unwrap());
         black_box(simdnbt_items_from_nbt(nbt));
