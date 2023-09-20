@@ -32,20 +32,17 @@ fn bench_file(filename: &str, c: &mut Criterion) {
         })
     });
 
-    // group.bench_function("Get", |b| {
-    //     b.iter(|| {
-    //         let level = nbt
-    //             .as_compound()
-    //             .unwrap()
-    //             .get("Level")
-    //             .unwrap()
-    //             .as_compound()
-    //             .unwrap();
-    //         for (k, _) in level.iter() {
-    //             black_box(level.get(black_box(k)));
-    //         }
-    //     })
-    // });
+    let nbt = simdnbt::borrow::Nbt::new(&mut decoded_src_stream)
+        .unwrap()
+        .unwrap();
+    group.bench_function("Get", |b| {
+        b.iter(|| {
+            let level = nbt.compound("abilities").unwrap();
+            for (k, _) in level.iter() {
+                black_box(level.get(black_box(&k.to_str())));
+            }
+        })
+    });
     group.finish();
 }
 

@@ -1,15 +1,4 @@
-//! an unnecessarily fast nbt decoder.
-//!
-//! afaik, this is currently the fastest nbt decoder in existence.
-//!
-//! ```
-//! use simdnbt::borrow::Nbt;
-//! use std::io::Cursor;
-//!
-//! let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../../tests/hello_world.nbt"))).unwrap().unwrap();
-//! assert_eq!(nbt.name().to_str(), "hello world");
-//! assert_eq!(nbt.string("name").unwrap().to_str(), "Bananrama");
-//! ```
+//! The borrowed variant of NBT. This is useful if you're only reading data and you can keep a reference to the original buffer.
 
 pub mod list;
 
@@ -150,76 +139,40 @@ impl<'a> CompoundTag<'a> {
     }
 
     pub fn byte(&self, name: &str) -> Option<i8> {
-        match self.get(name) {
-            Some(Tag::Byte(byte)) => Some(*byte),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.byte())
     }
     pub fn short(&self, name: &str) -> Option<i16> {
-        match self.get(name) {
-            Some(Tag::Short(short)) => Some(*short),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.short())
     }
     pub fn int(&self, name: &str) -> Option<i32> {
-        match self.get(name) {
-            Some(Tag::Int(int)) => Some(*int),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.int())
     }
     pub fn long(&self, name: &str) -> Option<i64> {
-        match self.get(name) {
-            Some(Tag::Long(long)) => Some(*long),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.long())
     }
     pub fn float(&self, name: &str) -> Option<f32> {
-        match self.get(name) {
-            Some(Tag::Float(float)) => Some(*float),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.float())
     }
-    pub fn double(&self, name: &str) -> Option<&f64> {
-        match self.get(name) {
-            Some(Tag::Double(double)) => Some(double),
-            _ => None,
-        }
+    pub fn double(&self, name: &str) -> Option<f64> {
+        self.get(name).and_then(|tag| tag.double())
     }
     pub fn byte_array(&self, name: &str) -> Option<&[u8]> {
-        match self.get(name) {
-            Some(Tag::ByteArray(byte_array)) => Some(byte_array),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.byte_array())
     }
     pub fn string(&self, name: &str) -> Option<&Mutf8Str> {
-        match self.get(name) {
-            Some(Tag::String(string)) => Some(string),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.string())
     }
     pub fn list(&self, name: &str) -> Option<&ListTag<'a>> {
-        match self.get(name) {
-            Some(Tag::List(list)) => Some(list),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.list())
     }
     pub fn compound(&self, name: &str) -> Option<&CompoundTag<'a>> {
-        match self.get(name) {
-            Some(Tag::Compound(compound)) => Some(compound),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.compound())
     }
     pub fn int_array(&self, name: &str) -> Option<&[i32]> {
-        match self.get(name) {
-            Some(Tag::IntArray(int_array)) => Some(int_array),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.int_array())
     }
     pub fn long_array(&self, name: &str) -> Option<&[i64]> {
-        match self.get(name) {
-            Some(Tag::LongArray(long_array)) => Some(long_array),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.long_array())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &Tag<'a>)> {

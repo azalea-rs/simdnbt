@@ -32,21 +32,31 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
         })
     });
 
-    group.bench_function("graphite_parse", |b| {
-        b.iter(|| {
-            let input = black_box(input);
-            let nbt = graphite_binary::nbt::decode::read(&mut &input[..]).unwrap();
-            black_box(nbt);
-        })
-    });
+    // group.bench_function("graphite_parse", |b| {
+    //     b.iter(|| {
+    //         let input = black_box(input);
+    //         let nbt = graphite_binary::nbt::decode::read(&mut &input[..]).unwrap();
+    //         black_box(nbt);
+    //     })
+    // });
 
-    group.bench_function("simdnbt_parse", |b| {
+    // group.bench_function("simdnbt_parse", |b| {
+    //     b.iter(|| {
+    //         let input = black_box(input);
+    //         let nbt = simdnbt::borrow::Nbt::new(&mut Cursor::new(input))
+    //             .unwrap()
+    //             .unwrap();
+    //         // let _ = black_box(nbt.list("").unwrap().ints());
+    //         black_box(nbt);
+    //     })
+    // });
+    group.bench_function("simdnbt_owned_parse", |b| {
         b.iter(|| {
             let input = black_box(input);
-            let nbt = simdnbt::borrow::Nbt::new(&mut Cursor::new(input))
+            let nbt = simdnbt::owned::Nbt::new(&mut Cursor::new(input))
                 .unwrap()
                 .unwrap();
-            let _ = black_box(nbt.list("").unwrap().ints());
+            // let _ = black_box(nbt.list("").unwrap().ints());
             black_box(nbt);
         })
     });
@@ -83,7 +93,7 @@ fn bench(c: &mut Criterion) {
     bench_read_file("complex_player.dat", c);
     bench_read_file("level.dat", c);
     // bench_read_file("stringtest.nbt", c);
-    bench_read_file("inttest1023.nbt", c);
+    // bench_read_file("inttest1023.nbt", c);
 }
 
 criterion_group!(compare, bench);

@@ -1,15 +1,4 @@
-//! an unnecessarily fast nbt decoder.
-//!
-//! afaik, this is currently the fastest nbt decoder in existence.
-//!
-//! ```
-//! use simdnbt::borrow::Nbt;
-//! use std::io::Cursor;
-//!
-//! let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../../tests/hello_world.nbt"))).unwrap().unwrap();
-//! assert_eq!(nbt.name().to_str(), "hello world");
-//! assert_eq!(nbt.string("name").unwrap().to_str(), "Bananrama");
-//! ```
+//! The owned variant of NBT. This is useful if you're writing data from scratch or if you can't keep a reference to the original data.
 
 pub mod list;
 
@@ -139,6 +128,18 @@ impl CompoundTag {
         None
     }
 
+    #[inline]
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut Tag> {
+        let name = Mutf8Str::from_str(name);
+        let name = name.as_ref();
+        for (key, value) in &mut self.values {
+            if key.as_str() == name {
+                return Some(value);
+            }
+        }
+        None
+    }
+
     /// Returns whether there is a tag with the given name.
     pub fn contains(&self, name: &str) -> bool {
         let name = Mutf8Str::from_str(name);
@@ -152,80 +153,120 @@ impl CompoundTag {
     }
 
     pub fn byte(&self, name: &str) -> Option<i8> {
-        match self.get(name) {
-            Some(Tag::Byte(byte)) => Some(*byte),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.byte())
+    }
+    pub fn byte_mut(&mut self, name: &str) -> Option<&mut i8> {
+        self.get_mut(name).and_then(|tag| tag.byte_mut())
     }
     pub fn short(&self, name: &str) -> Option<i16> {
-        match self.get(name) {
-            Some(Tag::Short(short)) => Some(*short),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.short())
+    }
+    pub fn short_mut(&mut self, name: &str) -> Option<&mut i16> {
+        self.get_mut(name).and_then(|tag| tag.short_mut())
     }
     pub fn int(&self, name: &str) -> Option<i32> {
-        match self.get(name) {
-            Some(Tag::Int(int)) => Some(*int),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.int())
+    }
+    pub fn int_mut(&mut self, name: &str) -> Option<&mut i32> {
+        self.get_mut(name).and_then(|tag| tag.int_mut())
     }
     pub fn long(&self, name: &str) -> Option<i64> {
-        match self.get(name) {
-            Some(Tag::Long(long)) => Some(*long),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.long())
+    }
+    pub fn long_mut(&mut self, name: &str) -> Option<&mut i64> {
+        self.get_mut(name).and_then(|tag| tag.long_mut())
     }
     pub fn float(&self, name: &str) -> Option<f32> {
-        match self.get(name) {
-            Some(Tag::Float(float)) => Some(*float),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.float())
     }
-    pub fn double(&self, name: &str) -> Option<&f64> {
-        match self.get(name) {
-            Some(Tag::Double(double)) => Some(double),
-            _ => None,
-        }
+    pub fn float_mut(&mut self, name: &str) -> Option<&mut f32> {
+        self.get_mut(name).and_then(|tag| tag.float_mut())
+    }
+    pub fn double(&self, name: &str) -> Option<f64> {
+        self.get(name).and_then(|tag| tag.double())
+    }
+    pub fn double_mut(&mut self, name: &str) -> Option<&mut f64> {
+        self.get_mut(name).and_then(|tag| tag.double_mut())
     }
     pub fn byte_array(&self, name: &str) -> Option<&[u8]> {
-        match self.get(name) {
-            Some(Tag::ByteArray(byte_array)) => Some(byte_array),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.byte_array())
+    }
+    pub fn byte_array_mut(&mut self, name: &str) -> Option<&mut Vec<u8>> {
+        self.get_mut(name).and_then(|tag| tag.byte_array_mut())
     }
     pub fn string(&self, name: &str) -> Option<&Mutf8Str> {
-        match self.get(name) {
-            Some(Tag::String(string)) => Some(string),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.string())
+    }
+    pub fn string_mut(&mut self, name: &str) -> Option<&mut Mutf8String> {
+        self.get_mut(name).and_then(|tag| tag.string_mut())
     }
     pub fn list(&self, name: &str) -> Option<&ListTag> {
-        match self.get(name) {
-            Some(Tag::List(list)) => Some(list),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.list())
+    }
+    pub fn list_mut(&mut self, name: &str) -> Option<&mut ListTag> {
+        self.get_mut(name).and_then(|tag| tag.list_mut())
     }
     pub fn compound(&self, name: &str) -> Option<&CompoundTag> {
-        match self.get(name) {
-            Some(Tag::Compound(compound)) => Some(compound),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.compound())
+    }
+    pub fn compound_mut(&mut self, name: &str) -> Option<&mut CompoundTag> {
+        self.get_mut(name).and_then(|tag| tag.compound_mut())
     }
     pub fn int_array(&self, name: &str) -> Option<&[i32]> {
-        match self.get(name) {
-            Some(Tag::IntArray(int_array)) => Some(int_array),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.int_array())
+    }
+    pub fn int_array_mut(&mut self, name: &str) -> Option<&mut Vec<i32>> {
+        self.get_mut(name).and_then(|tag| tag.int_array_mut())
     }
     pub fn long_array(&self, name: &str) -> Option<&[i64]> {
-        match self.get(name) {
-            Some(Tag::LongArray(long_array)) => Some(long_array),
-            _ => None,
-        }
+        self.get(name).and_then(|tag| tag.long_array())
+    }
+    pub fn long_array_mut(&mut self, name: &str) -> Option<&mut Vec<i64>> {
+        self.get_mut(name).and_then(|tag| tag.long_array_mut())
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &Tag)> {
         self.values.iter().map(|(k, v)| (k.as_str(), v))
+    }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&Mutf8Str, &mut Tag)> {
+        self.values.iter_mut().map(|(k, v)| (k.as_str(), v))
+    }
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+    pub fn keys(&self) -> impl Iterator<Item = &Mutf8Str> {
+        self.values.iter().map(|(k, _)| k.as_str())
+    }
+    pub fn keys_mut(&mut self) -> impl Iterator<Item = &mut Mutf8String> {
+        self.values.iter_mut().map(|(k, _)| k)
+    }
+    pub fn values(&self) -> impl Iterator<Item = &Tag> {
+        self.values.iter().map(|(_, v)| v)
+    }
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Tag> {
+        self.values.iter_mut().map(|(_, v)| v)
+    }
+    pub fn into_iter(self) -> impl Iterator<Item = (Mutf8String, Tag)> {
+        self.values.into_iter()
+    }
+    pub fn clear(&mut self) {
+        self.values.clear();
+    }
+    pub fn insert(&mut self, name: Mutf8String, tag: Tag) {
+        self.values.push((name, tag));
+    }
+    pub fn remove(&mut self, name: &str) -> Option<Tag> {
+        let name = Mutf8Str::from_str(name);
+        let name = name.as_ref();
+        for i in 0..self.values.len() {
+            if self.values[i].0.as_str() == name {
+                return Some(self.values.remove(i).1);
+            }
+        }
+        None
     }
 }
 
@@ -252,9 +293,21 @@ impl Tag {
             _ => None,
         }
     }
+    pub fn byte_mut(&mut self) -> Option<&mut i8> {
+        match self {
+            Tag::Byte(byte) => Some(byte),
+            _ => None,
+        }
+    }
     pub fn short(&self) -> Option<i16> {
         match self {
             Tag::Short(short) => Some(*short),
+            _ => None,
+        }
+    }
+    pub fn short_mut(&mut self) -> Option<&mut i16> {
+        match self {
+            Tag::Short(short) => Some(short),
             _ => None,
         }
     }
@@ -264,9 +317,21 @@ impl Tag {
             _ => None,
         }
     }
+    pub fn int_mut(&mut self) -> Option<&mut i32> {
+        match self {
+            Tag::Int(int) => Some(int),
+            _ => None,
+        }
+    }
     pub fn long(&self) -> Option<i64> {
         match self {
             Tag::Long(long) => Some(*long),
+            _ => None,
+        }
+    }
+    pub fn long_mut(&mut self) -> Option<&mut i64> {
+        match self {
+            Tag::Long(long) => Some(long),
             _ => None,
         }
     }
@@ -276,13 +341,31 @@ impl Tag {
             _ => None,
         }
     }
+    pub fn float_mut(&mut self) -> Option<&mut f32> {
+        match self {
+            Tag::Float(float) => Some(float),
+            _ => None,
+        }
+    }
     pub fn double(&self) -> Option<f64> {
         match self {
             Tag::Double(double) => Some(*double),
             _ => None,
         }
     }
+    pub fn double_mut(&mut self) -> Option<&mut f64> {
+        match self {
+            Tag::Double(double) => Some(double),
+            _ => None,
+        }
+    }
     pub fn byte_array(&self) -> Option<&[u8]> {
+        match self {
+            Tag::ByteArray(byte_array) => Some(byte_array),
+            _ => None,
+        }
+    }
+    pub fn byte_array_mut(&mut self) -> Option<&mut Vec<u8>> {
         match self {
             Tag::ByteArray(byte_array) => Some(byte_array),
             _ => None,
@@ -294,7 +377,19 @@ impl Tag {
             _ => None,
         }
     }
+    pub fn string_mut(&mut self) -> Option<&mut Mutf8String> {
+        match self {
+            Tag::String(string) => Some(string),
+            _ => None,
+        }
+    }
     pub fn list(&self) -> Option<&ListTag> {
+        match self {
+            Tag::List(list) => Some(list),
+            _ => None,
+        }
+    }
+    pub fn list_mut(&mut self) -> Option<&mut ListTag> {
         match self {
             Tag::List(list) => Some(list),
             _ => None,
@@ -306,13 +401,31 @@ impl Tag {
             _ => None,
         }
     }
+    pub fn compound_mut(&mut self) -> Option<&mut CompoundTag> {
+        match self {
+            Tag::Compound(compound) => Some(compound),
+            _ => None,
+        }
+    }
     pub fn int_array(&self) -> Option<&[i32]> {
         match self {
             Tag::IntArray(int_array) => Some(int_array),
             _ => None,
         }
     }
+    pub fn int_array_mut(&mut self) -> Option<&mut Vec<i32>> {
+        match self {
+            Tag::IntArray(int_array) => Some(int_array),
+            _ => None,
+        }
+    }
     pub fn long_array(&self) -> Option<&[i64]> {
+        match self {
+            Tag::LongArray(long_array) => Some(long_array),
+            _ => None,
+        }
+    }
+    pub fn long_array_mut(&mut self) -> Option<&mut Vec<i64>> {
         match self {
             Tag::LongArray(long_array) => Some(long_array),
             _ => None,
