@@ -23,6 +23,7 @@ use crate::{
         BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
         LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
+    mutf8::Mutf8String,
     Error, Mutf8Str,
 };
 
@@ -30,27 +31,27 @@ use self::list::ListTag;
 
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug)]
-pub struct Nbt<'a> {
-    name: &'a Mutf8Str,
-    tag: CompoundTag<'a>,
+pub struct Nbt {
+    name: Mutf8String,
+    tag: CompoundTag,
 }
-impl<'a> Nbt<'a> {
+impl Nbt {
     /// Get the name of the NBT compound. This is often an empty string.
-    pub fn name(&self) -> &'a Mutf8Str {
-        self.name
+    pub fn name(&self) -> &Mutf8Str {
+        &self.name
     }
 }
-impl<'a> Deref for Nbt<'a> {
-    type Target = CompoundTag<'a>;
+impl Deref for Nbt {
+    type Target = CompoundTag;
 
     fn deref(&self) -> &Self::Target {
         &self.tag
     }
 }
 
-impl<'a> Nbt<'a> {
+impl Nbt {
     /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
-    pub fn new(data: &mut Cursor<&'a [u8]>) -> Result<Option<Nbt<'a>>, Error> {
+    pub fn new(data: &mut Cursor<&[u8]>) -> Result<Option<Nbt>, Error> {
         let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(None);
@@ -58,7 +59,7 @@ impl<'a> Nbt<'a> {
         if root_type != COMPOUND_ID {
             return Err(Error::InvalidRootType(root_type));
         }
-        let name = read_string(data)?;
+        let name = read_string(data)?.to_owned();
         let tag = CompoundTag::new(data, 0)?;
 
         Ok(Some(Nbt { name, tag }))
@@ -67,12 +68,12 @@ impl<'a> Nbt<'a> {
 
 /// A list of named tags. The order of the tags is preserved.
 #[derive(Debug, Default)]
-pub struct CompoundTag<'a> {
-    values: Vec<(&'a Mutf8Str, Tag<'a>)>,
+pub struct CompoundTag {
+    values: Vec<(Mutf8String, Tag)>,
 }
 
-impl<'a> CompoundTag<'a> {
-    fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+impl CompoundTag {
+    fn new(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
@@ -82,7 +83,7 @@ impl<'a> CompoundTag<'a> {
             if tag_type == END_ID {
                 break;
             }
-            let tag_name = read_string(data)?;
+            let tag_name = read_string(data)?.to_owned();
 
             match tag_type {
                 BYTE_ID => values.push((
@@ -109,10 +110,11 @@ impl<'a> CompoundTag<'a> {
                     tag_name,
                     Tag::Double(data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
-                BYTE_ARRAY_ID => {
-                    values.push((tag_name, Tag::ByteArray(read_with_u32_length(data, 1)?)))
-                }
-                STRING_ID => values.push((tag_name, Tag::String(read_string(data)?))),
+                BYTE_ARRAY_ID => values.push((
+                    tag_name,
+                    Tag::ByteArray(read_with_u32_length(data, 1)?.to_owned()),
+                )),
+                STRING_ID => values.push((tag_name, Tag::String(read_string(data)?.to_owned()))),
                 LIST_ID => values.push((tag_name, Tag::List(ListTag::new(data, depth + 1)?))),
                 COMPOUND_ID => {
                     values.push((tag_name, Tag::Compound(CompoundTag::new(data, depth + 1)?)))
@@ -126,11 +128,11 @@ impl<'a> CompoundTag<'a> {
     }
 
     #[inline]
-    pub fn get(&self, name: &str) -> Option<&Tag<'a>> {
+    pub fn get(&self, name: &str) -> Option<&Tag> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
         for (key, value) in &self.values {
-            if key == &name {
+            if key.as_str() == name {
                 return Some(value);
             }
         }
@@ -142,7 +144,7 @@ impl<'a> CompoundTag<'a> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
         for (key, _) in &self.values {
-            if key == &name {
+            if key.as_str() == name {
                 return true;
             }
         }
@@ -197,13 +199,13 @@ impl<'a> CompoundTag<'a> {
             _ => None,
         }
     }
-    pub fn list(&self, name: &str) -> Option<&ListTag<'a>> {
+    pub fn list(&self, name: &str) -> Option<&ListTag> {
         match self.get(name) {
             Some(Tag::List(list)) => Some(list),
             _ => None,
         }
     }
-    pub fn compound(&self, name: &str) -> Option<&CompoundTag<'a>> {
+    pub fn compound(&self, name: &str) -> Option<&CompoundTag> {
         match self.get(name) {
             Some(Tag::Compound(compound)) => Some(compound),
             _ => None,
@@ -222,28 +224,28 @@ impl<'a> CompoundTag<'a> {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &Tag<'a>)> {
-        self.values.iter().map(|(k, v)| (*k, v))
+    pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &Tag)> {
+        self.values.iter().map(|(k, v)| (k.as_str(), v))
     }
 }
 
 /// A single NBT tag.
 #[derive(Debug)]
-pub enum Tag<'a> {
+pub enum Tag {
     Byte(i8),
     Short(i16),
     Int(i32),
     Long(i64),
     Float(f32),
     Double(f64),
-    ByteArray(&'a [u8]),
-    String(&'a Mutf8Str),
-    List(ListTag<'a>),
-    Compound(CompoundTag<'a>),
+    ByteArray(Vec<u8>),
+    String(Mutf8String),
+    List(ListTag),
+    Compound(CompoundTag),
     IntArray(Vec<i32>),
     LongArray(Vec<i64>),
 }
-impl<'a> Tag<'a> {
+impl Tag {
     pub fn byte(&self) -> Option<i8> {
         match self {
             Tag::Byte(byte) => Some(*byte),
@@ -292,13 +294,13 @@ impl<'a> Tag<'a> {
             _ => None,
         }
     }
-    pub fn list(&self) -> Option<&ListTag<'a>> {
+    pub fn list(&self) -> Option<&ListTag> {
         match self {
             Tag::List(list) => Some(list),
             _ => None,
         }
     }
-    pub fn compound(&self) -> Option<&CompoundTag<'a>> {
+    pub fn compound(&self) -> Option<&CompoundTag> {
         match self {
             Tag::Compound(compound) => Some(compound),
             _ => None,

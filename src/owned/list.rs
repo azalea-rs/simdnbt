@@ -1,4 +1,4 @@
-use std::{io::Cursor, marker::PhantomData};
+use std::io::Cursor;
 
 use byteorder::ReadBytesExt;
 
@@ -9,31 +9,32 @@ use crate::{
         END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID,
         STRING_ID,
     },
-    Error, Mutf8Str,
+    mutf8::Mutf8String,
+    Error,
 };
 
 use super::{read_u32, CompoundTag, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[derive(Debug, Default)]
-pub enum ListTag<'a> {
+pub enum ListTag {
     #[default]
     Empty,
-    Byte(&'a [i8]),
-    Short(RawList<'a, i16>),
-    Int(RawList<'a, i32>),
-    Long(RawList<'a, i64>),
-    Float(RawList<'a, f32>),
-    Double(RawList<'a, f64>),
-    ByteArray(&'a [u8]),
-    String(Vec<&'a Mutf8Str>),
-    List(Vec<ListTag<'a>>),
-    Compound(Vec<CompoundTag<'a>>),
+    Byte(Vec<i8>),
+    Short(Vec<i16>),
+    Int(Vec<i32>),
+    Long(Vec<i64>),
+    Float(Vec<f32>),
+    Double(Vec<f64>),
+    ByteArray(Vec<u8>),
+    String(Vec<Mutf8String>),
+    List(Vec<ListTag>),
+    Compound(Vec<CompoundTag>),
     IntArray(Vec<Vec<i32>>),
     LongArray(Vec<Vec<i64>>),
 }
-impl<'a> ListTag<'a> {
-    pub fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+impl ListTag {
+    pub fn new(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
@@ -43,19 +44,19 @@ impl<'a> ListTag<'a> {
                 data.set_position(data.position() + 4);
                 ListTag::Empty
             }
-            BYTE_ID => ListTag::Byte(read_i8_array(data)?),
-            SHORT_ID => ListTag::Short(RawList::new(read_with_u32_length(data, 2)?)),
-            INT_ID => ListTag::Int(RawList::new(read_with_u32_length(data, 4)?)),
-            LONG_ID => ListTag::Long(RawList::new(read_with_u32_length(data, 8)?)),
-            FLOAT_ID => ListTag::Float(RawList::new(read_with_u32_length(data, 4)?)),
-            DOUBLE_ID => ListTag::Double(RawList::new(read_with_u32_length(data, 8)?)),
-            BYTE_ARRAY_ID => ListTag::ByteArray(read_u8_array(data)?),
+            BYTE_ID => ListTag::Byte(read_i8_array(data)?.to_owned()),
+            SHORT_ID => ListTag::Short(swap_endianness(read_with_u32_length(data, 2)?)),
+            INT_ID => ListTag::Int(swap_endianness(read_with_u32_length(data, 4)?)),
+            LONG_ID => ListTag::Long(swap_endianness(read_with_u32_length(data, 8)?)),
+            FLOAT_ID => ListTag::Float(swap_endianness(read_with_u32_length(data, 4)?)),
+            DOUBLE_ID => ListTag::Double(swap_endianness(read_with_u32_length(data, 8)?)),
+            BYTE_ARRAY_ID => ListTag::ByteArray(read_u8_array(data)?.to_owned()),
             STRING_ID => ListTag::String({
                 let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
                 let mut strings = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    strings.push(read_string(data)?)
+                    strings.push(read_string(data)?.to_owned())
                 }
                 strings
             }),
@@ -141,7 +142,7 @@ impl<'a> ListTag<'a> {
             _ => None,
         }
     }
-    pub fn strings(&self) -> Option<&[&Mutf8Str]> {
+    pub fn strings(&self) -> Option<&[Mutf8String]> {
         match self {
             ListTag::String(strings) => Some(strings),
             _ => None,
@@ -170,28 +171,5 @@ impl<'a> ListTag<'a> {
             ListTag::LongArray(long_arrays) => Some(long_arrays),
             _ => None,
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct RawList<'a, T> {
-    data: &'a [u8],
-    _marker: PhantomData<T>,
-}
-impl<'a, T> RawList<'a, T> {
-    pub fn new(data: &'a [u8]) -> Self {
-        Self {
-            data,
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<T> RawList<'_, T> {
-    pub fn to_vec(&self) -> Vec<T>
-    where
-        T: Copy,
-    {
-        swap_endianness(self.data)
     }
 }

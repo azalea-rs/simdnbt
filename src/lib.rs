@@ -19,6 +19,7 @@ pub mod borrow;
 mod common;
 mod error;
 mod mutf8;
+pub mod owned;
 
 pub use error::Error;
 pub use mutf8::Mutf8Str;
