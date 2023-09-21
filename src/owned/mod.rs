@@ -26,6 +26,7 @@ pub struct Nbt {
     tag: CompoundTag,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum OptionalNbt {
     Some(Nbt),
     None,
