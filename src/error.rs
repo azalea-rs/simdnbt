@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::common::MAX_DEPTH;
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Invalid root type {0}")]
@@ -8,6 +10,6 @@ pub enum Error {
     UnknownTagId(u8),
     #[error("Unexpected end of data")]
     UnexpectedEof,
-    #[error("Tried to read NBT tag with too high complexity, depth > 512")]
+    #[error("Tried to read NBT tag with too high complexity, depth > {MAX_DEPTH}")]
     MaxDepthExceeded,
 }

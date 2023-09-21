@@ -48,6 +48,15 @@ impl OptionalNbt {
         Ok(OptionalNbt::Some(Nbt { name, tag }))
     }
 
+    pub fn write(&self, data: &mut Vec<u8>) {
+        match self {
+            OptionalNbt::Some(nbt) => nbt.write(data),
+            OptionalNbt::None => {
+                data.push(END_ID);
+            }
+        }
+    }
+
     pub fn unwrap(self) -> Nbt {
         match self {
             OptionalNbt::Some(nbt) => nbt,
