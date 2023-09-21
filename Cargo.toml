@@ -24,11 +24,11 @@ hematite-nbt = { version = "0.5.2", default-features = false }
 
 [profile.release]
 lto = true
-debug = true
+debug = false
 
 [profile.bench]
 lto = true
-debug = true
+debug = false
 
 [[bench]]
 harness = false

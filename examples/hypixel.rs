@@ -101,15 +101,10 @@ fn simdnbt_items_from_nbt(nbt: Nbt) -> Option<Vec<Option<Item>>> {
 
 fn main() {
     let input = black_box(include_bytes!("../tests/realworld.nbt"));
+
     for _ in 0..10000 {
         let nbt = Nbt::new(&mut Cursor::new(input));
         let nbt = black_box(nbt.unwrap().unwrap());
         black_box(simdnbt_items_from_nbt(nbt));
-    }
-
-    let nbt = Nbt::new(&mut Cursor::new(input)).unwrap().unwrap();
-    for _ in 0..100000 {
-        let mut out = Vec::new();
-        nbt.write(&mut out);
     }
 }

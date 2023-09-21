@@ -5,9 +5,9 @@ use byteorder::ReadBytesExt;
 use crate::{
     common::{
         read_i8_array, read_int_array, read_long_array, read_string, read_u8_array,
-        read_with_u32_length, write_i8_array, write_string, write_u32, BYTE_ARRAY_ID, BYTE_ID,
-        COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID,
-        LONG_ID, SHORT_ID, STRING_ID,
+        read_with_u32_length, slice_i8_into_u8, unchecked_extend, unchecked_push, write_string,
+        write_u32, write_with_u32_length, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID,
+        FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
     },
     raw_list::RawList,
     Mutf8Str, ReadError,
@@ -27,7 +27,7 @@ pub enum ListTag<'a> {
     Long(RawList<'a, i64>) = LONG_ID,
     Float(RawList<'a, f32>) = FLOAT_ID,
     Double(RawList<'a, f64>) = DOUBLE_ID,
-    ByteArray(&'a [u8]) = BYTE_ARRAY_ID,
+    ByteArray(Vec<&'a [u8]>) = BYTE_ARRAY_ID,
     String(Vec<&'a Mutf8Str>) = STRING_ID,
     List(Vec<ListTag<'a>>) = LIST_ID,
     Compound(Vec<CompoundTag<'a>>) = COMPOUND_ID,
@@ -51,7 +51,15 @@ impl<'a> ListTag<'a> {
             LONG_ID => ListTag::Long(RawList::new(read_with_u32_length(data, 8)?)),
             FLOAT_ID => ListTag::Float(RawList::new(read_with_u32_length(data, 4)?)),
             DOUBLE_ID => ListTag::Double(RawList::new(read_with_u32_length(data, 8)?)),
-            BYTE_ARRAY_ID => ListTag::ByteArray(read_u8_array(data)?),
+            BYTE_ARRAY_ID => ListTag::ByteArray({
+                let length = read_u32(data)?;
+                // arbitrary number to prevent big allocations
+                let mut arrays = Vec::with_capacity(length.min(128) as usize);
+                for _ in 0..length {
+                    arrays.push(read_u8_array(data)?)
+                }
+                arrays
+            }),
             STRING_ID => ListTag::String({
                 let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
@@ -102,42 +110,52 @@ impl<'a> ListTag<'a> {
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
+        // fast path for compound since it's very common to have lists of compounds
+        if let ListTag::Compound(compounds) = self {
+            data.reserve(5);
+            // SAFETY: we just reserved 5 bytes
+            unsafe {
+                unchecked_push(data, COMPOUND_ID);
+                unchecked_extend(data, &(compounds.len() as u32).to_be_bytes());
+            }
+            for compound in compounds {
+                compound.write(data);
+            }
+            return;
+        }
+
         data.push(self.id());
         match self {
             ListTag::Empty => {
-                write_u32(data, 0);
+                data.extend(&0u32.to_be_bytes());
             }
             ListTag::Byte(bytes) => {
-                write_u32(data, bytes.len() as u32);
-                write_i8_array(data, bytes);
+                write_with_u32_length(data, 1, slice_i8_into_u8(bytes));
             }
             ListTag::Short(shorts) => {
-                write_u32(data, shorts.len() as u32);
-                data.extend_from_slice(&shorts.as_big_endian());
+                write_with_u32_length(data, 2, shorts.as_big_endian());
             }
             ListTag::Int(ints) => {
-                write_u32(data, ints.len() as u32);
-                data.extend_from_slice(&ints.as_big_endian());
+                write_with_u32_length(data, 4, ints.as_big_endian());
             }
             ListTag::Long(longs) => {
-                write_u32(data, longs.len() as u32);
-                data.extend_from_slice(&longs.as_big_endian());
+                write_with_u32_length(data, 8, longs.as_big_endian());
             }
             ListTag::Float(floats) => {
-                write_u32(data, floats.len() as u32);
-                data.extend_from_slice(&floats.as_big_endian());
+                write_with_u32_length(data, 4, floats.as_big_endian());
             }
             ListTag::Double(doubles) => {
-                write_u32(data, doubles.len() as u32);
-                data.extend_from_slice(&doubles.as_big_endian());
+                write_with_u32_length(data, 8, doubles.as_big_endian());
             }
             ListTag::ByteArray(byte_arrays) => {
                 write_u32(data, byte_arrays.len() as u32);
-                data.extend_from_slice(byte_arrays);
+                for array in byte_arrays.iter() {
+                    write_with_u32_length(data, 1, array);
+                }
             }
             ListTag::String(strings) => {
                 write_u32(data, strings.len() as u32);
-                for &string in strings {
+                for string in strings {
                     write_string(data, string);
                 }
             }
@@ -147,24 +165,19 @@ impl<'a> ListTag<'a> {
                     list.write(data);
                 }
             }
-            ListTag::Compound(compounds) => {
-                write_u32(data, compounds.len() as u32);
-                for compound in compounds {
-                    compound.write(data);
-                }
+            ListTag::Compound(_) => {
+                unreachable!("fast path for compound should have been taken")
             }
             ListTag::IntArray(int_arrays) => {
                 write_u32(data, int_arrays.len() as u32);
                 for array in int_arrays {
-                    write_u32(data, array.len() as u32);
-                    data.extend_from_slice(&array.as_big_endian());
+                    write_with_u32_length(data, 4, array.as_big_endian());
                 }
             }
             ListTag::LongArray(long_arrays) => {
                 write_u32(data, long_arrays.len() as u32);
                 for array in long_arrays {
-                    write_u32(data, array.len() as u32);
-                    data.extend_from_slice(&array.as_big_endian());
+                    write_with_u32_length(data, 8, array.as_big_endian());
                 }
             }
         }
@@ -216,7 +229,7 @@ impl<'a> ListTag<'a> {
             _ => None,
         }
     }
-    pub fn byte_arrays(&self) -> Option<&[u8]> {
+    pub fn byte_arrays(&self) -> Option<&Vec<&[u8]>> {
         match self {
             ListTag::ByteArray(byte_arrays) => Some(byte_arrays),
             _ => None,

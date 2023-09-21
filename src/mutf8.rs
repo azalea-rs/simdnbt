@@ -76,6 +76,7 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
 }
 
 impl Mutf8Str {
+    #[inline]
     pub fn to_string_lossy(&self) -> Cow<str> {
         String::from_utf8_lossy(&self.slice)
     }
@@ -88,6 +89,7 @@ impl Mutf8Str {
 
     // we can't implement FromStr on Cow<Mutf8Str>
     #[allow(clippy::should_implement_trait)]
+    #[inline]
     pub fn from_str(s: &str) -> Cow<Mutf8Str> {
         match mutf8::encode(s) {
             Cow::Borrowed(b) => Cow::Borrowed(Mutf8Str::from_slice(b)),
@@ -95,6 +97,7 @@ impl Mutf8Str {
         }
     }
 
+    #[inline]
     pub fn to_str(&self) -> Cow<str> {
         // fast check to skip if none of the bytes have the top bit set or are null
         if is_plain_ascii(&self.slice) {
@@ -108,10 +111,12 @@ impl Mutf8Str {
         }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.slice.len()
     }
 
+    #[inline]
     pub fn as_bytes(&self) -> &[u8] {
         &self.slice
     }
@@ -126,6 +131,7 @@ impl fmt::Display for Mutf8Str {
 impl ToOwned for Mutf8Str {
     type Owned = Mutf8String;
 
+    #[inline]
     fn to_owned(&self) -> Self::Owned {
         Mutf8String {
             vec: self.slice.to_vec(),
@@ -133,6 +139,7 @@ impl ToOwned for Mutf8Str {
     }
 }
 impl Borrow<Mutf8Str> for Mutf8String {
+    #[inline]
     fn borrow(&self) -> &Mutf8Str {
         self.as_str()
     }
@@ -144,6 +151,7 @@ impl Mutf8String {
         Mutf8Str::from_slice(self.vec.as_slice())
     }
 
+    #[inline]
     pub fn into_string(self) -> String {
         if is_plain_ascii(&self.vec) {
             // SAFETY: &[u8] and &str are the same layout.
@@ -156,6 +164,7 @@ impl Mutf8String {
         }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.vec.len()
     }
@@ -163,6 +172,7 @@ impl Mutf8String {
 impl Deref for Mutf8String {
     type Target = Mutf8Str;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.as_str()
     }

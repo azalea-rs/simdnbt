@@ -10,6 +10,7 @@ impl SwappableNumber for i64 {}
 impl SwappableNumber for f32 {}
 impl SwappableNumber for f64 {}
 
+#[inline]
 fn swap_endianness_16bit(bytes: &mut [u8], num: usize) {
     for i in 0..num / 32 {
         let simd: u8x64 = Simd::from_slice(bytes[i * 32 * 2..(i + 1) * 32 * 2].as_ref());
@@ -124,6 +125,7 @@ fn swap_endianness_16bit(bytes: &mut [u8], num: usize) {
     }
 }
 
+#[inline]
 fn swap_endianness_32bit(bytes: &mut [u8], num: usize) {
     for i in 0..num / 16 {
         let simd: u8x64 = Simd::from_slice(bytes[i * 16 * 4..(i + 1) * 16 * 4].as_ref());
@@ -198,6 +200,7 @@ fn swap_endianness_32bit(bytes: &mut [u8], num: usize) {
     }
 }
 
+#[inline]
 fn swap_endianness_64bit(bytes: &mut [u8], num: usize) {
     for i in 0..num / 8 {
         let simd: u8x64 = Simd::from_slice(bytes[i * 64..i * 64 + 64].as_ref());

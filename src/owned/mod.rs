@@ -9,9 +9,9 @@ use byteorder::{ReadBytesExt, BE};
 use crate::{
     common::{
         read_int_array, read_long_array, read_string, read_u32, read_with_u32_length,
-        slice_into_u8_big_endian, write_i32, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID,
-        DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID,
-        MAX_DEPTH, SHORT_ID, STRING_ID,
+        slice_into_u8_big_endian, unchecked_extend, unchecked_push, unchecked_write_string,
+        write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID,
+        INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     mutf8::Mutf8String,
     Mutf8Str, ReadError,
@@ -145,29 +145,37 @@ impl CompoundTag {
 
     pub fn write(&self, data: &mut Vec<u8>) {
         for (name, tag) in &self.values {
-            data.push(tag.id());
-            write_string(data, name);
+            // reserve 4 bytes extra so we can avoid reallocating for small tags
+            data.reserve(1 + 2 + name.len() + 4);
+            // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
+            // 4 bytes of tag data.
+            unsafe {
+                unchecked_push(data, tag.id());
+                unchecked_write_string(data, name);
+            }
             match tag {
-                Tag::Byte(byte) => {
-                    data.push(*byte as u8);
-                }
-                Tag::Short(short) => {
-                    data.extend_from_slice(&short.to_be_bytes());
-                }
-                Tag::Int(int) => {
-                    write_i32(data, *int);
-                }
+                Tag::Byte(byte) => unsafe {
+                    unchecked_push(data, *byte as u8);
+                },
+                Tag::Short(short) => unsafe {
+                    unchecked_extend(data, &short.to_be_bytes());
+                },
+                Tag::Int(int) => unsafe {
+                    unchecked_extend(data, &int.to_be_bytes());
+                },
                 Tag::Long(long) => {
                     data.extend_from_slice(&long.to_be_bytes());
                 }
-                Tag::Float(float) => {
-                    data.extend_from_slice(&float.to_be_bytes());
-                }
+                Tag::Float(float) => unsafe {
+                    unchecked_extend(data, &float.to_be_bytes());
+                },
                 Tag::Double(double) => {
                     data.extend_from_slice(&double.to_be_bytes());
                 }
                 Tag::ByteArray(byte_array) => {
-                    write_i32(data, byte_array.len() as i32);
+                    unsafe {
+                        unchecked_extend(data, &byte_array.len().to_be_bytes());
+                    }
                     data.extend_from_slice(byte_array);
                 }
                 Tag::String(string) => {
@@ -180,11 +188,15 @@ impl CompoundTag {
                     compound.write(data);
                 }
                 Tag::IntArray(int_array) => {
-                    write_i32(data, int_array.len() as i32);
+                    unsafe {
+                        unchecked_extend(data, &int_array.len().to_be_bytes());
+                    }
                     data.extend_from_slice(&slice_into_u8_big_endian(int_array));
                 }
                 Tag::LongArray(long_array) => {
-                    write_i32(data, long_array.len() as i32);
+                    unsafe {
+                        unchecked_extend(data, &long_array.len().to_be_bytes());
+                    }
                     data.extend_from_slice(&slice_into_u8_big_endian(long_array));
                 }
             }

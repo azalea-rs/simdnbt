@@ -108,35 +108,75 @@ fn slice_u8_into_i8(s: &[u8]) -> &[i8] {
     unsafe { slice::from_raw_parts(s.as_ptr() as *const i8, s.len()) }
 }
 
-fn slice_i8_into_u8(s: &[i8]) -> &[u8] {
+pub fn slice_i8_into_u8(s: &[i8]) -> &[u8] {
     unsafe { slice::from_raw_parts(s.as_ptr() as *const u8, s.len()) }
+}
+
+#[inline(always)]
+pub fn write_with_u32_length<'a>(data: &mut Vec<u8>, width: usize, value: &'a [u8]) {
+    let length = value.len() / width;
+    data.reserve(4 + value.len());
+    unsafe {
+        unchecked_extend(data, &(length as u32).to_be_bytes());
+        unchecked_extend(data, value);
+    }
 }
 
 pub fn write_u32(data: &mut Vec<u8>, value: u32) {
     data.extend_from_slice(&value.to_be_bytes());
 }
-pub fn write_i32(data: &mut Vec<u8>, value: i32) {
-    data.extend_from_slice(&value.to_be_bytes());
-}
-pub fn write_u16(data: &mut Vec<u8>, value: u16) {
-    data.extend_from_slice(&value.to_be_bytes());
-}
-pub fn write_i8_array(data: &mut Vec<u8>, value: &[i8]) {
-    data.extend_from_slice(slice_i8_into_u8(value));
-}
 pub fn write_string(data: &mut Vec<u8>, value: &Mutf8Str) {
-    write_u16(data, value.len() as u16);
-    data.extend_from_slice(value.as_bytes());
+    data.reserve(2 + value.len());
+    // SAFETY: We reserved enough capacity
+    unsafe {
+        unchecked_write_string(data, value);
+    }
+}
+/// Write a string to a Vec<u8> without checking if the Vec has enough capacity.
+/// This is unsafe because it can cause a buffer overflow if the Vec doesn't have enough capacity.
+///
+/// # Safety
+///
+/// You must reserve enough capacity (2 + value.len()) in the Vec before calling this function.
+#[inline]
+pub unsafe fn unchecked_write_string(data: &mut Vec<u8>, value: &Mutf8Str) {
+    unchecked_extend(data, &(value.len() as u16).to_be_bytes());
+    unchecked_extend(data, value.as_bytes());
+}
+
+/// Extend a Vec<u8> with a slice of u8 without checking if the Vec has enough capacity.
+///
+/// This optimization is barely measurable, but it does make it slightly faster!
+///
+/// # Safety
+///
+/// You must reserve enough capacity in the Vec before calling this function.
+#[inline]
+pub unsafe fn unchecked_extend(data: &mut Vec<u8>, value: &[u8]) {
+    let ptr = data.as_mut_ptr();
+    let len = data.len();
+    std::ptr::copy_nonoverlapping(value.as_ptr(), ptr.add(len), value.len());
+    data.set_len(len + value.len());
+}
+
+#[inline]
+pub unsafe fn unchecked_push(data: &mut Vec<u8>, value: u8) {
+    let ptr = data.as_mut_ptr();
+    let len = data.len();
+    std::ptr::write(ptr.add(len), value);
+    data.set_len(len + 1);
 }
 
 /// Convert a slice of any type into a slice of u8. This will probably return the data as little
 /// endian! Use [`slice_into_u8_big_endian`] to get big endian (the endianness that's used in NBT).
+#[inline]
 pub fn slice_into_u8_native_endian<T>(s: &[T]) -> &[u8] {
     unsafe { slice::from_raw_parts(s.as_ptr() as *const u8, s.len() * std::mem::size_of::<T>()) }
 }
 
 /// Convert a slice of any type into a Vec<u8>. This will return the data as big endian (the
 /// endianness that's used in NBT).
+#[inline]
 pub fn slice_into_u8_big_endian<T: SwappableNumber>(s: &[T]) -> Vec<u8> {
     swap_endianness_as_u8::<T>(slice_into_u8_native_endian(s))
 }

@@ -91,13 +91,13 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     //         black_box(nbt);
     //     })
     // });
-    // let nbt = graphite_binary::nbt::decode::read(&mut &input[..]).unwrap();
-    // group.bench_function("graphite_write", |b| {
-    //     b.iter(|| {
-    //         let out = graphite_binary::nbt::encode::write(&nbt);
-    //         black_box(out);
-    //     })
-    // });
+    let nbt = graphite_binary::nbt::decode::read(&mut &input[..]).unwrap();
+    group.bench_function("graphite_write", |b| {
+        b.iter(|| {
+            let out = graphite_binary::nbt::encode::write(&nbt);
+            black_box(out);
+        })
+    });
 
     // group.bench_function("valence_parse", |b| {
     //     b.iter(|| {
@@ -129,7 +129,7 @@ fn bench(c: &mut Criterion) {
     // bench_read_file("bigtest.nbt", c);
     // bench_read_file("simple_player.dat", c);
     bench_read_file("complex_player.dat", c);
-    // bench_read_file("level.dat", c);
+    bench_read_file("level.dat", c);
     // bench_read_file("stringtest.nbt", c);
     // bench_read_file("inttest1023.nbt", c);
 }
