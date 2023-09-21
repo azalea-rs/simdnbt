@@ -107,6 +107,14 @@ impl Mutf8Str {
             }
         }
     }
+
+    pub fn len(&self) -> usize {
+        self.slice.len()
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.slice
+    }
 }
 
 impl fmt::Display for Mutf8Str {
@@ -146,6 +154,10 @@ impl Mutf8String {
                 Cow::Owned(o) => o,
             }
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.vec.len()
     }
 }
 impl Deref for Mutf8String {

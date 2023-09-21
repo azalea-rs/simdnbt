@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum Error {
+pub enum ReadError {
     #[error("Invalid root type {0}")]
     InvalidRootType(u8),
     #[error("Unknown tag id {0}")]

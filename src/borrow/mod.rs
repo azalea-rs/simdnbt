@@ -8,11 +8,12 @@ use byteorder::{ReadBytesExt, BE};
 
 use crate::{
     common::{
-        read_int_array, read_long_array, read_string, read_u32, read_with_u32_length,
-        BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
-        LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
+        read_int_array, read_long_array, read_string, read_u32, read_with_u32_length, write_i32,
+        write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID,
+        INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
-    Error, Mutf8Str,
+    raw_list::RawList,
+    Mutf8Str, ReadError,
 };
 
 use self::list::ListTag;
@@ -23,6 +24,13 @@ pub struct Nbt<'a> {
     name: &'a Mutf8Str,
     tag: CompoundTag<'a>,
 }
+
+/// A list of named tags. The order of the tags is preserved.
+#[derive(Debug, Default)]
+pub struct CompoundTag<'a> {
+    values: Vec<(&'a Mutf8Str, Tag<'a>)>,
+}
+
 impl<'a> Nbt<'a> {
     /// Get the name of the NBT compound. This is often an empty string.
     pub fn name(&self) -> &'a Mutf8Str {
@@ -39,35 +47,36 @@ impl<'a> Deref for Nbt<'a> {
 
 impl<'a> Nbt<'a> {
     /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
-    pub fn new(data: &mut Cursor<&'a [u8]>) -> Result<Option<Nbt<'a>>, Error> {
-        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+    pub fn new(data: &mut Cursor<&'a [u8]>) -> Result<Option<Nbt<'a>>, ReadError> {
+        let root_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(None);
         }
         if root_type != COMPOUND_ID {
-            return Err(Error::InvalidRootType(root_type));
+            return Err(ReadError::InvalidRootType(root_type));
         }
         let name = read_string(data)?;
         let tag = CompoundTag::new(data, 0)?;
 
         Ok(Some(Nbt { name, tag }))
     }
-}
 
-/// A list of named tags. The order of the tags is preserved.
-#[derive(Debug, Default)]
-pub struct CompoundTag<'a> {
-    values: Vec<(&'a Mutf8Str, Tag<'a>)>,
+    pub fn write(&self, data: &mut Vec<u8>) {
+        data.push(COMPOUND_ID);
+        write_string(data, self.name);
+        self.tag.write(data);
+        data.push(END_ID);
+    }
 }
 
 impl<'a> CompoundTag<'a> {
-    fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+    fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, ReadError> {
         if depth > MAX_DEPTH {
-            return Err(Error::MaxDepthExceeded);
+            return Err(ReadError::MaxDepthExceeded);
         }
         let mut values = Vec::with_capacity(4);
         loop {
-            let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+            let tag_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
             if tag_type == END_ID {
                 break;
             }
@@ -76,27 +85,42 @@ impl<'a> CompoundTag<'a> {
             match tag_type {
                 BYTE_ID => values.push((
                     tag_name,
-                    Tag::Byte(data.read_i8().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Byte(data.read_i8().map_err(|_| ReadError::UnexpectedEof)?),
                 )),
                 SHORT_ID => values.push((
                     tag_name,
-                    Tag::Short(data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Short(
+                        data.read_i16::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 INT_ID => values.push((
                     tag_name,
-                    Tag::Int(data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Int(
+                        data.read_i32::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 LONG_ID => values.push((
                     tag_name,
-                    Tag::Long(data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Long(
+                        data.read_i64::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 FLOAT_ID => values.push((
                     tag_name,
-                    Tag::Float(data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Float(
+                        data.read_f32::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 DOUBLE_ID => values.push((
                     tag_name,
-                    Tag::Double(data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Double(
+                        data.read_f64::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 BYTE_ARRAY_ID => {
                     values.push((tag_name, Tag::ByteArray(read_with_u32_length(data, 1)?)))
@@ -108,10 +132,59 @@ impl<'a> CompoundTag<'a> {
                 }
                 INT_ARRAY_ID => values.push((tag_name, Tag::IntArray(read_int_array(data)?))),
                 LONG_ARRAY_ID => values.push((tag_name, Tag::LongArray(read_long_array(data)?))),
-                _ => return Err(Error::UnknownTagId(tag_type)),
+                _ => return Err(ReadError::UnknownTagId(tag_type)),
             }
         }
         Ok(Self { values })
+    }
+
+    pub fn write(&self, data: &mut Vec<u8>) {
+        for (name, tag) in &self.values {
+            data.push(tag.id());
+            write_string(data, name);
+            match tag {
+                Tag::Byte(byte) => {
+                    data.push(*byte as u8);
+                }
+                Tag::Short(short) => {
+                    data.extend_from_slice(&short.to_be_bytes());
+                }
+                Tag::Int(int) => {
+                    write_i32(data, *int);
+                }
+                Tag::Long(long) => {
+                    data.extend_from_slice(&long.to_be_bytes());
+                }
+                Tag::Float(float) => {
+                    data.extend_from_slice(&float.to_be_bytes());
+                }
+                Tag::Double(double) => {
+                    data.extend_from_slice(&double.to_be_bytes());
+                }
+                Tag::ByteArray(byte_array) => {
+                    write_i32(data, byte_array.len() as i32);
+                    data.extend_from_slice(byte_array);
+                }
+                Tag::String(string) => {
+                    write_string(data, string);
+                }
+                Tag::List(list) => {
+                    list.write(data);
+                }
+                Tag::Compound(compound) => {
+                    compound.write(data);
+                }
+                Tag::IntArray(int_array) => {
+                    write_i32(data, int_array.len() as i32);
+                    data.extend_from_slice(&int_array.to_little_endian());
+                }
+                Tag::LongArray(long_array) => {
+                    write_i32(data, long_array.len() as i32);
+                    data.extend_from_slice(&long_array.to_little_endian());
+                }
+            }
+        }
+        data.push(END_ID);
     }
 
     #[inline]
@@ -168,10 +241,10 @@ impl<'a> CompoundTag<'a> {
     pub fn compound(&self, name: &str) -> Option<&CompoundTag<'a>> {
         self.get(name).and_then(|tag| tag.compound())
     }
-    pub fn int_array(&self, name: &str) -> Option<&[i32]> {
+    pub fn int_array(&self, name: &str) -> Option<Vec<i32>> {
         self.get(name).and_then(|tag| tag.int_array())
     }
-    pub fn long_array(&self, name: &str) -> Option<&[i64]> {
+    pub fn long_array(&self, name: &str) -> Option<Vec<i64>> {
         self.get(name).and_then(|tag| tag.long_array())
     }
 
@@ -181,22 +254,33 @@ impl<'a> CompoundTag<'a> {
 }
 
 /// A single NBT tag.
+#[repr(u8)]
 #[derive(Debug)]
 pub enum Tag<'a> {
-    Byte(i8),
-    Short(i16),
-    Int(i32),
-    Long(i64),
-    Float(f32),
-    Double(f64),
-    ByteArray(&'a [u8]),
-    String(&'a Mutf8Str),
-    List(ListTag<'a>),
-    Compound(CompoundTag<'a>),
-    IntArray(Vec<i32>),
-    LongArray(Vec<i64>),
+    Byte(i8) = BYTE_ID,
+    Short(i16) = SHORT_ID,
+    Int(i32) = INT_ID,
+    Long(i64) = LONG_ID,
+    Float(f32) = FLOAT_ID,
+    Double(f64) = DOUBLE_ID,
+    ByteArray(&'a [u8]) = BYTE_ARRAY_ID,
+    String(&'a Mutf8Str) = STRING_ID,
+    List(ListTag<'a>) = LIST_ID,
+    Compound(CompoundTag<'a>) = COMPOUND_ID,
+    IntArray(RawList<'a, i32>) = INT_ARRAY_ID,
+    LongArray(RawList<'a, i64>) = LONG_ARRAY_ID,
 }
 impl<'a> Tag<'a> {
+    /// Get the numerical ID of the tag type.
+    #[inline]
+    pub fn id(&self) -> u8 {
+        // SAFETY: Because `Self` is marked `repr(u8)`, its layout is a `repr(C)`
+        // `union` between `repr(C)` structs, each of which has the `u8`
+        // discriminant as its first field, so we can read the discriminant
+        // without offsetting the pointer.
+        unsafe { *<*const _>::from(self).cast::<u8>() }
+    }
+
     pub fn byte(&self) -> Option<i8> {
         match self {
             Tag::Byte(byte) => Some(*byte),
@@ -257,15 +341,15 @@ impl<'a> Tag<'a> {
             _ => None,
         }
     }
-    pub fn int_array(&self) -> Option<&[i32]> {
+    pub fn int_array(&self) -> Option<Vec<i32>> {
         match self {
-            Tag::IntArray(int_array) => Some(int_array),
+            Tag::IntArray(int_array) => Some(int_array.to_vec()),
             _ => None,
         }
     }
-    pub fn long_array(&self) -> Option<&[i64]> {
+    pub fn long_array(&self) -> Option<Vec<i64>> {
         match self {
-            Tag::LongArray(long_array) => Some(long_array),
+            Tag::LongArray(long_array) => Some(long_array.to_vec()),
             _ => None,
         }
     }
@@ -311,13 +395,30 @@ mod tests {
     }
 
     #[test]
-    fn complex_player() {
+    fn read_complex_player() {
         let src = include_bytes!("../../tests/complex_player.dat").to_vec();
         let mut src_slice = src.as_slice();
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
         let nbt = Nbt::new(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+
+        assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
+        assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn read_write_complex_player() {
+        let src = include_bytes!("../../tests/complex_player.dat").to_vec();
+        let mut src_slice = src.as_slice();
+        let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
+        let mut decoded_src = Vec::new();
+        decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
+        let nbt = Nbt::new(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+
+        let mut out = Vec::new();
+        nbt.write(&mut out);
+        let nbt = Nbt::new(&mut Cursor::new(&out)).unwrap().unwrap();
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);

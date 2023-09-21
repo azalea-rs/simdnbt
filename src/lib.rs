@@ -20,6 +20,8 @@ mod common;
 mod error;
 mod mutf8;
 pub mod owned;
+pub mod raw_list;
+pub mod swap_endianness;
 
-pub use error::Error;
+pub use error::ReadError;
 pub use mutf8::Mutf8Str;

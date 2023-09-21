@@ -9,11 +9,12 @@ use byteorder::{ReadBytesExt, BE};
 use crate::{
     common::{
         read_int_array, read_long_array, read_string, read_u32, read_with_u32_length,
-        BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
-        LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
+        slice_into_u8_big_endian, write_i32, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID,
+        DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID,
+        MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     mutf8::Mutf8String,
-    Error, Mutf8Str,
+    Mutf8Str, ReadError,
 };
 
 use self::list::ListTag;
@@ -40,18 +41,25 @@ impl Deref for Nbt {
 
 impl Nbt {
     /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
-    pub fn new(data: &mut Cursor<&[u8]>) -> Result<Option<Nbt>, Error> {
-        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+    pub fn new(data: &mut Cursor<&[u8]>) -> Result<Option<Nbt>, ReadError> {
+        let root_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(None);
         }
         if root_type != COMPOUND_ID {
-            return Err(Error::InvalidRootType(root_type));
+            return Err(ReadError::InvalidRootType(root_type));
         }
         let name = read_string(data)?.to_owned();
         let tag = CompoundTag::new(data, 0)?;
 
         Ok(Some(Nbt { name, tag }))
+    }
+
+    /// Writes the NBT to the given buffer.
+    pub fn write(&self, data: &mut Vec<u8>) {
+        data.push(COMPOUND_ID);
+        write_string(data, &self.name);
+        self.tag.write(data);
     }
 }
 
@@ -62,13 +70,13 @@ pub struct CompoundTag {
 }
 
 impl CompoundTag {
-    fn new(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
+    fn new(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, ReadError> {
         if depth > MAX_DEPTH {
-            return Err(Error::MaxDepthExceeded);
+            return Err(ReadError::MaxDepthExceeded);
         }
         let mut values = Vec::with_capacity(4);
         loop {
-            let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+            let tag_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
             if tag_type == END_ID {
                 break;
             }
@@ -77,27 +85,42 @@ impl CompoundTag {
             match tag_type {
                 BYTE_ID => values.push((
                     tag_name,
-                    Tag::Byte(data.read_i8().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Byte(data.read_i8().map_err(|_| ReadError::UnexpectedEof)?),
                 )),
                 SHORT_ID => values.push((
                     tag_name,
-                    Tag::Short(data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Short(
+                        data.read_i16::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 INT_ID => values.push((
                     tag_name,
-                    Tag::Int(data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Int(
+                        data.read_i32::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 LONG_ID => values.push((
                     tag_name,
-                    Tag::Long(data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Long(
+                        data.read_i64::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 FLOAT_ID => values.push((
                     tag_name,
-                    Tag::Float(data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Float(
+                        data.read_f32::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 DOUBLE_ID => values.push((
                     tag_name,
-                    Tag::Double(data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    Tag::Double(
+                        data.read_f64::<BE>()
+                            .map_err(|_| ReadError::UnexpectedEof)?,
+                    ),
                 )),
                 BYTE_ARRAY_ID => values.push((
                     tag_name,
@@ -108,12 +131,65 @@ impl CompoundTag {
                 COMPOUND_ID => {
                     values.push((tag_name, Tag::Compound(CompoundTag::new(data, depth + 1)?)))
                 }
-                INT_ARRAY_ID => values.push((tag_name, Tag::IntArray(read_int_array(data)?))),
-                LONG_ARRAY_ID => values.push((tag_name, Tag::LongArray(read_long_array(data)?))),
-                _ => return Err(Error::UnknownTagId(tag_type)),
+                INT_ARRAY_ID => {
+                    values.push((tag_name, Tag::IntArray(read_int_array(data)?.to_vec())))
+                }
+                LONG_ARRAY_ID => {
+                    values.push((tag_name, Tag::LongArray(read_long_array(data)?.to_vec())))
+                }
+                _ => return Err(ReadError::UnknownTagId(tag_type)),
             }
         }
         Ok(Self { values })
+    }
+
+    pub fn write(&self, data: &mut Vec<u8>) {
+        for (name, tag) in &self.values {
+            data.push(tag.id());
+            write_string(data, name);
+            match tag {
+                Tag::Byte(byte) => {
+                    data.push(*byte as u8);
+                }
+                Tag::Short(short) => {
+                    data.extend_from_slice(&short.to_be_bytes());
+                }
+                Tag::Int(int) => {
+                    write_i32(data, *int);
+                }
+                Tag::Long(long) => {
+                    data.extend_from_slice(&long.to_be_bytes());
+                }
+                Tag::Float(float) => {
+                    data.extend_from_slice(&float.to_be_bytes());
+                }
+                Tag::Double(double) => {
+                    data.extend_from_slice(&double.to_be_bytes());
+                }
+                Tag::ByteArray(byte_array) => {
+                    write_i32(data, byte_array.len() as i32);
+                    data.extend_from_slice(byte_array);
+                }
+                Tag::String(string) => {
+                    write_string(data, string);
+                }
+                Tag::List(list) => {
+                    list.write(data);
+                }
+                Tag::Compound(compound) => {
+                    compound.write(data);
+                }
+                Tag::IntArray(int_array) => {
+                    write_i32(data, int_array.len() as i32);
+                    data.extend_from_slice(&slice_into_u8_big_endian(int_array));
+                }
+                Tag::LongArray(long_array) => {
+                    write_i32(data, long_array.len() as i32);
+                    data.extend_from_slice(&slice_into_u8_big_endian(long_array));
+                }
+            }
+        }
+        data.push(END_ID);
     }
 
     #[inline]
@@ -271,22 +347,33 @@ impl CompoundTag {
 }
 
 /// A single NBT tag.
+#[repr(u8)]
 #[derive(Debug)]
 pub enum Tag {
-    Byte(i8),
-    Short(i16),
-    Int(i32),
-    Long(i64),
-    Float(f32),
-    Double(f64),
-    ByteArray(Vec<u8>),
-    String(Mutf8String),
-    List(ListTag),
-    Compound(CompoundTag),
-    IntArray(Vec<i32>),
-    LongArray(Vec<i64>),
+    Byte(i8) = BYTE_ID,
+    Short(i16) = SHORT_ID,
+    Int(i32) = INT_ID,
+    Long(i64) = LONG_ID,
+    Float(f32) = FLOAT_ID,
+    Double(f64) = DOUBLE_ID,
+    ByteArray(Vec<u8>) = BYTE_ARRAY_ID,
+    String(Mutf8String) = STRING_ID,
+    List(ListTag) = LIST_ID,
+    Compound(CompoundTag) = COMPOUND_ID,
+    IntArray(Vec<i32>) = INT_ARRAY_ID,
+    LongArray(Vec<i64>) = LONG_ARRAY_ID,
 }
 impl Tag {
+    /// Get the numerical ID of the tag type.
+    #[inline]
+    pub fn id(&self) -> u8 {
+        // SAFETY: Because `Self` is marked `repr(u8)`, its layout is a `repr(C)`
+        // `union` between `repr(C)` structs, each of which has the `u8`
+        // discriminant as its first field, so we can read the discriminant
+        // without offsetting the pointer.
+        unsafe { *<*const _>::from(self).cast::<u8>() }
+    }
+
     pub fn byte(&self) -> Option<i8> {
         match self {
             Tag::Byte(byte) => Some(*byte),
@@ -486,6 +573,23 @@ mod tests {
     }
 
     #[test]
+    fn read_write_complex_player() {
+        let src = include_bytes!("../../tests/complex_player.dat").to_vec();
+        let mut src_slice = src.as_slice();
+        let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
+        let mut decoded_src = Vec::new();
+        decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
+        let nbt = Nbt::new(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+
+        let mut out = Vec::new();
+        nbt.write(&mut out);
+        let nbt = Nbt::new(&mut Cursor::new(&out)).unwrap().unwrap();
+
+        assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
+        assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
+    }
+
+    #[test]
     fn inttest_1023() {
         let nbt = Nbt::new(&mut Cursor::new(include_bytes!(
             "../../tests/inttest1023.nbt"
@@ -566,37 +670,4 @@ mod tests {
         }
         assert_eq!(ints.len(), 1023);
     }
-
-    // #[test]
-    // fn generate_inttest() {
-    //     use byteorder::WriteBytesExt;
-
-    //     let mut out = Vec::new();
-    //     out.write_u8(COMPOUND_ID).unwrap();
-    //     out.write_u16::<BE>(0).unwrap();
-    //     out.write_u8(LIST_ID).unwrap();
-    //     out.write_u16::<BE>(0).unwrap();
-    //     out.write_u8(INT_ID).unwrap();
-    //     out.write_i32::<BE>(1023).unwrap();
-    //     for i in 0..1023 {
-    //         out.write_i32::<BE>(i).unwrap();
-    //     }
-    //     out.write_u8(END_ID).unwrap();
-
-    //     std::fs::write("tests/inttest1023.nbt", out).unwrap();
-    // }
-
-    // #[test]
-    // fn generate_stringtest() {
-    //     let mut out = Vec::new();
-    //     out.write_u8(COMPOUND_ID).unwrap();
-    //     out.write_u16::<BE>(0).unwrap();
-    //     out.write_u8(LIST_ID).unwrap();
-    //     out.write_u16::<BE>(0).unwrap();
-    //     out.write_u8(STRING_ID).unwrap();
-    //     out.write_i32::<BE>(16).unwrap();
-    //     out.extend_from_slice(&std::fs::read("tests/stringtest.nbt").unwrap().as_slice()[13..]);
-    //     out.write_u8(END_ID).unwrap();
-    //     std::fs::write("tests/stringtest2.nbt", out).unwrap();
-    // }
 }
