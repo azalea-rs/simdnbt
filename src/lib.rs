@@ -3,10 +3,10 @@
 //! afaik, this is currently the fastest nbt decoder in existence.
 //!
 //! ```
-//! use simdnbt::borrow::Nbt;
+//! use simdnbt::borrow::{Nbt, OptionalNbt};
 //! use std::io::Cursor;
 //!
-//! let nbt = Nbt::new(&mut Cursor::new(include_bytes!("../tests/hello_world.nbt"))).unwrap().unwrap();
+//! let nbt = OptionalNbt::read(&mut Cursor::new(include_bytes!("../tests/hello_world.nbt"))).unwrap().unwrap();
 //! assert_eq!(nbt.name().to_str(), "hello world");
 //! assert_eq!(nbt.string("name").unwrap().to_str(), "Bananrama");
 //! ```

@@ -15,7 +15,7 @@ use crate::{
     ReadError,
 };
 
-use super::{read_u32, CompoundTag, MAX_DEPTH};
+use super::{compound::CompoundTag, read_u32, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[repr(u8)]

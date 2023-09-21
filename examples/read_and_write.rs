@@ -10,7 +10,7 @@ fn main() {
     }
     let input = input.as_slice();
 
-    let nbt = simdnbt::owned::Nbt::new(&mut Cursor::new(input))
+    let nbt = simdnbt::owned::OptionalNbt::read(&mut Cursor::new(input))
         .unwrap()
         .unwrap();
 

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hint::black_box, io::Cursor};
 
-use simdnbt::borrow::Nbt;
+use simdnbt::borrow::{Nbt, OptionalNbt};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Item {
@@ -103,7 +103,7 @@ fn main() {
     let input = black_box(include_bytes!("../tests/realworld.nbt"));
 
     for _ in 0..10000 {
-        let nbt = Nbt::new(&mut Cursor::new(input));
+        let nbt = OptionalNbt::read(&mut Cursor::new(input));
         let nbt = black_box(nbt.unwrap().unwrap());
         black_box(simdnbt_items_from_nbt(nbt));
     }

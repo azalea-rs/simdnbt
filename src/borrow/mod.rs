@@ -1,23 +1,23 @@
 //! The borrowed variant of NBT. This is useful if you're only reading data and you can keep a reference to the original buffer.
 
+pub mod compound;
 pub mod list;
 
 use std::{io::Cursor, ops::Deref};
 
-use byteorder::{ReadBytesExt, BE};
+use byteorder::ReadBytesExt;
 
 use crate::{
     common::{
-        read_int_array, read_long_array, read_string, read_u32, read_with_u32_length,
-        unchecked_extend, unchecked_push, unchecked_write_string, write_string, BYTE_ARRAY_ID,
-        BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
-        LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
+        read_string, read_u32, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID,
+        END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH,
+        SHORT_ID, STRING_ID,
     },
     raw_list::RawList,
     Mutf8Str, ReadError,
 };
 
-use self::list::ListTag;
+use self::{compound::CompoundTag, list::ListTag};
 
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug, PartialEq)]
@@ -26,10 +26,44 @@ pub struct Nbt<'a> {
     tag: CompoundTag<'a>,
 }
 
-/// A list of named tags. The order of the tags is preserved.
-#[derive(Debug, Default, PartialEq)]
-pub struct CompoundTag<'a> {
-    values: Vec<(&'a Mutf8Str, Tag<'a>)>,
+pub enum OptionalNbt<'a> {
+    Some(Nbt<'a>),
+    None,
+}
+
+impl<'a> OptionalNbt<'a> {
+    /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
+    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<OptionalNbt<'a>, ReadError> {
+        let root_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
+        if root_type == END_ID {
+            return Ok(OptionalNbt::None);
+        }
+        if root_type != COMPOUND_ID {
+            return Err(ReadError::InvalidRootType(root_type));
+        }
+        let name = read_string(data)?;
+        let tag = CompoundTag::new(data, 0)?;
+
+        Ok(OptionalNbt::Some(Nbt { name, tag }))
+    }
+
+    pub fn unwrap(self) -> Nbt<'a> {
+        match self {
+            OptionalNbt::Some(nbt) => nbt,
+            OptionalNbt::None => panic!("called `OptionalNbt::unwrap()` on a `None` value"),
+        }
+    }
+
+    pub fn is_some(&self) -> bool {
+        match self {
+            OptionalNbt::Some(_) => true,
+            OptionalNbt::None => false,
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        !self.is_some()
+    }
 }
 
 impl<'a> Nbt<'a> {
@@ -47,222 +81,11 @@ impl<'a> Deref for Nbt<'a> {
 }
 
 impl<'a> Nbt<'a> {
-    /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
-    pub fn new(data: &mut Cursor<&'a [u8]>) -> Result<Option<Nbt<'a>>, ReadError> {
-        let root_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
-        if root_type == END_ID {
-            return Ok(None);
-        }
-        if root_type != COMPOUND_ID {
-            return Err(ReadError::InvalidRootType(root_type));
-        }
-        let name = read_string(data)?;
-        let tag = CompoundTag::new(data, 0)?;
-
-        Ok(Some(Nbt { name, tag }))
-    }
-
     pub fn write(&self, data: &mut Vec<u8>) {
         data.push(COMPOUND_ID);
         write_string(data, self.name);
         self.tag.write(data);
         data.push(END_ID);
-    }
-}
-
-impl<'a> CompoundTag<'a> {
-    fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, ReadError> {
-        if depth > MAX_DEPTH {
-            return Err(ReadError::MaxDepthExceeded);
-        }
-        let mut values = Vec::with_capacity(4);
-        loop {
-            let tag_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
-            if tag_type == END_ID {
-                break;
-            }
-            let tag_name = read_string(data)?;
-
-            match tag_type {
-                BYTE_ID => values.push((
-                    tag_name,
-                    Tag::Byte(data.read_i8().map_err(|_| ReadError::UnexpectedEof)?),
-                )),
-                SHORT_ID => values.push((
-                    tag_name,
-                    Tag::Short(
-                        data.read_i16::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
-                )),
-                INT_ID => values.push((
-                    tag_name,
-                    Tag::Int(
-                        data.read_i32::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
-                )),
-                LONG_ID => values.push((
-                    tag_name,
-                    Tag::Long(
-                        data.read_i64::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
-                )),
-                FLOAT_ID => values.push((
-                    tag_name,
-                    Tag::Float(
-                        data.read_f32::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
-                )),
-                DOUBLE_ID => values.push((
-                    tag_name,
-                    Tag::Double(
-                        data.read_f64::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
-                )),
-                BYTE_ARRAY_ID => {
-                    values.push((tag_name, Tag::ByteArray(read_with_u32_length(data, 1)?)))
-                }
-                STRING_ID => values.push((tag_name, Tag::String(read_string(data)?))),
-                LIST_ID => values.push((tag_name, Tag::List(ListTag::new(data, depth + 1)?))),
-                COMPOUND_ID => {
-                    values.push((tag_name, Tag::Compound(CompoundTag::new(data, depth + 1)?)))
-                }
-                INT_ARRAY_ID => values.push((tag_name, Tag::IntArray(read_int_array(data)?))),
-                LONG_ARRAY_ID => values.push((tag_name, Tag::LongArray(read_long_array(data)?))),
-                _ => return Err(ReadError::UnknownTagId(tag_type)),
-            }
-        }
-        Ok(Self { values })
-    }
-
-    pub fn write(&self, data: &mut Vec<u8>) {
-        for (name, tag) in &self.values {
-            // reserve 4 bytes extra so we can avoid reallocating for small tags
-            data.reserve(1 + 2 + name.len() + 4);
-            // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
-            // 4 bytes of tag data.
-            unsafe {
-                unchecked_push(data, tag.id());
-                unchecked_write_string(data, name);
-            }
-            match tag {
-                Tag::Byte(byte) => unsafe {
-                    unchecked_push(data, *byte as u8);
-                },
-                Tag::Short(short) => unsafe {
-                    unchecked_extend(data, &short.to_be_bytes());
-                },
-                Tag::Int(int) => unsafe {
-                    unchecked_extend(data, &int.to_be_bytes());
-                },
-                Tag::Long(long) => {
-                    data.extend_from_slice(&long.to_be_bytes());
-                }
-                Tag::Float(float) => unsafe {
-                    unchecked_extend(data, &float.to_be_bytes());
-                },
-                Tag::Double(double) => {
-                    data.extend_from_slice(&double.to_be_bytes());
-                }
-                Tag::ByteArray(byte_array) => {
-                    unsafe {
-                        unchecked_extend(data, &byte_array.len().to_be_bytes());
-                    }
-                    data.extend_from_slice(byte_array);
-                }
-                Tag::String(string) => {
-                    write_string(data, string);
-                }
-                Tag::List(list) => {
-                    list.write(data);
-                }
-                Tag::Compound(compound) => {
-                    compound.write(data);
-                }
-                Tag::IntArray(int_array) => {
-                    unsafe {
-                        unchecked_extend(data, &int_array.len().to_be_bytes());
-                    }
-                    data.extend_from_slice(&int_array.as_big_endian());
-                }
-                Tag::LongArray(long_array) => {
-                    unsafe {
-                        unchecked_extend(data, &long_array.len().to_be_bytes());
-                    }
-                    data.extend_from_slice(&long_array.as_big_endian());
-                }
-            }
-        }
-        data.push(END_ID);
-    }
-
-    #[inline]
-    pub fn get(&self, name: &str) -> Option<&Tag<'a>> {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, value) in &self.values {
-            if key == &name {
-                return Some(value);
-            }
-        }
-        None
-    }
-
-    /// Returns whether there is a tag with the given name.
-    pub fn contains(&self, name: &str) -> bool {
-        let name = Mutf8Str::from_str(name);
-        let name = name.as_ref();
-        for (key, _) in &self.values {
-            if key == &name {
-                return true;
-            }
-        }
-        false
-    }
-
-    pub fn byte(&self, name: &str) -> Option<i8> {
-        self.get(name).and_then(|tag| tag.byte())
-    }
-    pub fn short(&self, name: &str) -> Option<i16> {
-        self.get(name).and_then(|tag| tag.short())
-    }
-    pub fn int(&self, name: &str) -> Option<i32> {
-        self.get(name).and_then(|tag| tag.int())
-    }
-    pub fn long(&self, name: &str) -> Option<i64> {
-        self.get(name).and_then(|tag| tag.long())
-    }
-    pub fn float(&self, name: &str) -> Option<f32> {
-        self.get(name).and_then(|tag| tag.float())
-    }
-    pub fn double(&self, name: &str) -> Option<f64> {
-        self.get(name).and_then(|tag| tag.double())
-    }
-    pub fn byte_array(&self, name: &str) -> Option<&[u8]> {
-        self.get(name).and_then(|tag| tag.byte_array())
-    }
-    pub fn string(&self, name: &str) -> Option<&Mutf8Str> {
-        self.get(name).and_then(|tag| tag.string())
-    }
-    pub fn list(&self, name: &str) -> Option<&ListTag<'a>> {
-        self.get(name).and_then(|tag| tag.list())
-    }
-    pub fn compound(&self, name: &str) -> Option<&CompoundTag<'a>> {
-        self.get(name).and_then(|tag| tag.compound())
-    }
-    pub fn int_array(&self, name: &str) -> Option<Vec<i32>> {
-        self.get(name).and_then(|tag| tag.int_array())
-    }
-    pub fn long_array(&self, name: &str) -> Option<Vec<i64>> {
-        self.get(name).and_then(|tag| tag.long_array())
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &Tag<'a>)> {
-        self.values.iter().map(|(k, v)| (*k, v))
     }
 }
 
@@ -372,7 +195,7 @@ impl<'a> Tag<'a> {
 mod tests {
     use std::io::Read;
 
-    use byteorder::WriteBytesExt;
+    use byteorder::{WriteBytesExt, BE};
     use flate2::read::GzDecoder;
 
     use crate::common::{INT_ID, LIST_ID, LONG_ID};
@@ -381,7 +204,7 @@ mod tests {
 
     #[test]
     fn hello_world() {
-        let nbt = Nbt::new(&mut Cursor::new(include_bytes!(
+        let nbt = OptionalNbt::read(&mut Cursor::new(include_bytes!(
             "../../tests/hello_world.nbt"
         )))
         .unwrap()
@@ -401,7 +224,9 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = Nbt::new(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+        let nbt = OptionalNbt::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
 
         assert_eq!(nbt.int("PersistentId"), Some(1946940766));
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
@@ -414,7 +239,9 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = Nbt::new(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+        let nbt = OptionalNbt::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
@@ -427,11 +254,13 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = Nbt::new(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+        let nbt = OptionalNbt::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
 
         let mut out = Vec::new();
         nbt.write(&mut out);
-        let nbt = Nbt::new(&mut Cursor::new(&out)).unwrap().unwrap();
+        let nbt = OptionalNbt::read(&mut Cursor::new(&out)).unwrap().unwrap();
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
@@ -439,7 +268,7 @@ mod tests {
 
     #[test]
     fn inttest_1023() {
-        let nbt = Nbt::new(&mut Cursor::new(include_bytes!(
+        let nbt = OptionalNbt::read(&mut Cursor::new(include_bytes!(
             "../../tests/inttest1023.nbt"
         )))
         .unwrap()
@@ -467,7 +296,7 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = Nbt::new(&mut Cursor::new(&data)).unwrap().unwrap();
+        let nbt = OptionalNbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
         let ints = nbt.list("").unwrap().ints().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
@@ -489,7 +318,7 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = Nbt::new(&mut Cursor::new(&data)).unwrap().unwrap();
+        let nbt = OptionalNbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
         let ints = nbt.list("").unwrap().ints().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
@@ -511,7 +340,7 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = Nbt::new(&mut Cursor::new(&data)).unwrap().unwrap();
+        let nbt = OptionalNbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
         let ints = nbt.list("").unwrap().longs().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i64, item);
