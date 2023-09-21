@@ -9,7 +9,7 @@ use crate::{
         DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID,
         MAX_DEPTH, SHORT_ID, STRING_ID,
     },
-    Mutf8Str, ReadError,
+    Error, Mutf8Str,
 };
 
 use super::{list::ListTag, Tag};
@@ -21,13 +21,13 @@ pub struct CompoundTag<'a> {
 }
 
 impl<'a> CompoundTag<'a> {
-    pub fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, ReadError> {
+    pub fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
-            return Err(ReadError::MaxDepthExceeded);
+            return Err(Error::MaxDepthExceeded);
         }
         let mut values = Vec::with_capacity(4);
         loop {
-            let tag_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
+            let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
             if tag_type == END_ID {
                 break;
             }
@@ -36,42 +36,27 @@ impl<'a> CompoundTag<'a> {
             match tag_type {
                 BYTE_ID => values.push((
                     tag_name,
-                    Tag::Byte(data.read_i8().map_err(|_| ReadError::UnexpectedEof)?),
+                    Tag::Byte(data.read_i8().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 SHORT_ID => values.push((
                     tag_name,
-                    Tag::Short(
-                        data.read_i16::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
+                    Tag::Short(data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 INT_ID => values.push((
                     tag_name,
-                    Tag::Int(
-                        data.read_i32::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
+                    Tag::Int(data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 LONG_ID => values.push((
                     tag_name,
-                    Tag::Long(
-                        data.read_i64::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
+                    Tag::Long(data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 FLOAT_ID => values.push((
                     tag_name,
-                    Tag::Float(
-                        data.read_f32::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
+                    Tag::Float(data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 DOUBLE_ID => values.push((
                     tag_name,
-                    Tag::Double(
-                        data.read_f64::<BE>()
-                            .map_err(|_| ReadError::UnexpectedEof)?,
-                    ),
+                    Tag::Double(data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 BYTE_ARRAY_ID => {
                     values.push((tag_name, Tag::ByteArray(read_with_u32_length(data, 1)?)))
@@ -83,7 +68,7 @@ impl<'a> CompoundTag<'a> {
                 }
                 INT_ARRAY_ID => values.push((tag_name, Tag::IntArray(read_int_array(data)?))),
                 LONG_ARRAY_ID => values.push((tag_name, Tag::LongArray(read_long_array(data)?))),
-                _ => return Err(ReadError::UnknownTagId(tag_type)),
+                _ => return Err(Error::UnknownTagId(tag_type)),
             }
         }
         Ok(Self { values })

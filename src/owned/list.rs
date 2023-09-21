@@ -12,7 +12,7 @@ use crate::{
     },
     mutf8::Mutf8String,
     swap_endianness::swap_endianness,
-    ReadError,
+    Error,
 };
 
 use super::{compound::CompoundTag, read_u32, MAX_DEPTH};
@@ -37,11 +37,11 @@ pub enum ListTag {
     LongArray(Vec<Vec<i64>>) = LONG_ARRAY_ID,
 }
 impl ListTag {
-    pub fn new(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, ReadError> {
+    pub fn new(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
-            return Err(ReadError::MaxDepthExceeded);
+            return Err(Error::MaxDepthExceeded);
         }
-        let tag_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
+        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         Ok(match tag_type {
             END_ID => {
                 data.set_position(data.position() + 4);
@@ -107,7 +107,7 @@ impl ListTag {
                 }
                 arrays
             }),
-            _ => return Err(ReadError::UnknownTagId(tag_type)),
+            _ => return Err(Error::UnknownTagId(tag_type)),
         })
     }
 

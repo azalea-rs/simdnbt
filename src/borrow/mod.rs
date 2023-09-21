@@ -14,7 +14,7 @@ use crate::{
         SHORT_ID, STRING_ID,
     },
     raw_list::RawList,
-    Mutf8Str, ReadError,
+    Error, Mutf8Str,
 };
 
 use self::{compound::CompoundTag, list::ListTag};
@@ -34,13 +34,13 @@ pub enum OptionalNbt<'a> {
 
 impl<'a> OptionalNbt<'a> {
     /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
-    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<OptionalNbt<'a>, ReadError> {
-        let root_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
+    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<OptionalNbt<'a>, Error> {
+        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(OptionalNbt::None);
         }
         if root_type != COMPOUND_ID {
-            return Err(ReadError::InvalidRootType(root_type));
+            return Err(Error::InvalidRootType(root_type));
         }
         let name = read_string(data)?;
         let tag = CompoundTag::new(data, 0)?;

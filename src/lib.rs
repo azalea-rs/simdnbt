@@ -23,5 +23,5 @@ pub mod owned;
 pub mod raw_list;
 pub mod swap_endianness;
 
-pub use error::ReadError;
+pub use error::Error;
 pub use mutf8::Mutf8Str;

@@ -10,7 +10,7 @@ use crate::{
         FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
     },
     raw_list::RawList,
-    Mutf8Str, ReadError,
+    Error, Mutf8Str,
 };
 
 use super::{read_u32, CompoundTag, MAX_DEPTH};
@@ -35,11 +35,11 @@ pub enum ListTag<'a> {
     LongArray(Vec<RawList<'a, i64>>) = LONG_ARRAY_ID,
 }
 impl<'a> ListTag<'a> {
-    pub fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, ReadError> {
+    pub fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
-            return Err(ReadError::MaxDepthExceeded);
+            return Err(Error::MaxDepthExceeded);
         }
-        let tag_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
+        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         Ok(match tag_type {
             END_ID => {
                 data.set_position(data.position() + 4);
@@ -105,7 +105,7 @@ impl<'a> ListTag<'a> {
                 }
                 arrays
             }),
-            _ => return Err(ReadError::UnknownTagId(tag_type)),
+            _ => return Err(Error::UnknownTagId(tag_type)),
         })
     }
 
