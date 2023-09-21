@@ -1,7 +1,7 @@
 //! The owned variant of NBT. This is useful if you're writing data from scratch or if you can't keep a reference to the original data.
 
-pub mod compound;
-pub mod list;
+mod compound;
+mod list;
 
 use std::{io::Cursor, ops::Deref};
 
@@ -17,10 +17,10 @@ use crate::{
     Error, Mutf8Str,
 };
 
-use self::{compound::CompoundTag, list::ListTag};
+pub use self::{compound::CompoundTag, list::ListTag};
 
 /// A complete NBT container. This contains a name and a compound tag.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Nbt {
     name: Mutf8String,
     tag: CompoundTag,
@@ -33,6 +33,10 @@ pub enum OptionalNbt {
 }
 
 impl OptionalNbt {
+    pub fn new(name: Mutf8String, tag: CompoundTag) -> Self {
+        Self::Some(Nbt { name, tag })
+    }
+
     /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
     pub fn read(data: &mut Cursor<&[u8]>) -> Result<OptionalNbt, Error> {
         let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
@@ -77,9 +81,20 @@ impl OptionalNbt {
 }
 
 impl Nbt {
+    pub fn new(name: Mutf8String, tag: CompoundTag) -> Self {
+        Self { name, tag }
+    }
+
     /// Get the name of the NBT compound. This is often an empty string.
     pub fn name(&self) -> &Mutf8Str {
         &self.name
+    }
+
+    /// Writes the NBT to the given buffer.
+    pub fn write(&self, data: &mut Vec<u8>) {
+        data.push(COMPOUND_ID);
+        write_string(data, &self.name);
+        self.tag.write(data);
     }
 }
 impl Deref for Nbt {
@@ -87,15 +102,6 @@ impl Deref for Nbt {
 
     fn deref(&self) -> &Self::Target {
         &self.tag
-    }
-}
-
-impl Nbt {
-    /// Writes the NBT to the given buffer.
-    pub fn write(&self, data: &mut Vec<u8>) {
-        data.push(COMPOUND_ID);
-        write_string(data, &self.name);
-        self.tag.write(data);
     }
 }
 

@@ -1,7 +1,7 @@
 //! The borrowed variant of NBT. This is useful if you're only reading data and you can keep a reference to the original buffer.
 
-pub mod compound;
-pub mod list;
+mod compound;
+mod list;
 
 use std::{io::Cursor, ops::Deref};
 
@@ -17,7 +17,7 @@ use crate::{
     Error, Mutf8Str,
 };
 
-use self::{compound::CompoundTag, list::ListTag};
+pub use self::{compound::CompoundTag, list::ListTag};
 
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug, PartialEq)]
