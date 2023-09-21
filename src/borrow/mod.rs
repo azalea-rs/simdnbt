@@ -20,14 +20,14 @@ use crate::{
 use self::list::ListTag;
 
 /// A complete NBT container. This contains a name and a compound tag.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Nbt<'a> {
     name: &'a Mutf8Str,
     tag: CompoundTag<'a>,
 }
 
 /// A list of named tags. The order of the tags is preserved.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq)]
 pub struct CompoundTag<'a> {
     values: Vec<(&'a Mutf8Str, Tag<'a>)>,
 }
@@ -268,7 +268,7 @@ impl<'a> CompoundTag<'a> {
 
 /// A single NBT tag.
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Tag<'a> {
     Byte(i8) = BYTE_ID,
     Short(i16) = SHORT_ID,

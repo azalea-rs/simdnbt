@@ -13,7 +13,7 @@ pub struct Mutf8Str {
     pub(crate) slice: [u8],
 }
 /// An owned M-UTF8 string.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Mutf8String {
     vec: Vec<u8>,
 }

@@ -20,7 +20,7 @@ use crate::{
 use self::list::ListTag;
 
 /// A complete NBT container. This contains a name and a compound tag.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Nbt {
     name: Mutf8String,
     tag: CompoundTag,
@@ -64,7 +64,7 @@ impl Nbt {
 }
 
 /// A list of named tags. The order of the tags is preserved.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct CompoundTag {
     values: Vec<(Mutf8String, Tag)>,
 }
@@ -74,7 +74,7 @@ impl CompoundTag {
         if depth > MAX_DEPTH {
             return Err(ReadError::MaxDepthExceeded);
         }
-        let mut values = Vec::with_capacity(4);
+        let mut values = Vec::with_capacity(8);
         loop {
             let tag_type = data.read_u8().map_err(|_| ReadError::UnexpectedEof)?;
             if tag_type == END_ID {
@@ -360,7 +360,7 @@ impl CompoundTag {
 
 /// A single NBT tag.
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Tag {
     Byte(i8) = BYTE_ID,
     Short(i16) = SHORT_ID,

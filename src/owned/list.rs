@@ -19,7 +19,7 @@ use super::{read_u32, CompoundTag, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[repr(u8)]
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum ListTag {
     #[default]
     Empty = END_ID,
