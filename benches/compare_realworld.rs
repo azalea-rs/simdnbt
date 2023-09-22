@@ -33,7 +33,7 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
             graphite_items_from_nbt(graphite_binary::nbt::decode::read(&mut &input[..]).unwrap())
                 .unwrap();
         let simdnbt_nbt = simdnbt_items_from_nbt(
-            simdnbt::borrow::OptionalNbt::read(&mut Cursor::new(input))
+            simdnbt::borrow::Nbt::read(&mut Cursor::new(input))
                 .unwrap()
                 .unwrap(),
         )
@@ -63,7 +63,7 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     group.bench_function("simdnbt_parse", |b| {
         b.iter(|| {
             let input = black_box(input);
-            let nbt = black_box(simdnbt::borrow::OptionalNbt::read(&mut Cursor::new(input)));
+            let nbt = black_box(simdnbt::borrow::Nbt::read(&mut Cursor::new(input)));
             let nbt = nbt.unwrap().unwrap();
             black_box(simdnbt_items_from_nbt(nbt));
         })
@@ -97,7 +97,7 @@ pub struct ItemDisplay {
     pub color: Option<i32>,
 }
 
-fn simdnbt_items_from_nbt(nbt: simdnbt::borrow::Nbt) -> Option<Vec<Option<Item>>> {
+fn simdnbt_items_from_nbt(nbt: simdnbt::borrow::BaseNbt) -> Option<Vec<Option<Item>>> {
     let mut items = Vec::new();
     for item_nbt in nbt
         .list("i")

@@ -35,7 +35,7 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     //     })
     // });
 
-    let nbt = simdnbt::borrow::OptionalNbt::read(&mut Cursor::new(input))
+    let nbt = simdnbt::borrow::Nbt::read(&mut Cursor::new(input))
         .unwrap()
         .unwrap();
     group.bench_function("simdnbt_borrow_write", |b| {
@@ -56,7 +56,7 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     //         black_box(nbt);
     //     })
     // });
-    let nbt = simdnbt::owned::OptionalNbt::read(&mut Cursor::new(input))
+    let nbt = simdnbt::owned::Nbt::read(&mut Cursor::new(input))
         .unwrap()
         .unwrap();
     group.bench_function("simdnbt_owned_write", |b| {

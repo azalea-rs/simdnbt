@@ -21,23 +21,23 @@ pub use self::{compound::CompoundTag, list::ListTag};
 
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug, PartialEq)]
-pub struct Nbt<'a> {
+pub struct BaseNbt<'a> {
     name: &'a Mutf8Str,
     tag: CompoundTag<'a>,
 }
 
 #[derive(Debug, PartialEq)]
-pub enum OptionalNbt<'a> {
-    Some(Nbt<'a>),
+pub enum Nbt<'a> {
+    Some(BaseNbt<'a>),
     None,
 }
 
-impl<'a> OptionalNbt<'a> {
+impl<'a> Nbt<'a> {
     /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
-    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<OptionalNbt<'a>, Error> {
+    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
         let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
-            return Ok(OptionalNbt::None);
+            return Ok(Nbt::None);
         }
         if root_type != COMPOUND_ID {
             return Err(Error::InvalidRootType(root_type));
@@ -45,29 +45,29 @@ impl<'a> OptionalNbt<'a> {
         let name = read_string(data)?;
         let tag = CompoundTag::new(data, 0)?;
 
-        Ok(OptionalNbt::Some(Nbt { name, tag }))
+        Ok(Nbt::Some(BaseNbt { name, tag }))
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
         match self {
-            OptionalNbt::Some(nbt) => nbt.write(data),
-            OptionalNbt::None => {
+            Nbt::Some(nbt) => nbt.write(data),
+            Nbt::None => {
                 data.push(END_ID);
             }
         }
     }
 
-    pub fn unwrap(self) -> Nbt<'a> {
+    pub fn unwrap(self) -> BaseNbt<'a> {
         match self {
-            OptionalNbt::Some(nbt) => nbt,
-            OptionalNbt::None => panic!("called `OptionalNbt::unwrap()` on a `None` value"),
+            Nbt::Some(nbt) => nbt,
+            Nbt::None => panic!("called `OptionalNbt::unwrap()` on a `None` value"),
         }
     }
 
     pub fn is_some(&self) -> bool {
         match self {
-            OptionalNbt::Some(_) => true,
-            OptionalNbt::None => false,
+            Nbt::Some(_) => true,
+            Nbt::None => false,
         }
     }
 
@@ -76,13 +76,13 @@ impl<'a> OptionalNbt<'a> {
     }
 }
 
-impl<'a> Nbt<'a> {
+impl<'a> BaseNbt<'a> {
     /// Get the name of the NBT compound. This is often an empty string.
     pub fn name(&self) -> &'a Mutf8Str {
         self.name
     }
 }
-impl<'a> Deref for Nbt<'a> {
+impl<'a> Deref for BaseNbt<'a> {
     type Target = CompoundTag<'a>;
 
     fn deref(&self) -> &Self::Target {
@@ -90,7 +90,7 @@ impl<'a> Deref for Nbt<'a> {
     }
 }
 
-impl<'a> Nbt<'a> {
+impl<'a> BaseNbt<'a> {
     pub fn write(&self, data: &mut Vec<u8>) {
         data.push(COMPOUND_ID);
         write_string(data, self.name);
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn hello_world() {
-        let nbt = OptionalNbt::read(&mut Cursor::new(include_bytes!(
+        let nbt = Nbt::read(&mut Cursor::new(include_bytes!(
             "../../tests/hello_world.nbt"
         )))
         .unwrap()
@@ -234,9 +234,7 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = OptionalNbt::read(&mut Cursor::new(&decoded_src))
-            .unwrap()
-            .unwrap();
+        let nbt = Nbt::read(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
 
         assert_eq!(nbt.int("PersistentId"), Some(1946940766));
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
@@ -249,9 +247,7 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = OptionalNbt::read(&mut Cursor::new(&decoded_src))
-            .unwrap()
-            .unwrap();
+        let nbt = Nbt::read(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
@@ -264,13 +260,11 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = OptionalNbt::read(&mut Cursor::new(&decoded_src))
-            .unwrap()
-            .unwrap();
+        let nbt = Nbt::read(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
 
         let mut out = Vec::new();
         nbt.write(&mut out);
-        let nbt = OptionalNbt::read(&mut Cursor::new(&out)).unwrap().unwrap();
+        let nbt = Nbt::read(&mut Cursor::new(&out)).unwrap().unwrap();
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
@@ -278,7 +272,7 @@ mod tests {
 
     #[test]
     fn inttest_1023() {
-        let nbt = OptionalNbt::read(&mut Cursor::new(include_bytes!(
+        let nbt = Nbt::read(&mut Cursor::new(include_bytes!(
             "../../tests/inttest1023.nbt"
         )))
         .unwrap()
@@ -306,7 +300,7 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = OptionalNbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        let nbt = Nbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
         let ints = nbt.list("").unwrap().ints().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
@@ -328,7 +322,7 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = OptionalNbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        let nbt = Nbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
         let ints = nbt.list("").unwrap().ints().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
@@ -350,7 +344,7 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = OptionalNbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        let nbt = Nbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
         let ints = nbt.list("").unwrap().longs().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i64, item);
