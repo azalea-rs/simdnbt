@@ -17,13 +17,13 @@ use crate::{
     Error, Mutf8Str,
 };
 
-pub use self::{compound::CompoundTag, list::ListTag};
+pub use self::{compound::NbtCompound, list::ListTag};
 
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug, PartialEq)]
 pub struct BaseNbt<'a> {
     name: &'a Mutf8Str,
-    tag: CompoundTag<'a>,
+    tag: NbtCompound<'a>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -43,7 +43,7 @@ impl<'a> Nbt<'a> {
             return Err(Error::InvalidRootType(root_type));
         }
         let name = read_string(data)?;
-        let tag = CompoundTag::new(data, 0)?;
+        let tag = NbtCompound::read_with_depth(data, 0)?;
 
         Ok(Nbt::Some(BaseNbt { name, tag }))
     }
@@ -83,7 +83,7 @@ impl<'a> BaseNbt<'a> {
     }
 }
 impl<'a> Deref for BaseNbt<'a> {
-    type Target = CompoundTag<'a>;
+    type Target = NbtCompound<'a>;
 
     fn deref(&self) -> &Self::Target {
         &self.tag
@@ -102,7 +102,7 @@ impl<'a> BaseNbt<'a> {
 /// A single NBT tag.
 #[repr(u8)]
 #[derive(Debug, PartialEq)]
-pub enum Tag<'a> {
+pub enum NbtTag<'a> {
     Byte(i8) = BYTE_ID,
     Short(i16) = SHORT_ID,
     Int(i32) = INT_ID,
@@ -112,11 +112,11 @@ pub enum Tag<'a> {
     ByteArray(&'a [u8]) = BYTE_ARRAY_ID,
     String(&'a Mutf8Str) = STRING_ID,
     List(ListTag<'a>) = LIST_ID,
-    Compound(CompoundTag<'a>) = COMPOUND_ID,
+    Compound(NbtCompound<'a>) = COMPOUND_ID,
     IntArray(RawList<'a, i32>) = INT_ARRAY_ID,
     LongArray(RawList<'a, i64>) = LONG_ARRAY_ID,
 }
-impl<'a> Tag<'a> {
+impl<'a> NbtTag<'a> {
     /// Get the numerical ID of the tag type.
     #[inline]
     pub fn id(&self) -> u8 {
@@ -129,73 +129,73 @@ impl<'a> Tag<'a> {
 
     pub fn byte(&self) -> Option<i8> {
         match self {
-            Tag::Byte(byte) => Some(*byte),
+            NbtTag::Byte(byte) => Some(*byte),
             _ => None,
         }
     }
     pub fn short(&self) -> Option<i16> {
         match self {
-            Tag::Short(short) => Some(*short),
+            NbtTag::Short(short) => Some(*short),
             _ => None,
         }
     }
     pub fn int(&self) -> Option<i32> {
         match self {
-            Tag::Int(int) => Some(*int),
+            NbtTag::Int(int) => Some(*int),
             _ => None,
         }
     }
     pub fn long(&self) -> Option<i64> {
         match self {
-            Tag::Long(long) => Some(*long),
+            NbtTag::Long(long) => Some(*long),
             _ => None,
         }
     }
     pub fn float(&self) -> Option<f32> {
         match self {
-            Tag::Float(float) => Some(*float),
+            NbtTag::Float(float) => Some(*float),
             _ => None,
         }
     }
     pub fn double(&self) -> Option<f64> {
         match self {
-            Tag::Double(double) => Some(*double),
+            NbtTag::Double(double) => Some(*double),
             _ => None,
         }
     }
     pub fn byte_array(&self) -> Option<&[u8]> {
         match self {
-            Tag::ByteArray(byte_array) => Some(byte_array),
+            NbtTag::ByteArray(byte_array) => Some(byte_array),
             _ => None,
         }
     }
     pub fn string(&self) -> Option<&Mutf8Str> {
         match self {
-            Tag::String(string) => Some(string),
+            NbtTag::String(string) => Some(string),
             _ => None,
         }
     }
     pub fn list(&self) -> Option<&ListTag<'a>> {
         match self {
-            Tag::List(list) => Some(list),
+            NbtTag::List(list) => Some(list),
             _ => None,
         }
     }
-    pub fn compound(&self) -> Option<&CompoundTag<'a>> {
+    pub fn compound(&self) -> Option<&NbtCompound<'a>> {
         match self {
-            Tag::Compound(compound) => Some(compound),
+            NbtTag::Compound(compound) => Some(compound),
             _ => None,
         }
     }
     pub fn int_array(&self) -> Option<Vec<i32>> {
         match self {
-            Tag::IntArray(int_array) => Some(int_array.to_vec()),
+            NbtTag::IntArray(int_array) => Some(int_array.to_vec()),
             _ => None,
         }
     }
     pub fn long_array(&self) -> Option<Vec<i64>> {
         match self {
-            Tag::LongArray(long_array) => Some(long_array.to_vec()),
+            NbtTag::LongArray(long_array) => Some(long_array.to_vec()),
             _ => None,
         }
     }

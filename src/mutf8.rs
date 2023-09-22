@@ -15,7 +15,7 @@ pub struct Mutf8Str {
 /// An owned M-UTF8 string.
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct Mutf8String {
-    vec: Vec<u8>,
+    pub(crate) vec: Vec<u8>,
 }
 
 #[inline]
@@ -168,6 +168,16 @@ impl Mutf8String {
     pub fn len(&self) -> usize {
         self.vec.len()
     }
+
+    #[inline]
+    pub fn from_vec(vec: Vec<u8>) -> Mutf8String {
+        Self { vec }
+    }
+
+    #[inline]
+    pub fn from_string(s: String) -> Mutf8String {
+        Self::from_vec(mutf8::encode(&s).into_owned())
+    }
 }
 impl Deref for Mutf8String {
     type Target = Mutf8Str;
@@ -178,7 +188,12 @@ impl Deref for Mutf8String {
     }
 }
 
-// TODO: make Mutf8 correct
+impl From<String> for Mutf8String {
+    #[inline]
+    fn from(s: String) -> Self {
+        Self::from_string(s)
+    }
+}
 
 #[cfg(test)]
 mod tests {

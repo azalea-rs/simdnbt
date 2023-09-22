@@ -15,7 +15,7 @@ use crate::{
     Error,
 };
 
-use super::{compound::CompoundTag, read_u32, MAX_DEPTH};
+use super::{compound::NbtCompound, read_u32, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[repr(u8)]
@@ -32,12 +32,12 @@ pub enum ListTag {
     ByteArray(Vec<Vec<u8>>) = BYTE_ARRAY_ID,
     String(Vec<Mutf8String>) = STRING_ID,
     List(Vec<ListTag>) = LIST_ID,
-    Compound(Vec<CompoundTag>) = COMPOUND_ID,
+    Compound(Vec<NbtCompound>) = COMPOUND_ID,
     IntArray(Vec<Vec<i32>>) = INT_ARRAY_ID,
     LongArray(Vec<Vec<i64>>) = LONG_ARRAY_ID,
 }
 impl ListTag {
-    pub fn new(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
+    pub fn read(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
@@ -76,7 +76,7 @@ impl ListTag {
                 // arbitrary number to prevent big allocations
                 let mut lists = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    lists.push(ListTag::new(data, depth + 1)?)
+                    lists.push(ListTag::read(data, depth + 1)?)
                 }
                 lists
             }),
@@ -85,7 +85,7 @@ impl ListTag {
                 // arbitrary number to prevent big allocations
                 let mut compounds = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    compounds.push(CompoundTag::new(data, depth + 1)?)
+                    compounds.push(NbtCompound::read_with_depth(data, depth + 1)?)
                 }
                 compounds
             }),
@@ -249,7 +249,7 @@ impl ListTag {
             _ => None,
         }
     }
-    pub fn compounds(&self) -> Option<&[CompoundTag]> {
+    pub fn compounds(&self) -> Option<&[NbtCompound]> {
         match self {
             ListTag::Compound(compounds) => Some(compounds),
             _ => None,

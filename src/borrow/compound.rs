@@ -12,16 +12,20 @@ use crate::{
     Error, Mutf8Str,
 };
 
-use super::{list::ListTag, Tag};
+use super::{list::ListTag, NbtTag};
 
 /// A list of named tags. The order of the tags is preserved.
 #[derive(Debug, Default, PartialEq)]
-pub struct CompoundTag<'a> {
-    values: Vec<(&'a Mutf8Str, Tag<'a>)>,
+pub struct NbtCompound<'a> {
+    values: Vec<(&'a Mutf8Str, NbtTag<'a>)>,
 }
 
-impl<'a> CompoundTag<'a> {
-    pub fn new(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+impl<'a> NbtCompound<'a> {
+    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
+        Self::read_with_depth(data, 0)
+    }
+
+    pub fn read_with_depth(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
@@ -36,38 +40,39 @@ impl<'a> CompoundTag<'a> {
             match tag_type {
                 BYTE_ID => values.push((
                     tag_name,
-                    Tag::Byte(data.read_i8().map_err(|_| Error::UnexpectedEof)?),
+                    NbtTag::Byte(data.read_i8().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 SHORT_ID => values.push((
                     tag_name,
-                    Tag::Short(data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    NbtTag::Short(data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 INT_ID => values.push((
                     tag_name,
-                    Tag::Int(data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    NbtTag::Int(data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 LONG_ID => values.push((
                     tag_name,
-                    Tag::Long(data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    NbtTag::Long(data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 FLOAT_ID => values.push((
                     tag_name,
-                    Tag::Float(data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    NbtTag::Float(data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 DOUBLE_ID => values.push((
                     tag_name,
-                    Tag::Double(data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?),
+                    NbtTag::Double(data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?),
                 )),
                 BYTE_ARRAY_ID => {
-                    values.push((tag_name, Tag::ByteArray(read_with_u32_length(data, 1)?)))
+                    values.push((tag_name, NbtTag::ByteArray(read_with_u32_length(data, 1)?)))
                 }
-                STRING_ID => values.push((tag_name, Tag::String(read_string(data)?))),
-                LIST_ID => values.push((tag_name, Tag::List(ListTag::new(data, depth + 1)?))),
-                COMPOUND_ID => {
-                    values.push((tag_name, Tag::Compound(CompoundTag::new(data, depth + 1)?)))
-                }
-                INT_ARRAY_ID => values.push((tag_name, Tag::IntArray(read_int_array(data)?))),
-                LONG_ARRAY_ID => values.push((tag_name, Tag::LongArray(read_long_array(data)?))),
+                STRING_ID => values.push((tag_name, NbtTag::String(read_string(data)?))),
+                LIST_ID => values.push((tag_name, NbtTag::List(ListTag::read(data, depth + 1)?))),
+                COMPOUND_ID => values.push((
+                    tag_name,
+                    NbtTag::Compound(NbtCompound::read_with_depth(data, depth + 1)?),
+                )),
+                INT_ARRAY_ID => values.push((tag_name, NbtTag::IntArray(read_int_array(data)?))),
+                LONG_ARRAY_ID => values.push((tag_name, NbtTag::LongArray(read_long_array(data)?))),
                 _ => return Err(Error::UnknownTagId(tag_type)),
             }
         }
@@ -85,46 +90,46 @@ impl<'a> CompoundTag<'a> {
                 unchecked_write_string(data, name);
             }
             match tag {
-                Tag::Byte(byte) => unsafe {
+                NbtTag::Byte(byte) => unsafe {
                     unchecked_push(data, *byte as u8);
                 },
-                Tag::Short(short) => unsafe {
+                NbtTag::Short(short) => unsafe {
                     unchecked_extend(data, &short.to_be_bytes());
                 },
-                Tag::Int(int) => unsafe {
+                NbtTag::Int(int) => unsafe {
                     unchecked_extend(data, &int.to_be_bytes());
                 },
-                Tag::Long(long) => {
+                NbtTag::Long(long) => {
                     data.extend_from_slice(&long.to_be_bytes());
                 }
-                Tag::Float(float) => unsafe {
+                NbtTag::Float(float) => unsafe {
                     unchecked_extend(data, &float.to_be_bytes());
                 },
-                Tag::Double(double) => {
+                NbtTag::Double(double) => {
                     data.extend_from_slice(&double.to_be_bytes());
                 }
-                Tag::ByteArray(byte_array) => {
+                NbtTag::ByteArray(byte_array) => {
                     unsafe {
                         unchecked_extend(data, &byte_array.len().to_be_bytes());
                     }
                     data.extend_from_slice(byte_array);
                 }
-                Tag::String(string) => {
+                NbtTag::String(string) => {
                     write_string(data, string);
                 }
-                Tag::List(list) => {
+                NbtTag::List(list) => {
                     list.write(data);
                 }
-                Tag::Compound(compound) => {
+                NbtTag::Compound(compound) => {
                     compound.write(data);
                 }
-                Tag::IntArray(int_array) => {
+                NbtTag::IntArray(int_array) => {
                     unsafe {
                         unchecked_extend(data, &int_array.len().to_be_bytes());
                     }
                     data.extend_from_slice(&int_array.as_big_endian());
                 }
-                Tag::LongArray(long_array) => {
+                NbtTag::LongArray(long_array) => {
                     unsafe {
                         unchecked_extend(data, &long_array.len().to_be_bytes());
                     }
@@ -136,7 +141,7 @@ impl<'a> CompoundTag<'a> {
     }
 
     #[inline]
-    pub fn get(&self, name: &str) -> Option<&Tag<'a>> {
+    pub fn get(&self, name: &str) -> Option<&NbtTag<'a>> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
         for (key, value) in &self.values {
@@ -186,7 +191,7 @@ impl<'a> CompoundTag<'a> {
     pub fn list(&self, name: &str) -> Option<&ListTag<'a>> {
         self.get(name).and_then(|tag| tag.list())
     }
-    pub fn compound(&self, name: &str) -> Option<&CompoundTag<'a>> {
+    pub fn compound(&self, name: &str) -> Option<&NbtCompound<'a>> {
         self.get(name).and_then(|tag| tag.compound())
     }
     pub fn int_array(&self, name: &str) -> Option<Vec<i32>> {
@@ -196,7 +201,7 @@ impl<'a> CompoundTag<'a> {
         self.get(name).and_then(|tag| tag.long_array())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &Tag<'a>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &NbtTag<'a>)> {
         self.values.iter().map(|(k, v)| (*k, v))
     }
 }
