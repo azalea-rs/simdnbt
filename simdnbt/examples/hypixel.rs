@@ -1,8 +1,8 @@
 use std::{collections::HashMap, hint::black_box, io::Cursor};
 
-use simdnbt::{owned::Nbt, Deserialize};
+use simdnbt::{owned::Nbt, Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Item {
     pub id: i16,
     #[simdnbt(rename = "Damage")]
@@ -13,7 +13,7 @@ pub struct Item {
     pub tag: ItemTag,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ItemTag {
     #[simdnbt(rename = "SkullOwner")]
     pub skull_owner: Option<SkullOwner>,
@@ -22,7 +22,7 @@ pub struct ItemTag {
     pub display: ItemDisplay,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ExtraAttributes {
     pub id: Option<String>,
     pub modifier: Option<String>,
@@ -32,23 +32,23 @@ pub struct ExtraAttributes {
     pub timestamp: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct SkullOwner {
     pub properties: Properties,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Properties {
     pub textures: Vec<Texture>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Texture {
     #[simdnbt(rename = "Value")]
     pub value: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ItemDisplay {
     #[simdnbt(rename = "Name")]
     pub name: String,
@@ -58,7 +58,7 @@ pub struct ItemDisplay {
     pub color: Option<i32>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Base {
     #[simdnbt(rename = "i")]
     pub items: Vec<Option<Item>>,
@@ -71,8 +71,12 @@ fn main() {
         let nbt = Nbt::read(&mut Cursor::new(input));
         let nbt = black_box(nbt.unwrap().unwrap());
 
-        let data = Base::from_nbt(nbt).unwrap().items;
+        let data = Base::from_nbt(nbt).unwrap();
 
-        println!("data: {data:?}");
+        // roundtrip
+        let new_data = Base::from_nbt(data.clone().to_nbt()).unwrap();
+        assert_eq!(data, new_data);
+
+        println!("data: {:?}", data.items);
     }
 }

@@ -194,6 +194,12 @@ impl From<String> for Mutf8String {
         Self::from_string(s)
     }
 }
+impl From<&str> for Mutf8String {
+    #[inline]
+    fn from(s: &str) -> Self {
+        Self::from_string(s.to_owned())
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -115,7 +115,8 @@ impl Deref for Nbt {
 }
 
 impl BaseNbt {
-    pub fn new(name: Mutf8String, tag: NbtCompound) -> Self {
+    pub fn new(name: impl Into<Mutf8String>, tag: NbtCompound) -> Self {
+        let name = name.into();
         Self { name, tag }
     }
 

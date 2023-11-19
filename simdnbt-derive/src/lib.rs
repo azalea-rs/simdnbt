@@ -51,3 +51,51 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 
     output.into()
 }
+
+#[proc_macro_derive(Serialize, attributes(simdnbt))]
+pub fn serialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    let ident = input.ident;
+
+    let mut field_serializers = Vec::<proc_macro2::TokenStream>::new();
+
+    match input.data {
+        syn::Data::Struct(syn::DataStruct { fields, .. }) => match fields {
+            syn::Fields::Named(syn::FieldsNamed { named, .. }) => {
+                for field in named {
+                    let struct_field_name = field.ident.unwrap();
+
+                    let mut field_attrs = parse_field_attrs(&field.attrs);
+
+                    let field_name = field_attrs
+                        .rename
+                        .take()
+                        .unwrap_or_else(|| struct_field_name.to_string());
+
+                    field_serializers.push(quote! {
+                        if let Some(item) = simdnbt::ToNbtTag::to_optional_nbt_tag(self.#struct_field_name) {
+                            nbt.insert(#field_name, item);
+                        }
+                    });
+                }
+            }
+            syn::Fields::Unnamed(_) => todo!(),
+            syn::Fields::Unit => todo!(),
+        },
+        syn::Data::Enum(_) => todo!(),
+        syn::Data::Union(_) => todo!(),
+    }
+
+    let output = quote! {
+        impl simdnbt::Serialize for #ident {
+            fn to_compound(self) -> simdnbt::owned::NbtCompound {
+                let mut nbt = simdnbt::owned::NbtCompound::new();
+                #(#field_serializers)*
+                nbt
+            }
+        }
+    };
+
+    output.into()
+}

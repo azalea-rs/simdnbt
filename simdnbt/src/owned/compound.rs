@@ -26,6 +26,10 @@ impl NbtCompound {
         Self::default()
     }
 
+    pub fn from_values(values: Vec<(Mutf8String, NbtTag)>) -> Self {
+        Self { values }
+    }
+
     pub fn read(data: &mut Cursor<&[u8]>) -> Result<Self, Error> {
         Self::read_with_depth(data, 0)
     }
