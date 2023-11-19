@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display, hash::Hash, hash::Hasher, str::FromStr};
 
 use crate::DeserializeError;
 
@@ -37,26 +37,28 @@ pub trait ToNbtTag: Sized {
     }
 }
 
-impl<T: FromNbtTag> Deserialize for HashMap<String, T> {
+impl<K: Display + FromStr + Eq + Hash, V: FromNbtTag> Deserialize for HashMap<K, V> {
     fn from_compound(compound: crate::owned::NbtCompound) -> Result<Self, DeserializeError> {
         let mut hashmap = HashMap::with_capacity(compound.values.len());
 
         for (k, v) in compound.values {
             hashmap.insert(
-                k.to_string(),
-                T::from_nbt_tag(v).ok_or(DeserializeError::MismatchedFieldType)?,
+                k.to_str()
+                    .parse()
+                    .map_err(|_| DeserializeError::MismatchedFieldType)?,
+                V::from_nbt_tag(v).ok_or(DeserializeError::MismatchedFieldType)?,
             );
         }
 
         Ok(hashmap)
     }
 }
-impl<T: ToNbtTag> Serialize for HashMap<String, T> {
+impl<K: Display + FromStr + Eq + Hash, V: ToNbtTag> Serialize for HashMap<K, V> {
     fn to_compound(self) -> crate::owned::NbtCompound {
         let mut compound = crate::owned::NbtCompound::new();
 
         for (k, v) in self {
-            compound.insert(k, v.to_nbt_tag());
+            compound.insert(k.to_string(), v.to_nbt_tag());
         }
 
         compound

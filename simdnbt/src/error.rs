@@ -20,4 +20,6 @@ pub enum DeserializeError {
     MissingField,
     #[error("Mismatched type")]
     MismatchedFieldType,
+    #[error("Unknown fields {0:?}")]
+    UnknownField(Vec<String>),
 }

@@ -25,11 +25,17 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                         .take()
                         .unwrap_or_else(|| struct_field_name.to_string());
 
-                    field_deserializers.push(quote! {
-                        #struct_field_name: simdnbt::FromNbtTag::from_optional_nbt_tag(
-                            nbt.take(#field_name)
-                        )?.ok_or(simdnbt::DeserializeError::MismatchedFieldType)?
-                    });
+                    if field_attrs.flatten {
+                        field_deserializers.push(quote! {
+                            #struct_field_name: simdnbt::Deserialize::from_compound(nbt)?,
+                        })
+                    } else {
+                        field_deserializers.push(quote! {
+                            #struct_field_name: simdnbt::FromNbtTag::from_optional_nbt_tag(
+                                nbt.take(#field_name)
+                            )?.ok_or(simdnbt::DeserializeError::MismatchedFieldType)?
+                        });
+                    }
                 }
             }
             syn::Fields::Unnamed(_) => todo!(),
@@ -39,12 +45,27 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         syn::Data::Union(_) => todo!(),
     }
 
+    let generics = input.generics;
+    let struct_attrs = attrs::parse_struct_attrs(&input.attrs);
+
+    let extra_checks = if struct_attrs.deny_unknown_fields {
+        quote! {
+            if !nbt.is_empty() {
+                return Err(simdnbt::DeserializeError::UnknownField(nbt.keys().next().unwrap().clone()));
+            }
+        }
+    } else {
+        quote! {}
+    };
+
     let output = quote! {
-        impl simdnbt::Deserialize for #ident {
+        impl #generics simdnbt::Deserialize for #ident #generics {
             fn from_compound(mut nbt: simdnbt::owned::NbtCompound) -> Result<Self, simdnbt::DeserializeError> {
-                Ok(Self {
+                let value = Self {
                     #(#field_deserializers),*
-                })
+                };
+                #extra_checks
+                Ok(value)
             }
         }
     };
@@ -87,8 +108,11 @@ pub fn serialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStre
         syn::Data::Union(_) => todo!(),
     }
 
+    let generics = input.generics;
+    let struct_attrs = attrs::parse_struct_attrs(&input.attrs);
+
     let output = quote! {
-        impl simdnbt::Serialize for #ident {
+        impl #generics simdnbt::Serialize for #ident #generics {
             fn to_compound(self) -> simdnbt::owned::NbtCompound {
                 let mut nbt = simdnbt::owned::NbtCompound::new();
                 #(#field_serializers)*

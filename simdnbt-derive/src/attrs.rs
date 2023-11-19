@@ -3,6 +3,12 @@ use syn::parse::{Parse, ParseStream};
 #[derive(Default, Debug)]
 pub struct FieldAttrs {
     pub rename: Option<String>,
+    pub flatten: bool,
+}
+
+#[derive(Default, Debug)]
+pub struct StructAttrs {
+    pub deny_unknown_fields: bool,
 }
 
 impl Parse for FieldAttrs {
@@ -17,6 +23,27 @@ impl Parse for FieldAttrs {
                     let rename = input.parse::<syn::LitStr>()?;
 
                     attrs.rename = Some(rename.value());
+                }
+                "flatten" => {
+                    attrs.flatten = true;
+                }
+                _ => todo!(),
+            }
+        }
+
+        Ok(attrs)
+    }
+}
+
+impl Parse for StructAttrs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut attrs = Self::default();
+
+        while !input.is_empty() {
+            let attr = input.parse::<proc_macro2::Ident>()?;
+            match attr.to_string().as_str() {
+                "deny_unknown_fields" => {
+                    attrs.deny_unknown_fields = true;
                 }
                 _ => todo!(),
             }
@@ -39,4 +66,19 @@ pub fn parse_field_attrs(attrs: &[syn::Attribute]) -> FieldAttrs {
     }
 
     field_attrs
+}
+
+pub fn parse_struct_attrs(attrs: &[syn::Attribute]) -> StructAttrs {
+    let mut struct_attrs = StructAttrs::default();
+
+    for attr in attrs.iter().filter(|attr| attr.path().is_ident("simdnbt")) {
+        let new_attr = attr
+            .parse_args::<StructAttrs>()
+            .expect("invalid simdnbt attr");
+        if new_attr.deny_unknown_fields {
+            struct_attrs.deny_unknown_fields = true;
+        }
+    }
+
+    struct_attrs
 }
