@@ -26,9 +26,10 @@ pub struct BaseNbt<'a> {
     tag: NbtCompound<'a>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub enum Nbt<'a> {
     Some(BaseNbt<'a>),
+    #[default]
     None,
 }
 
