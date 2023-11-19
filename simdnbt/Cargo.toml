@@ -12,7 +12,7 @@ repository = "https://github.com/mat-1/simdnbt"
 byteorder = "1.4.3"
 flate2 = "^1.0.27"
 residua-mutf8 = "2.0.0"
-simdnbt-derive = { version = "0.1.0", path = "../simdnbt-derive", optional = true }
+simdnbt-derive = { version = "0.2.0", path = "../simdnbt-derive", optional = true }
 thiserror = "1.0.47"
 
 [dev-dependencies]
