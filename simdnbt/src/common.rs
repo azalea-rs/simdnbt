@@ -113,7 +113,7 @@ pub fn slice_i8_into_u8(s: &[i8]) -> &[u8] {
 }
 
 #[inline(always)]
-pub fn write_with_u32_length<'a>(data: &mut Vec<u8>, width: usize, value: &'a [u8]) {
+pub fn write_with_u32_length(data: &mut Vec<u8>, width: usize, value: &[u8]) {
     let length = value.len() / width;
     data.reserve(4 + value.len());
     unsafe {
@@ -171,7 +171,7 @@ pub unsafe fn unchecked_push(data: &mut Vec<u8>, value: u8) {
 /// endian! Use [`slice_into_u8_big_endian`] to get big endian (the endianness that's used in NBT).
 #[inline]
 pub fn slice_into_u8_native_endian<T>(s: &[T]) -> &[u8] {
-    unsafe { slice::from_raw_parts(s.as_ptr() as *const u8, s.len() * std::mem::size_of::<T>()) }
+    unsafe { slice::from_raw_parts(s.as_ptr() as *const u8, std::mem::size_of_val(s)) }
 }
 
 /// Convert a slice of any type into a Vec<u8>. This will return the data as big endian (the

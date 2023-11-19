@@ -8,12 +8,12 @@ use std::{
 };
 
 /// A M-UTF8 string slice. This is how strings are represented internally in NBT.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct Mutf8Str {
     pub(crate) slice: [u8],
 }
 /// An owned M-UTF8 string.
-#[derive(Debug, Eq, PartialEq, Clone, Default)]
+#[derive(Eq, PartialEq, Clone, Default)]
 pub struct Mutf8String {
     pub(crate) vec: Vec<u8>,
 }
@@ -116,6 +116,10 @@ impl Mutf8Str {
         self.slice.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.slice.is_empty()
+    }
+
     #[inline]
     pub fn as_bytes(&self) -> &[u8] {
         &self.slice
@@ -125,6 +129,18 @@ impl Mutf8Str {
 impl fmt::Display for Mutf8Str {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.to_str())
+    }
+}
+
+impl fmt::Debug for Mutf8Str {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Mutf8Str").field(&self.to_str()).finish()
+    }
+}
+
+impl fmt::Debug for Mutf8String {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Mutf8String").field(&self.to_str()).finish()
     }
 }
 

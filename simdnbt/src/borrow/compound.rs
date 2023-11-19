@@ -127,13 +127,13 @@ impl<'a> NbtCompound<'a> {
                     unsafe {
                         unchecked_extend(data, &int_array.len().to_be_bytes());
                     }
-                    data.extend_from_slice(&int_array.as_big_endian());
+                    data.extend_from_slice(int_array.as_big_endian());
                 }
                 NbtTag::LongArray(long_array) => {
                     unsafe {
                         unchecked_extend(data, &long_array.len().to_be_bytes());
                     }
-                    data.extend_from_slice(&long_array.as_big_endian());
+                    data.extend_from_slice(long_array.as_big_endian());
                 }
             }
         }

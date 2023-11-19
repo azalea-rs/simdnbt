@@ -20,6 +20,10 @@ impl<'a, T> RawList<'a, T> {
     pub fn len(&self) -> usize {
         self.data.len() / std::mem::size_of::<T>()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
 }
 
 impl<T: SwappableNumber> RawList<'_, T> {

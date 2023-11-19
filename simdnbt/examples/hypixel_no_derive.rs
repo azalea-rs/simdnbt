@@ -1,10 +1,6 @@
-use simdnbt::ToNbtTag;
 use std::{collections::HashMap, hint::black_box, io::Cursor};
 
-use simdnbt::{
-    borrow::{BaseNbt, Nbt},
-    owned,
-};
+use simdnbt::borrow::{BaseNbt, Nbt};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Item {
@@ -103,44 +99,12 @@ fn items_from_nbt(nbt: BaseNbt) -> Option<Vec<Option<Item>>> {
     Some(items)
 }
 
-fn nbt_from_items(items: Vec<Option<Item>>) -> owned::BaseNbt {
-    owned::BaseNbt::new("", {
-        let i = {
-            let mut i = Vec::new();
-
-            for item in items {
-                let Some(item) = item else {
-                    i.push(owned::NbtCompound::new());
-                    continue;
-                };
-
-                let mut nbt = {
-                    let mut nbt = owned::NbtCompound::new();
-                    nbt.insert("id", item.id.to_nbt_tag());
-                    nbt.insert("Damage", item.damage.to_nbt_tag());
-                    nbt.insert("Count", item.count.to_nbt_tag());
-                    nbt
-                };
-
-                i.push(nbt);
-            }
-
-            owned::NbtList::Compound(i)
-        };
-
-        let mut nbt = owned::NbtCompound::new();
-        nbt.insert("i", owned::NbtTag::List(i));
-        nbt
-    })
-}
-
 fn main() {
     let input = black_box(include_bytes!("../tests/realworld.nbt"));
 
     for _ in 0..1 {
         let nbt = Nbt::read(&mut Cursor::new(input));
         let nbt = black_box(nbt.unwrap().unwrap());
-        println!("{:?}", items_from_nbt(nbt));
-        // black_box(simdnbt_items_from_nbt(nbt));
+        black_box(items_from_nbt(nbt));
     }
 }

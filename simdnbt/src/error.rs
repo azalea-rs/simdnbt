@@ -18,8 +18,8 @@ pub enum Error {
 pub enum DeserializeError {
     #[error("Missing field")]
     MissingField,
-    #[error("Mismatched type")]
-    MismatchedFieldType,
+    #[error("Mismatched type for {0}")]
+    MismatchedFieldType(String),
     #[error("Unknown fields {0:?}")]
     UnknownField(Vec<String>),
 }

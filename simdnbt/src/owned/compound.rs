@@ -1,14 +1,9 @@
 use std::{io::Cursor, mem};
 
-use byteorder::{ReadBytesExt, BE};
+use byteorder::ReadBytesExt;
 
 use crate::{
-    common::{
-        read_int_array, read_long_array, read_string, read_with_u32_length,
-        slice_into_u8_big_endian, unchecked_extend, unchecked_push, unchecked_write_string,
-        write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID,
-        INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
-    },
+    common::{read_string, unchecked_push, unchecked_write_string, END_ID, MAX_DEPTH},
     mutf8::Mutf8String,
     Error, Mutf8Str,
 };
@@ -46,49 +41,7 @@ impl NbtCompound {
             }
             let tag_name = read_string(data)?.to_owned();
 
-            match tag_type {
-                BYTE_ID => values.push((
-                    tag_name,
-                    NbtTag::Byte(data.read_i8().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                SHORT_ID => values.push((
-                    tag_name,
-                    NbtTag::Short(data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                INT_ID => values.push((
-                    tag_name,
-                    NbtTag::Int(data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                LONG_ID => values.push((
-                    tag_name,
-                    NbtTag::Long(data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                FLOAT_ID => values.push((
-                    tag_name,
-                    NbtTag::Float(data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                DOUBLE_ID => values.push((
-                    tag_name,
-                    NbtTag::Double(data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                BYTE_ARRAY_ID => values.push((
-                    tag_name,
-                    NbtTag::ByteArray(read_with_u32_length(data, 1)?.to_owned()),
-                )),
-                STRING_ID => values.push((tag_name, NbtTag::String(read_string(data)?.to_owned()))),
-                LIST_ID => values.push((tag_name, NbtTag::List(NbtList::read(data, depth + 1)?))),
-                COMPOUND_ID => values.push((
-                    tag_name,
-                    NbtTag::Compound(NbtCompound::read_with_depth(data, depth + 1)?),
-                )),
-                INT_ARRAY_ID => {
-                    values.push((tag_name, NbtTag::IntArray(read_int_array(data)?.to_vec())))
-                }
-                LONG_ARRAY_ID => {
-                    values.push((tag_name, NbtTag::LongArray(read_long_array(data)?.to_vec())))
-                }
-                _ => return Err(Error::UnknownTagId(tag_type)),
-            }
+            values.push((tag_name, NbtTag::read_with_type(data, tag_type, depth)?));
         }
         Ok(Self { values })
     }
@@ -102,53 +55,7 @@ impl NbtCompound {
             unsafe {
                 unchecked_push(data, tag.id());
                 unchecked_write_string(data, name);
-            }
-            match tag {
-                NbtTag::Byte(byte) => unsafe {
-                    unchecked_push(data, *byte as u8);
-                },
-                NbtTag::Short(short) => unsafe {
-                    unchecked_extend(data, &short.to_be_bytes());
-                },
-                NbtTag::Int(int) => unsafe {
-                    unchecked_extend(data, &int.to_be_bytes());
-                },
-                NbtTag::Long(long) => {
-                    data.extend_from_slice(&long.to_be_bytes());
-                }
-                NbtTag::Float(float) => unsafe {
-                    unchecked_extend(data, &float.to_be_bytes());
-                },
-                NbtTag::Double(double) => {
-                    data.extend_from_slice(&double.to_be_bytes());
-                }
-                NbtTag::ByteArray(byte_array) => {
-                    unsafe {
-                        unchecked_extend(data, &byte_array.len().to_be_bytes());
-                    }
-                    data.extend_from_slice(byte_array);
-                }
-                NbtTag::String(string) => {
-                    write_string(data, string);
-                }
-                NbtTag::List(list) => {
-                    list.write(data);
-                }
-                NbtTag::Compound(compound) => {
-                    compound.write(data);
-                }
-                NbtTag::IntArray(int_array) => {
-                    unsafe {
-                        unchecked_extend(data, &int_array.len().to_be_bytes());
-                    }
-                    data.extend_from_slice(&slice_into_u8_big_endian(int_array));
-                }
-                NbtTag::LongArray(long_array) => {
-                    unsafe {
-                        unchecked_extend(data, &long_array.len().to_be_bytes());
-                    }
-                    data.extend_from_slice(&slice_into_u8_big_endian(long_array));
-                }
+                tag.unchecked_write_without_tag_type(data);
             }
         }
         data.push(END_ID);
@@ -301,9 +208,6 @@ impl NbtCompound {
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut NbtTag> {
         self.values.iter_mut().map(|(_, v)| v)
     }
-    pub fn into_iter(self) -> impl Iterator<Item = (Mutf8String, NbtTag)> {
-        self.values.into_iter()
-    }
     pub fn clear(&mut self) {
         self.values.clear();
     }
@@ -320,5 +224,14 @@ impl NbtCompound {
             }
         }
         None
+    }
+}
+
+impl IntoIterator for NbtCompound {
+    type Item = (Mutf8String, NbtTag);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.values.into_iter()
     }
 }

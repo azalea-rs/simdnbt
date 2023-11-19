@@ -5,13 +5,14 @@ mod list;
 
 use std::{io::Cursor, ops::Deref};
 
-use byteorder::ReadBytesExt;
+use byteorder::{ReadBytesExt, BE};
 
 use crate::{
     common::{
-        read_string, read_u32, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID,
-        END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH,
-        SHORT_ID, STRING_ID,
+        read_int_array, read_long_array, read_string, read_u32, read_with_u32_length,
+        slice_into_u8_big_endian, unchecked_extend, unchecked_push, write_string, BYTE_ARRAY_ID,
+        BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
+        LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     mutf8::Mutf8String,
     Error, Mutf8Str,
@@ -52,9 +53,34 @@ impl Nbt {
         Ok(Nbt::Some(BaseNbt { name, tag }))
     }
 
+    pub fn read_unnamed(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
+        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        if root_type == END_ID {
+            return Ok(Nbt::None);
+        }
+        if root_type != COMPOUND_ID {
+            return Err(Error::InvalidRootType(root_type));
+        }
+        let tag = NbtCompound::read_with_depth(data, 0)?;
+
+        Ok(Nbt::Some(BaseNbt {
+            name: Mutf8String::from(""),
+            tag,
+        }))
+    }
+
     pub fn write(&self, data: &mut Vec<u8>) {
         match self {
             Nbt::Some(nbt) => nbt.write(data),
+            Nbt::None => {
+                data.push(END_ID);
+            }
+        }
+    }
+
+    pub fn write_unnamed(&self, data: &mut Vec<u8>) {
+        match self {
+            Nbt::Some(nbt) => nbt.write_unnamed(data),
             Nbt::None => {
                 data.push(END_ID);
             }
@@ -65,6 +91,13 @@ impl Nbt {
         match self {
             Nbt::Some(nbt) => nbt,
             Nbt::None => panic!("called `OptionalNbt::unwrap()` on a `None` value"),
+        }
+    }
+
+    pub fn unwrap_or<'a>(&'a self, default: &'a BaseNbt) -> &'a BaseNbt {
+        match self {
+            Nbt::Some(nbt) => nbt,
+            Nbt::None => default,
         }
     }
 
@@ -80,7 +113,7 @@ impl Nbt {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &NbtTag)> {
-        const EMPTY: &'static NbtCompound = &NbtCompound { values: Vec::new() };
+        const EMPTY: &NbtCompound = &NbtCompound { values: Vec::new() };
 
         if let Nbt::Some(nbt) = self {
             nbt.iter()
@@ -88,21 +121,12 @@ impl Nbt {
             EMPTY.iter()
         }
     }
-
-    pub fn into_iter(self) -> impl Iterator<Item = (Mutf8String, NbtTag)> {
-        const EMPTY: NbtCompound = NbtCompound { values: Vec::new() };
-
-        match self {
-            Nbt::Some(nbt) => nbt.tag.into_iter(),
-            Nbt::None => EMPTY.into_iter(),
-        }
-    }
 }
 impl Deref for Nbt {
     type Target = BaseNbt;
 
     fn deref(&self) -> &Self::Target {
-        const EMPTY: &'static BaseNbt = &BaseNbt {
+        const EMPTY: &BaseNbt = &BaseNbt {
             name: Mutf8String { vec: Vec::new() },
             tag: NbtCompound { values: Vec::new() },
         };
@@ -110,6 +134,20 @@ impl Deref for Nbt {
         match self {
             Nbt::Some(nbt) => nbt,
             Nbt::None => EMPTY,
+        }
+    }
+}
+
+impl IntoIterator for Nbt {
+    type Item = (Mutf8String, NbtTag);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        const EMPTY: NbtCompound = NbtCompound { values: Vec::new() };
+
+        match self {
+            Nbt::Some(nbt) => nbt.tag.into_iter(),
+            Nbt::None => EMPTY.into_iter(),
         }
     }
 }
@@ -132,14 +170,25 @@ impl BaseNbt {
         self.tag.write(data);
     }
 
-    pub fn into_iter(self) -> impl Iterator<Item = (Mutf8String, NbtTag)> {
-        self.tag.into_iter()
+    pub fn write_unnamed(&self, data: &mut Vec<u8>) {
+        data.push(COMPOUND_ID);
+        self.tag.write(data);
     }
 
     pub fn into_inner(self) -> NbtCompound {
         self.tag
     }
 }
+
+impl IntoIterator for BaseNbt {
+    type Item = (Mutf8String, NbtTag);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.tag.into_iter()
+    }
+}
+
 impl Deref for BaseNbt {
     type Target = NbtCompound;
 
@@ -174,6 +223,109 @@ impl NbtTag {
         // discriminant as its first field, so we can read the discriminant
         // without offsetting the pointer.
         unsafe { *<*const _>::from(self).cast::<u8>() }
+    }
+
+    fn read_with_type(data: &mut Cursor<&[u8]>, tag_type: u8, depth: usize) -> Result<Self, Error> {
+        match tag_type {
+            BYTE_ID => Ok(NbtTag::Byte(
+                data.read_i8().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            SHORT_ID => Ok(NbtTag::Short(
+                data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            INT_ID => Ok(NbtTag::Int(
+                data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            LONG_ID => Ok(NbtTag::Long(
+                data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            FLOAT_ID => Ok(NbtTag::Float(
+                data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            DOUBLE_ID => Ok(NbtTag::Double(
+                data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            BYTE_ARRAY_ID => Ok(NbtTag::ByteArray(read_with_u32_length(data, 1)?.to_owned())),
+            STRING_ID => Ok(NbtTag::String(read_string(data)?.to_owned())),
+            LIST_ID => Ok(NbtTag::List(NbtList::read(data, depth + 1)?)),
+            COMPOUND_ID => Ok(NbtTag::Compound(NbtCompound::read_with_depth(
+                data,
+                depth + 1,
+            )?)),
+            INT_ARRAY_ID => Ok(NbtTag::IntArray(read_int_array(data)?.to_vec())),
+            LONG_ARRAY_ID => Ok(NbtTag::LongArray(read_long_array(data)?.to_vec())),
+            _ => Err(Error::UnknownTagId(tag_type)),
+        }
+    }
+
+    pub fn read(data: &mut Cursor<&[u8]>) -> Result<Self, Error> {
+        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        Self::read_with_type(data, tag_type, 0)
+    }
+
+    /// Write to the data without checking that there's enough space in it.
+    ///
+    /// # Safety
+    ///
+    /// This function is unsafe because it doesn't check that there's enough space in the data.
+    /// 4 bytes MUST be reserved before calling this function.
+    unsafe fn unchecked_write_without_tag_type(&self, data: &mut Vec<u8>) {
+        match self {
+            NbtTag::Byte(byte) => unsafe {
+                unchecked_push(data, *byte as u8);
+            },
+            NbtTag::Short(short) => unsafe {
+                unchecked_extend(data, &short.to_be_bytes());
+            },
+            NbtTag::Int(int) => unsafe {
+                unchecked_extend(data, &int.to_be_bytes());
+            },
+            NbtTag::Long(long) => {
+                data.extend_from_slice(&long.to_be_bytes());
+            }
+            NbtTag::Float(float) => unsafe {
+                unchecked_extend(data, &float.to_be_bytes());
+            },
+            NbtTag::Double(double) => {
+                data.extend_from_slice(&double.to_be_bytes());
+            }
+            NbtTag::ByteArray(byte_array) => {
+                unsafe {
+                    unchecked_extend(data, &byte_array.len().to_be_bytes());
+                }
+                data.extend_from_slice(byte_array);
+            }
+            NbtTag::String(string) => {
+                write_string(data, string);
+            }
+            NbtTag::List(list) => {
+                list.write(data);
+            }
+            NbtTag::Compound(compound) => {
+                compound.write(data);
+            }
+            NbtTag::IntArray(int_array) => {
+                unsafe {
+                    unchecked_extend(data, &int_array.len().to_be_bytes());
+                }
+                data.extend_from_slice(&slice_into_u8_big_endian(int_array));
+            }
+            NbtTag::LongArray(long_array) => {
+                unsafe {
+                    unchecked_extend(data, &long_array.len().to_be_bytes());
+                }
+                data.extend_from_slice(&slice_into_u8_big_endian(long_array));
+            }
+        }
+    }
+
+    pub fn write(&self, data: &mut Vec<u8>) {
+        data.reserve(1 + 4);
+        // SAFETY: We just reserved enough space for the tag ID and 4 bytes of tag data.
+        unsafe {
+            unchecked_push(data, self.id());
+            self.unchecked_write_without_tag_type(data);
+        }
     }
 
     pub fn byte(&self) -> Option<i8> {
