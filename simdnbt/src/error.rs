@@ -13,3 +13,11 @@ pub enum Error {
     #[error("Tried to read NBT tag with too high complexity, depth > {MAX_DEPTH}")]
     MaxDepthExceeded,
 }
+
+#[derive(Error, Debug)]
+pub enum DeserializeError {
+    #[error("Missing field")]
+    MissingField,
+    #[error("Mismatched type")]
+    MismatchedFieldType,
+}

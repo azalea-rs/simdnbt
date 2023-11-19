@@ -12,7 +12,7 @@ use crate::{
     Error, Mutf8Str,
 };
 
-use super::{list::ListTag, NbtTag};
+use super::{list::NbtList, NbtTag};
 
 /// A list of named tags. The order of the tags is preserved.
 #[derive(Debug, Default, PartialEq)]
@@ -66,7 +66,7 @@ impl<'a> NbtCompound<'a> {
                     values.push((tag_name, NbtTag::ByteArray(read_with_u32_length(data, 1)?)))
                 }
                 STRING_ID => values.push((tag_name, NbtTag::String(read_string(data)?))),
-                LIST_ID => values.push((tag_name, NbtTag::List(ListTag::read(data, depth + 1)?))),
+                LIST_ID => values.push((tag_name, NbtTag::List(NbtList::read(data, depth + 1)?))),
                 COMPOUND_ID => values.push((
                     tag_name,
                     NbtTag::Compound(NbtCompound::read_with_depth(data, depth + 1)?),
@@ -188,7 +188,7 @@ impl<'a> NbtCompound<'a> {
     pub fn string(&self, name: &str) -> Option<&Mutf8Str> {
         self.get(name).and_then(|tag| tag.string())
     }
-    pub fn list(&self, name: &str) -> Option<&ListTag<'a>> {
+    pub fn list(&self, name: &str) -> Option<&NbtList<'a>> {
         self.get(name).and_then(|tag| tag.list())
     }
     pub fn compound(&self, name: &str) -> Option<&NbtCompound<'a>> {

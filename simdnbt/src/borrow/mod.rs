@@ -17,7 +17,7 @@ use crate::{
     Error, Mutf8Str,
 };
 
-pub use self::{compound::NbtCompound, list::ListTag};
+pub use self::{compound::NbtCompound, list::NbtList};
 
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug, PartialEq)]
@@ -111,7 +111,7 @@ pub enum NbtTag<'a> {
     Double(f64) = DOUBLE_ID,
     ByteArray(&'a [u8]) = BYTE_ARRAY_ID,
     String(&'a Mutf8Str) = STRING_ID,
-    List(ListTag<'a>) = LIST_ID,
+    List(NbtList<'a>) = LIST_ID,
     Compound(NbtCompound<'a>) = COMPOUND_ID,
     IntArray(RawList<'a, i32>) = INT_ARRAY_ID,
     LongArray(RawList<'a, i64>) = LONG_ARRAY_ID,
@@ -175,7 +175,7 @@ impl<'a> NbtTag<'a> {
             _ => None,
         }
     }
-    pub fn list(&self) -> Option<&ListTag<'a>> {
+    pub fn list(&self) -> Option<&NbtList<'a>> {
         match self {
             NbtTag::List(list) => Some(list),
             _ => None,

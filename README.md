@@ -1,6 +1,6 @@
 # simdnbt
 
-an unnecessarily fast nbt decoder. like seriously you probably don't need this unless you're trying to win benchmarks.
+a very fast nbt serializer and deserializer.
 
 simdnbt currently makes use of simd instructions for two things:
 - swapping the endianness of int arrays

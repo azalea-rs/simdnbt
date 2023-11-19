@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{io::Cursor, mem};
 
 use byteorder::{ReadBytesExt, BE};
 
@@ -13,7 +13,7 @@ use crate::{
     Error, Mutf8Str,
 };
 
-use super::{list::ListTag, NbtTag};
+use super::{list::NbtList, NbtTag};
 
 /// A list of named tags. The order of the tags is preserved.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -72,7 +72,7 @@ impl NbtCompound {
                     NbtTag::ByteArray(read_with_u32_length(data, 1)?.to_owned()),
                 )),
                 STRING_ID => values.push((tag_name, NbtTag::String(read_string(data)?.to_owned()))),
-                LIST_ID => values.push((tag_name, NbtTag::List(ListTag::read(data, depth + 1)?))),
+                LIST_ID => values.push((tag_name, NbtTag::List(NbtList::read(data, depth + 1)?))),
                 COMPOUND_ID => values.push((
                     tag_name,
                     NbtTag::Compound(NbtCompound::read_with_depth(data, depth + 1)?),
@@ -174,6 +174,20 @@ impl NbtCompound {
         None
     }
 
+    /// Get an owned tag from the compound by swapping it with a dummy tag.
+    pub fn take(&mut self, name: &str) -> Option<NbtTag> {
+        let name = Mutf8Str::from_str(name);
+        let name = name.as_ref();
+        for i in 0..self.values.len() {
+            if self.values[i].0.as_str() == name {
+                let mut value = NbtTag::Byte(0);
+                mem::swap(&mut self.values[i].1, &mut value);
+                return Some(value);
+            }
+        }
+        None
+    }
+
     /// Returns whether there is a tag with the given name.
     pub fn contains(&self, name: &str) -> bool {
         let name = Mutf8Str::from_str(name);
@@ -234,10 +248,10 @@ impl NbtCompound {
     pub fn string_mut(&mut self, name: &str) -> Option<&mut Mutf8String> {
         self.get_mut(name).and_then(|tag| tag.string_mut())
     }
-    pub fn list(&self, name: &str) -> Option<&ListTag> {
+    pub fn list(&self, name: &str) -> Option<&NbtList> {
         self.get(name).and_then(|tag| tag.list())
     }
-    pub fn list_mut(&mut self, name: &str) -> Option<&mut ListTag> {
+    pub fn list_mut(&mut self, name: &str) -> Option<&mut NbtList> {
         self.get_mut(name).and_then(|tag| tag.list_mut())
     }
     pub fn compound(&self, name: &str) -> Option<&NbtCompound> {

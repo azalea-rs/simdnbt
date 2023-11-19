@@ -17,7 +17,7 @@ use crate::{
     Error, Mutf8Str,
 };
 
-pub use self::{compound::NbtCompound, list::ListTag};
+pub use self::{compound::NbtCompound, list::NbtList};
 
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -134,6 +134,10 @@ impl BaseNbt {
     pub fn into_iter(self) -> impl Iterator<Item = (Mutf8String, NbtTag)> {
         self.tag.into_iter()
     }
+
+    pub fn into_inner(self) -> NbtCompound {
+        self.tag
+    }
 }
 impl Deref for BaseNbt {
     type Target = NbtCompound;
@@ -155,7 +159,7 @@ pub enum NbtTag {
     Double(f64) = DOUBLE_ID,
     ByteArray(Vec<u8>) = BYTE_ARRAY_ID,
     String(Mutf8String) = STRING_ID,
-    List(ListTag) = LIST_ID,
+    List(NbtList) = LIST_ID,
     Compound(NbtCompound) = COMPOUND_ID,
     IntArray(Vec<i32>) = INT_ARRAY_ID,
     LongArray(Vec<i64>) = LONG_ARRAY_ID,
@@ -323,19 +327,19 @@ impl NbtTag {
         }
     }
 
-    pub fn list(&self) -> Option<&ListTag> {
+    pub fn list(&self) -> Option<&NbtList> {
         match self {
             NbtTag::List(list) => Some(list),
             _ => None,
         }
     }
-    pub fn list_mut(&mut self) -> Option<&mut ListTag> {
+    pub fn list_mut(&mut self) -> Option<&mut NbtList> {
         match self {
             NbtTag::List(list) => Some(list),
             _ => None,
         }
     }
-    pub fn into_list(self) -> Option<ListTag> {
+    pub fn into_list(self) -> Option<NbtList> {
         match self {
             NbtTag::List(list) => Some(list),
             _ => None,

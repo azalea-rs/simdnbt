@@ -22,6 +22,10 @@ mod mutf8;
 pub mod owned;
 pub mod raw_list;
 pub mod swap_endianness;
+mod traits;
 
-pub use error::Error;
+pub use error::{DeserializeError, Error};
 pub use mutf8::Mutf8Str;
+pub use traits::{Deserialize, FromNbtTag};
+
+pub use simdnbt_derive::*;
