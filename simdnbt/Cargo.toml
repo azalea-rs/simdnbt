@@ -9,11 +9,11 @@ repository = "https://github.com/mat-1/simdnbt"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-byteorder = "1.4.3"
-flate2 = "^1.0.27"
+byteorder = "1.5.0"
+flate2 = "^1.0.28"
 residua-mutf8 = "2.0.0"
 simdnbt-derive = { version = "0.2.0", path = "../simdnbt-derive", optional = true }
-thiserror = "1.0.47"
+thiserror = "1.0.50"
 
 [dev-dependencies]
 criterion = { version = "^0.5.1", features = ["html_reports"] }
