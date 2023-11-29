@@ -3,11 +3,11 @@ use std::{collections::HashMap, fmt::Display, hash::Hash, str::FromStr};
 use crate::DeserializeError;
 
 pub trait Deserialize: Sized {
-    fn from_nbt(nbt: crate::owned::BaseNbt) -> Result<Self, DeserializeError> {
-        Self::from_compound(nbt.into_inner())
+    fn from_nbt(nbt: &crate::borrow::BaseNbt) -> Result<Self, DeserializeError> {
+        Self::from_compound(nbt)
     }
 
-    fn from_compound(compound: crate::owned::NbtCompound) -> Result<Self, DeserializeError>;
+    fn from_compound(compound: &crate::borrow::NbtCompound) -> Result<Self, DeserializeError>;
 }
 
 pub trait Serialize: Sized {
@@ -19,9 +19,9 @@ pub trait Serialize: Sized {
 }
 
 pub trait FromNbtTag: Sized {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self>;
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self>;
     fn from_optional_nbt_tag(
-        tag: Option<crate::owned::NbtTag>,
+        tag: Option<&crate::borrow::NbtTag>,
     ) -> Result<Option<Self>, DeserializeError> {
         match tag {
             Some(tag) => Ok(Self::from_nbt_tag(tag)),
@@ -38,10 +38,10 @@ pub trait ToNbtTag: Sized {
 }
 
 impl<K: Display + FromStr + Eq + Hash, V: FromNbtTag> Deserialize for HashMap<K, V> {
-    fn from_compound(compound: crate::owned::NbtCompound) -> Result<Self, DeserializeError> {
-        let mut hashmap = HashMap::with_capacity(compound.values.len());
+    fn from_compound(compound: &crate::borrow::NbtCompound) -> Result<Self, DeserializeError> {
+        let mut hashmap = HashMap::with_capacity(compound.len());
 
-        for (k, v) in compound.values {
+        for (k, v) in compound.iter() {
             let k_str = k.to_str();
             let k_parsed = k_str
                 .parse()
@@ -70,8 +70,8 @@ impl<K: Display + FromStr + Eq + Hash, V: ToNbtTag> Serialize for HashMap<K, V> 
 }
 
 impl Deserialize for crate::owned::NbtCompound {
-    fn from_compound(compound: crate::owned::NbtCompound) -> Result<Self, DeserializeError> {
-        Ok(compound)
+    fn from_compound(compound: &crate::borrow::NbtCompound) -> Result<Self, DeserializeError> {
+        Ok(compound.to_owned())
     }
 }
 impl Serialize for crate::owned::NbtCompound {
@@ -81,9 +81,8 @@ impl Serialize for crate::owned::NbtCompound {
 }
 
 impl<T: Deserialize> FromNbtTag for T {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
-        tag.into_compound()
-            .and_then(|c| Self::from_compound(c).ok())
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
+        tag.compound().and_then(|c| Self::from_compound(c).ok())
     }
 }
 
@@ -94,8 +93,8 @@ impl<T: Serialize> ToNbtTag for T {
 }
 
 impl FromNbtTag for crate::owned::NbtTag {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
-        Some(tag)
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
+        Some(tag.to_owned())
     }
 }
 impl ToNbtTag for crate::owned::NbtTag {
@@ -106,7 +105,7 @@ impl ToNbtTag for crate::owned::NbtTag {
 
 // standard nbt types
 impl FromNbtTag for i8 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.byte()
     }
 }
@@ -117,7 +116,7 @@ impl ToNbtTag for i8 {
 }
 
 impl FromNbtTag for i16 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.short()
     }
 }
@@ -128,7 +127,7 @@ impl ToNbtTag for i16 {
 }
 
 impl FromNbtTag for i32 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.int()
     }
 }
@@ -139,7 +138,7 @@ impl ToNbtTag for i32 {
 }
 
 impl FromNbtTag for i64 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.long()
     }
 }
@@ -150,7 +149,7 @@ impl ToNbtTag for i64 {
 }
 
 impl FromNbtTag for f32 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.float()
     }
 }
@@ -161,7 +160,7 @@ impl ToNbtTag for f32 {
 }
 
 impl FromNbtTag for f64 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.double()
     }
 }
@@ -172,7 +171,7 @@ impl ToNbtTag for f64 {
 }
 
 impl FromNbtTag for String {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.string().map(|s| s.to_string())
     }
 }
@@ -184,7 +183,7 @@ impl ToNbtTag for String {
 
 // unsigned integers
 impl FromNbtTag for u8 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.byte().map(|b| b as u8)
     }
 }
@@ -195,7 +194,7 @@ impl ToNbtTag for u8 {
 }
 
 impl FromNbtTag for u16 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.short().map(|s| s as u16)
     }
 }
@@ -206,7 +205,7 @@ impl ToNbtTag for u16 {
 }
 
 impl FromNbtTag for u32 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.int().map(|i| i as u32)
     }
 }
@@ -217,7 +216,7 @@ impl ToNbtTag for u32 {
 }
 
 impl FromNbtTag for u64 {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.long().map(|l| l as u64)
     }
 }
@@ -229,7 +228,7 @@ impl ToNbtTag for u64 {
 
 // lists
 impl FromNbtTag for Vec<String> {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.list().and_then(|l| {
             l.strings()
                 .map(|s| s.iter().map(|s| s.to_string()).collect())
@@ -246,11 +245,11 @@ impl ToNbtTag for Vec<String> {
 
 // slightly less standard types
 impl<T: FromNbtTag> FromNbtTag for Option<T> {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         Some(T::from_nbt_tag(tag))
     }
     fn from_optional_nbt_tag(
-        tag: Option<crate::owned::NbtTag>,
+        tag: Option<&crate::borrow::NbtTag>,
     ) -> Result<Option<Self>, DeserializeError> {
         match tag {
             Some(tag) => Ok(Some(T::from_nbt_tag(tag))),
@@ -269,11 +268,11 @@ impl<T: ToNbtTag> ToNbtTag for Option<T> {
 
 impl<T: Deserialize> FromNbtTag for Vec<Option<T>> {
     /// A list of compounds where `None` is an empty compound
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
-        let list = tag.into_list()?.into_compounds()?;
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
+        let list = tag.list()?.compounds()?;
         let mut vec = Vec::with_capacity(list.len());
         for tag in list {
-            if tag.values.is_empty() {
+            if tag.is_empty() {
                 vec.push(None);
             } else {
                 vec.push(Some(T::from_compound(tag).ok()?));
@@ -297,8 +296,8 @@ impl<T: Serialize> ToNbtTag for Vec<Option<T>> {
 }
 
 impl<T: Deserialize> FromNbtTag for Vec<T> {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
-        let list = tag.into_list()?.into_compounds()?;
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
+        let list = tag.list()?.compounds()?;
         let mut vec = Vec::with_capacity(list.len());
         for tag in list {
             vec.push(T::from_compound(tag).ok()?);
@@ -316,7 +315,7 @@ impl<T: Serialize> ToNbtTag for Vec<T> {
 }
 
 impl FromNbtTag for bool {
-    fn from_nbt_tag(tag: crate::owned::NbtTag) -> Option<Self> {
+    fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
         tag.byte().map(|b| b != 0)
     }
 }

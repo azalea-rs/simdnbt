@@ -21,6 +21,10 @@ pub struct NbtCompound<'a> {
 }
 
 impl<'a> NbtCompound<'a> {
+    pub fn from_values(values: Vec<(&'a Mutf8Str, NbtTag<'a>)>) -> Self {
+        Self { values }
+    }
+
     pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
         Self::read_with_depth(data, 0)
     }
@@ -203,5 +207,21 @@ impl<'a> NbtCompound<'a> {
 
     pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &NbtTag<'a>)> {
         self.values.iter().map(|(k, v)| (*k, v))
+    }
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+
+    pub fn to_owned(&self) -> crate::owned::NbtCompound {
+        crate::owned::NbtCompound {
+            values: self
+                .values
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), v.to_owned()))
+                .collect(),
+        }
     }
 }

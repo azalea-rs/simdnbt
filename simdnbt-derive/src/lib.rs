@@ -34,7 +34,7 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 
                         field_deserializers.push(quote! {
                             #struct_field_name: simdnbt::FromNbtTag::from_optional_nbt_tag(
-                                nbt.take(#field_name)
+                                nbt.get(#field_name)
                             )?.ok_or(simdnbt::DeserializeError::MismatchedFieldType(#debug_ident.to_owned()))?
                         });
                     }
@@ -64,7 +64,7 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 
     let output = quote! {
         impl #generics simdnbt::Deserialize for #ident #generics #where_clause {
-            fn from_compound(mut nbt: simdnbt::owned::NbtCompound) -> Result<Self, simdnbt::DeserializeError> {
+            fn from_compound(mut nbt: &simdnbt::borrow::NbtCompound) -> Result<Self, simdnbt::DeserializeError> {
                 let value = Self {
                     #(#field_deserializers),*
                 };
@@ -168,7 +168,7 @@ pub fn from_nbt_tag_derive(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
     let output = quote! {
         impl #generics simdnbt::FromNbtTag for #ident #generics #where_clause {
-            fn from_nbt_tag(tag: simdnbt::owned::NbtTag) -> Option<Self> {
+            fn from_nbt_tag(tag: &simdnbt::borrow::NbtTag) -> Option<Self> {
                 match tag.string()?.to_str().as_ref() {
                     #(#matchers)*
                     _ => None,

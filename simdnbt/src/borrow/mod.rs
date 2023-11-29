@@ -200,6 +200,23 @@ impl<'a> NbtTag<'a> {
             _ => None,
         }
     }
+
+    pub fn to_owned(&self) -> crate::owned::NbtTag {
+        match self {
+            NbtTag::Byte(byte) => crate::owned::NbtTag::Byte(*byte),
+            NbtTag::Short(short) => crate::owned::NbtTag::Short(*short),
+            NbtTag::Int(int) => crate::owned::NbtTag::Int(*int),
+            NbtTag::Long(long) => crate::owned::NbtTag::Long(*long),
+            NbtTag::Float(float) => crate::owned::NbtTag::Float(*float),
+            NbtTag::Double(double) => crate::owned::NbtTag::Double(*double),
+            NbtTag::ByteArray(byte_array) => crate::owned::NbtTag::ByteArray(byte_array.to_vec()),
+            NbtTag::String(string) => crate::owned::NbtTag::String((*string).to_owned()),
+            NbtTag::List(list) => crate::owned::NbtTag::List(list.to_owned()),
+            NbtTag::Compound(compound) => crate::owned::NbtTag::Compound(compound.to_owned()),
+            NbtTag::IntArray(int_array) => crate::owned::NbtTag::IntArray(int_array.to_vec()),
+            NbtTag::LongArray(long_array) => crate::owned::NbtTag::LongArray(long_array.to_vec()),
+        }
+    }
 }
 
 #[cfg(test)]

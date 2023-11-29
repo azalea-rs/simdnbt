@@ -265,4 +265,43 @@ impl<'a> NbtList<'a> {
             _ => None,
         }
     }
+
+    pub fn to_owned(&self) -> crate::owned::NbtList {
+        match self {
+            NbtList::Empty => crate::owned::NbtList::Empty,
+            NbtList::Byte(bytes) => crate::owned::NbtList::Byte(bytes.to_vec()),
+            NbtList::Short(shorts) => crate::owned::NbtList::Short(shorts.to_vec()),
+            NbtList::Int(ints) => crate::owned::NbtList::Int(ints.to_vec()),
+            NbtList::Long(longs) => crate::owned::NbtList::Long(longs.to_vec()),
+            NbtList::Float(floats) => crate::owned::NbtList::Float(floats.to_vec()),
+            NbtList::Double(doubles) => crate::owned::NbtList::Double(doubles.to_vec()),
+            NbtList::ByteArray(byte_arrays) => crate::owned::NbtList::ByteArray(
+                byte_arrays.iter().map(|array| array.to_vec()).collect(),
+            ),
+            NbtList::String(strings) => crate::owned::NbtList::String(
+                strings.iter().map(|&string| string.to_owned()).collect(),
+            ),
+            NbtList::List(lists) => {
+                crate::owned::NbtList::List(lists.iter().map(|list| list.to_owned()).collect())
+            }
+            NbtList::Compound(compounds) => crate::owned::NbtList::Compound(
+                compounds
+                    .iter()
+                    .map(|compound| compound.to_owned())
+                    .collect(),
+            ),
+            NbtList::IntArray(int_arrays) => crate::owned::NbtList::IntArray(
+                int_arrays
+                    .iter()
+                    .map(|array| array.to_vec())
+                    .collect::<Vec<_>>(),
+            ),
+            NbtList::LongArray(long_arrays) => crate::owned::NbtList::LongArray(
+                long_arrays
+                    .iter()
+                    .map(|array| array.to_vec())
+                    .collect::<Vec<_>>(),
+            ),
+        }
+    }
 }
