@@ -217,6 +217,27 @@ impl From<&str> for Mutf8String {
     }
 }
 
+impl Default for &Mutf8Str {
+    #[inline]
+    fn default() -> Self {
+        Mutf8Str::from_slice(&[])
+    }
+}
+
+impl From<&Mutf8Str> for Mutf8String {
+    #[inline]
+    fn from(s: &Mutf8Str) -> Self {
+        s.to_owned()
+    }
+}
+
+impl From<&Mutf8Str> for String {
+    #[inline]
+    fn from(s: &Mutf8Str) -> Self {
+        s.to_str().into_owned()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;

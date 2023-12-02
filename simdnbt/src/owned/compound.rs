@@ -5,7 +5,7 @@ use byteorder::ReadBytesExt;
 use crate::{
     common::{read_string, unchecked_push, unchecked_write_string, END_ID, MAX_DEPTH},
     mutf8::Mutf8String,
-    Error, Mutf8Str,
+    Error, Mutf8Str, ToNbtTag,
 };
 
 use super::{list::NbtList, NbtTag};
@@ -211,9 +211,20 @@ impl NbtCompound {
     pub fn clear(&mut self) {
         self.values.clear();
     }
-    pub fn insert(&mut self, name: impl Into<Mutf8String>, tag: NbtTag) {
+    pub fn insert(&mut self, name: impl Into<Mutf8String>, tag: impl ToNbtTag) {
         let name = name.into();
+        let tag = tag.to_nbt_tag();
         self.values.push((name, tag));
+    }
+    pub fn extend(
+        &mut self,
+        other: impl IntoIterator<Item = (impl Into<Mutf8String>, impl ToNbtTag)>,
+    ) {
+        self.values.extend(
+            other
+                .into_iter()
+                .map(|(name, tag)| (name.into(), tag.to_nbt_tag())),
+        );
     }
     pub fn remove(&mut self, name: &str) -> Option<NbtTag> {
         let name = Mutf8Str::from_str(name);

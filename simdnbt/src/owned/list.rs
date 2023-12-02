@@ -351,3 +351,69 @@ impl NbtList {
         }
     }
 }
+
+impl From<Vec<i8>> for NbtList {
+    fn from(bytes: Vec<i8>) -> Self {
+        NbtList::Byte(bytes)
+    }
+}
+impl From<Vec<i16>> for NbtList {
+    fn from(shorts: Vec<i16>) -> Self {
+        NbtList::Short(shorts)
+    }
+}
+impl From<Vec<i32>> for NbtList {
+    fn from(ints: Vec<i32>) -> Self {
+        NbtList::Int(ints)
+    }
+}
+impl From<Vec<i64>> for NbtList {
+    fn from(longs: Vec<i64>) -> Self {
+        NbtList::Long(longs)
+    }
+}
+impl From<Vec<f32>> for NbtList {
+    fn from(floats: Vec<f32>) -> Self {
+        NbtList::Float(floats)
+    }
+}
+impl From<Vec<f64>> for NbtList {
+    fn from(doubles: Vec<f64>) -> Self {
+        NbtList::Double(doubles)
+    }
+}
+impl From<Vec<Vec<u8>>> for NbtList {
+    fn from(byte_arrays: Vec<Vec<u8>>) -> Self {
+        NbtList::ByteArray(byte_arrays)
+    }
+}
+impl From<Vec<Mutf8String>> for NbtList {
+    fn from(strings: Vec<Mutf8String>) -> Self {
+        NbtList::String(strings)
+    }
+}
+impl From<Vec<String>> for NbtList {
+    fn from(strings: Vec<String>) -> Self {
+        NbtList::String(strings.into_iter().map(Mutf8String::from).collect())
+    }
+}
+impl From<Vec<NbtList>> for NbtList {
+    fn from(lists: Vec<NbtList>) -> Self {
+        NbtList::List(lists)
+    }
+}
+impl From<Vec<NbtCompound>> for NbtList {
+    fn from(compounds: Vec<NbtCompound>) -> Self {
+        NbtList::Compound(compounds)
+    }
+}
+impl From<Vec<Vec<i32>>> for NbtList {
+    fn from(int_arrays: Vec<Vec<i32>>) -> Self {
+        NbtList::IntArray(int_arrays)
+    }
+}
+impl From<Vec<Vec<i64>>> for NbtList {
+    fn from(long_arrays: Vec<Vec<i64>>) -> Self {
+        NbtList::LongArray(long_arrays)
+    }
+}

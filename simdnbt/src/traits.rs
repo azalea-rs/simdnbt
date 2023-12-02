@@ -181,6 +181,12 @@ impl ToNbtTag for String {
     }
 }
 
+impl ToNbtTag for &str {
+    fn to_nbt_tag(self) -> crate::owned::NbtTag {
+        crate::owned::NbtTag::String(self.into())
+    }
+}
+
 // unsigned integers
 impl FromNbtTag for u8 {
     fn from_nbt_tag(tag: &crate::borrow::NbtTag) -> Option<Self> {
@@ -322,5 +328,11 @@ impl FromNbtTag for bool {
 impl ToNbtTag for bool {
     fn to_nbt_tag(self) -> crate::owned::NbtTag {
         crate::owned::NbtTag::Byte(if self { 1 } else { 0 })
+    }
+}
+
+impl ToNbtTag for crate::owned::NbtList {
+    fn to_nbt_tag(self) -> crate::owned::NbtTag {
+        crate::owned::NbtTag::List(self)
     }
 }

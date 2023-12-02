@@ -558,6 +558,24 @@ impl NbtTag {
     }
 }
 
+impl From<NbtCompound> for BaseNbt {
+    fn from(tag: NbtCompound) -> Self {
+        Self {
+            name: Mutf8String::from(""),
+            tag,
+        }
+    }
+}
+
+impl From<Nbt> for NbtTag {
+    fn from(value: Nbt) -> Self {
+        match value {
+            Nbt::Some(nbt) => NbtTag::Compound(nbt.tag),
+            Nbt::None => NbtTag::Compound(NbtCompound::new()),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io::Read;
