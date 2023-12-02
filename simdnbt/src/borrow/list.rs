@@ -17,7 +17,7 @@ use super::{read_u32, NbtCompound, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[repr(u8)]
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub enum NbtList<'a> {
     #[default]
     Empty = END_ID,

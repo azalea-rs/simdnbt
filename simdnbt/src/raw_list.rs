@@ -4,7 +4,7 @@ use crate::swap_endianness::{swap_endianness, swap_endianness_as_u8, SwappableNu
 
 /// A list of numbers that's kept as big-endian in memory.
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RawList<'a, T> {
     data: &'a [u8],
     _marker: PhantomData<T>,

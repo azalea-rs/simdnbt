@@ -5,13 +5,13 @@ mod list;
 
 use std::{io::Cursor, ops::Deref};
 
-use byteorder::ReadBytesExt;
+use byteorder::{ReadBytesExt, BE};
 
 use crate::{
     common::{
-        read_string, read_u32, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID,
-        END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH,
-        SHORT_ID, STRING_ID,
+        read_int_array, read_long_array, read_string, read_u32, read_with_u32_length, write_string,
+        BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
+        LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     raw_list::RawList,
     Error, Mutf8Str,
@@ -102,7 +102,7 @@ impl<'a> BaseNbt<'a> {
 
 /// A single NBT tag.
 #[repr(u8)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum NbtTag<'a> {
     Byte(i8) = BYTE_ID,
     Short(i16) = SHORT_ID,
@@ -126,6 +126,48 @@ impl<'a> NbtTag<'a> {
         // discriminant as its first field, so we can read the discriminant
         // without offsetting the pointer.
         unsafe { *<*const _>::from(self).cast::<u8>() }
+    }
+
+    fn read_with_type(
+        data: &mut Cursor<&'a [u8]>,
+        tag_type: u8,
+        depth: usize,
+    ) -> Result<Self, Error> {
+        match tag_type {
+            BYTE_ID => Ok(NbtTag::Byte(
+                data.read_i8().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            SHORT_ID => Ok(NbtTag::Short(
+                data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            INT_ID => Ok(NbtTag::Int(
+                data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            LONG_ID => Ok(NbtTag::Long(
+                data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            FLOAT_ID => Ok(NbtTag::Float(
+                data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            DOUBLE_ID => Ok(NbtTag::Double(
+                data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?,
+            )),
+            BYTE_ARRAY_ID => Ok(NbtTag::ByteArray(read_with_u32_length(data, 1)?)),
+            STRING_ID => Ok(NbtTag::String(read_string(data)?)),
+            LIST_ID => Ok(NbtTag::List(NbtList::read(data, depth + 1)?)),
+            COMPOUND_ID => Ok(NbtTag::Compound(NbtCompound::read_with_depth(
+                data,
+                depth + 1,
+            )?)),
+            INT_ARRAY_ID => Ok(NbtTag::IntArray(read_int_array(data)?)),
+            LONG_ARRAY_ID => Ok(NbtTag::LongArray(read_long_array(data)?)),
+            _ => Err(Error::UnknownTagId(tag_type)),
+        }
+    }
+
+    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
+        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        Self::read_with_type(data, tag_type, 0)
     }
 
     pub fn byte(&self) -> Option<i8> {

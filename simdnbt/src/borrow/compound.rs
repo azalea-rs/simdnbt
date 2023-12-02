@@ -1,13 +1,11 @@
 use std::io::Cursor;
 
-use byteorder::{ReadBytesExt, BE};
+use byteorder::ReadBytesExt;
 
 use crate::{
     common::{
-        read_int_array, read_long_array, read_string, read_with_u32_length, unchecked_extend,
-        unchecked_push, unchecked_write_string, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID,
-        DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID,
-        MAX_DEPTH, SHORT_ID, STRING_ID,
+        read_string, unchecked_extend, unchecked_push, unchecked_write_string, write_string,
+        END_ID, MAX_DEPTH,
     },
     Error, Mutf8Str,
 };
@@ -15,7 +13,7 @@ use crate::{
 use super::{list::NbtList, NbtTag};
 
 /// A list of named tags. The order of the tags is preserved.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct NbtCompound<'a> {
     values: Vec<(&'a Mutf8Str, NbtTag<'a>)>,
 }
@@ -41,44 +39,7 @@ impl<'a> NbtCompound<'a> {
             }
             let tag_name = read_string(data)?;
 
-            match tag_type {
-                BYTE_ID => values.push((
-                    tag_name,
-                    NbtTag::Byte(data.read_i8().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                SHORT_ID => values.push((
-                    tag_name,
-                    NbtTag::Short(data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                INT_ID => values.push((
-                    tag_name,
-                    NbtTag::Int(data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                LONG_ID => values.push((
-                    tag_name,
-                    NbtTag::Long(data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                FLOAT_ID => values.push((
-                    tag_name,
-                    NbtTag::Float(data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                DOUBLE_ID => values.push((
-                    tag_name,
-                    NbtTag::Double(data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?),
-                )),
-                BYTE_ARRAY_ID => {
-                    values.push((tag_name, NbtTag::ByteArray(read_with_u32_length(data, 1)?)))
-                }
-                STRING_ID => values.push((tag_name, NbtTag::String(read_string(data)?))),
-                LIST_ID => values.push((tag_name, NbtTag::List(NbtList::read(data, depth + 1)?))),
-                COMPOUND_ID => values.push((
-                    tag_name,
-                    NbtTag::Compound(NbtCompound::read_with_depth(data, depth + 1)?),
-                )),
-                INT_ARRAY_ID => values.push((tag_name, NbtTag::IntArray(read_int_array(data)?))),
-                LONG_ARRAY_ID => values.push((tag_name, NbtTag::LongArray(read_long_array(data)?))),
-                _ => return Err(Error::UnknownTagId(tag_type)),
-            }
+            values.push((tag_name, NbtTag::read_with_type(data, tag_type, depth)?));
         }
         Ok(Self { values })
     }
