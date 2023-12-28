@@ -264,6 +264,14 @@ impl NbtTag {
         Self::read_with_type(data, tag_type, 0)
     }
 
+    pub fn read_optional(data: &mut Cursor<&[u8]>) -> Result<Option<Self>, Error> {
+        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        if tag_type == END_ID {
+            return Ok(None);
+        }
+        Ok(Some(Self::read_with_type(data, tag_type, 0)?))
+    }
+
     /// Write to the data without checking that there's enough space in it.
     ///
     /// # Safety

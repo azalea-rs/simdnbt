@@ -170,6 +170,14 @@ impl<'a> NbtTag<'a> {
         Self::read_with_type(data, tag_type, 0)
     }
 
+    pub fn read_optional(data: &mut Cursor<&'a [u8]>) -> Result<Option<Self>, Error> {
+        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        if tag_type == END_ID {
+            return Ok(None);
+        }
+        Ok(Some(Self::read_with_type(data, tag_type, 0)?))
+    }
+
     pub fn byte(&self) -> Option<i8> {
         match self {
             NbtTag::Byte(byte) => Some(*byte),

@@ -23,6 +23,8 @@ fastnbt = "2.4.4"
 azalea-nbt = { git = "https://github.com/azalea-rs/azalea", rev = "84e036ce3752ecf57904b0f5aff1f33d43e95a32" }
 hematite-nbt = { version = "0.5.2", default-features = false }
 
+tikv-jemallocator = "0.5"
+
 [features]
 default = ["derive"]
 derive = ["dep:simdnbt-derive"]
