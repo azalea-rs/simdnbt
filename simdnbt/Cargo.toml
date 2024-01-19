@@ -13,10 +13,10 @@ byteorder = "1.5.0"
 flate2 = "^1.0.28"
 residua-mutf8 = "2.0.0"
 simdnbt-derive = { version = "0.3.0", path = "../simdnbt-derive", optional = true }
-thiserror = "1.0.50"
+thiserror = "1.0.56"
 
 [dev-dependencies]
-criterion = { version = "^0.5.1", features = ["html_reports"] }
+criterion = { version = "0.5.1", features = ["html_reports"] }
 graphite_binary = "0.1.0"
 valence_nbt = { version = "0.8.0", features = ["binary"] }
 fastnbt = "2.4.4"
