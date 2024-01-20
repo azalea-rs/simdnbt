@@ -51,21 +51,27 @@ let mut buffer = Vec::new();
 nbt.write(&mut buffer);
 ```
 
+## Performance guide
+
+Use the borrow variant of `Nbt` if possible, and avoid allocating unnecessarily (for example, keep strings as `Cow<str>` if you can).
+
+The most significant and simple optimization you can do is switching to an allocator like [mimalloc](https://docs.rs/mimalloc/latest/mimalloc/) (it's ~20% faster on my machine). Setting `RUSTFLAGS='-C target-cpu=native'` when running your code may also help a little bit.
+
 ## Implementation details
 
 Simdnbt currently makes use of SIMD instructions for two things:
 - swapping the endianness of int arrays
 - checking if a string is plain ascii for faster mutf8 to utf8 conversion
 
-Simdnbt takes some shortcuts to be this fast, some people call it cheating but I think it's fair game:
+Simdnbt ~~cheats~~ takes some shortcuts to be this fast:
 1. it requires a reference to the original data (to avoid cloning)
 2. it doesn't validate/decode the mutf-8 strings at decode-time
 
 ## Benchmarks
 
-Simdnbt is likely the fastest NBT decoder in existence.
+Simdnbt is likely the fastest NBT decoder currently in existence.
 
-Here's a benchmark comparing Simdnbt against a few of the other fastest nbt crates (though without actually accessing the data):
+Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crates (though without actually accessing the data):
 
 ![simdnbt is ~3x faster than the second fastest nbt crate](https://github.com/azalea-rs/simdnbt/assets/27899617/03a4f916-d162-4a23-aa1a-12f1b11dc903)
 
