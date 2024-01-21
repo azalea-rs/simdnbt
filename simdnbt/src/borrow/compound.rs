@@ -10,7 +10,7 @@ use crate::{
     Error, Mutf8Str,
 };
 
-use super::{list::NbtList, NbtTag};
+use super::{cursor::McCursor, list::NbtList, NbtTag};
 
 /// A list of named tags. The order of the tags is preserved.
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -23,11 +23,11 @@ impl<'a> NbtCompound<'a> {
         Self { values }
     }
 
-    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
+    pub fn read(data: &mut McCursor<'a>) -> Result<Self, Error> {
         Self::read_with_depth(data, 0)
     }
 
-    pub fn read_with_depth(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+    pub fn read_with_depth(data: &mut McCursor<'a>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
@@ -37,7 +37,7 @@ impl<'a> NbtCompound<'a> {
             if tag_type == END_ID {
                 break;
             }
-            let tag_name = read_string(data)?;
+            let tag_name = data.read_string()?;
 
             values.push((tag_name, NbtTag::read_with_type(data, tag_type, depth)?));
         }

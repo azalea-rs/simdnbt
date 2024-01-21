@@ -13,7 +13,7 @@ use crate::{
     Error, Mutf8Str,
 };
 
-use super::{read_u32, NbtCompound, MAX_DEPTH};
+use super::{cursor::McCursor, read_u32, NbtCompound, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[repr(u8)]
@@ -35,42 +35,42 @@ pub enum NbtList<'a> {
     LongArray(Vec<RawList<'a, i64>>) = LONG_ARRAY_ID,
 }
 impl<'a> NbtList<'a> {
-    pub fn read(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+    pub fn read(data: &mut McCursor<'a>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         Ok(match tag_type {
             END_ID => {
-                data.set_position(data.position() + 4);
+                data.advance(4);
                 NbtList::Empty
             }
-            BYTE_ID => NbtList::Byte(read_i8_array(data)?),
-            SHORT_ID => NbtList::Short(RawList::new(read_with_u32_length(data, 2)?)),
-            INT_ID => NbtList::Int(RawList::new(read_with_u32_length(data, 4)?)),
-            LONG_ID => NbtList::Long(RawList::new(read_with_u32_length(data, 8)?)),
-            FLOAT_ID => NbtList::Float(RawList::new(read_with_u32_length(data, 4)?)),
-            DOUBLE_ID => NbtList::Double(RawList::new(read_with_u32_length(data, 8)?)),
+            BYTE_ID => NbtList::Byte(data.read_i8_array()?),
+            SHORT_ID => NbtList::Short(RawList::new(data.read_with_u32_length(2)?)),
+            INT_ID => NbtList::Int(RawList::new(data.read_with_u32_length(4)?)),
+            LONG_ID => NbtList::Long(RawList::new(data.read_with_u32_length(8)?)),
+            FLOAT_ID => NbtList::Float(RawList::new(data.read_with_u32_length(4)?)),
+            DOUBLE_ID => NbtList::Double(RawList::new(data.read_with_u32_length(8)?)),
             BYTE_ARRAY_ID => NbtList::ByteArray({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut arrays = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    arrays.push(read_u8_array(data)?)
+                    arrays.push(data.read_u8_array()?)
                 }
                 arrays
             }),
             STRING_ID => NbtList::String({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut strings = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    strings.push(read_string(data)?)
+                    strings.push(data.read_string()?)
                 }
                 strings
             }),
             LIST_ID => NbtList::List({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut lists = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -79,7 +79,7 @@ impl<'a> NbtList<'a> {
                 lists
             }),
             COMPOUND_ID => NbtList::Compound({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut compounds = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -88,20 +88,20 @@ impl<'a> NbtList<'a> {
                 compounds
             }),
             INT_ARRAY_ID => NbtList::IntArray({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut arrays = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    arrays.push(read_int_array(data)?)
+                    arrays.push(data.read_int_array()?)
                 }
                 arrays
             }),
             LONG_ARRAY_ID => NbtList::LongArray({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut arrays = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    arrays.push(read_long_array(data)?)
+                    arrays.push(data.read_long_array()?)
                 }
                 arrays
             }),

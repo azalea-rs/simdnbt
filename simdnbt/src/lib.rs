@@ -2,6 +2,7 @@
 #![feature(portable_simd)]
 #![feature(array_chunks)]
 #![feature(split_array)]
+#![feature(slice_split_at_unchecked)]
 
 pub mod borrow;
 mod common;

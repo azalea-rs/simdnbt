@@ -6,6 +6,7 @@ use std::{
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use flate2::read::GzDecoder;
+use simdnbt::borrow::cursor::McCursor;
 
 pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     let mut file = File::open(format!("tests/{filename}")).unwrap();
@@ -33,7 +34,7 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
             graphite_items_from_nbt(graphite_binary::nbt::decode::read(&mut &input[..]).unwrap())
                 .unwrap();
         let simdnbt_nbt = simdnbt_items_from_nbt(
-            simdnbt::borrow::Nbt::read(&mut Cursor::new(input))
+            simdnbt::borrow::Nbt::read(&mut McCursor::new(input))
                 .unwrap()
                 .unwrap(),
         )
@@ -63,7 +64,7 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     group.bench_function("simdnbt_parse", |b| {
         b.iter(|| {
             let input = black_box(input);
-            let nbt = black_box(simdnbt::borrow::Nbt::read(&mut Cursor::new(input)));
+            let nbt = black_box(simdnbt::borrow::Nbt::read(&mut McCursor::new(input)));
             let nbt = nbt.unwrap().unwrap();
             black_box(simdnbt_items_from_nbt(nbt));
         })

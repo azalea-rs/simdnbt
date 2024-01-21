@@ -1,5 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use flate2::read::GzDecoder;
+use simdnbt::borrow::cursor::McCursor;
 use std::{
     fs::File,
     io::{Cursor, Read},
@@ -19,19 +20,18 @@ fn bench_file(filename: &str, c: &mut Criterion) {
         decoded_src = contents;
     }
 
-    let mut decoded_src_stream = Cursor::new(&decoded_src[..]);
-
     let mut group = c.benchmark_group(format!("nbt/{filename}"));
 
     group.throughput(Throughput::Bytes(decoded_src.len() as u64));
 
     group.bench_function("Decode", |b| {
         b.iter(|| {
+            let mut decoded_src_stream = McCursor::new(&decoded_src[..]);
             black_box(simdnbt::borrow::Nbt::read(&mut decoded_src_stream).unwrap());
-            decoded_src_stream.set_position(0);
         })
     });
 
+    let mut decoded_src_stream = McCursor::new(&decoded_src[..]);
     let nbt = simdnbt::borrow::Nbt::read(&mut decoded_src_stream)
         .unwrap()
         .unwrap();

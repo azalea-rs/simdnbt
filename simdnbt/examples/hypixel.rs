@@ -1,6 +1,6 @@
 use std::{collections::HashMap, hint::black_box, io::Cursor};
 
-use simdnbt::{Deserialize, Serialize};
+use simdnbt::{borrow::cursor::McCursor, Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct Item {
@@ -68,7 +68,7 @@ fn main() {
     let input = black_box(include_bytes!("../tests/realworld.nbt"));
 
     for _ in 0..1 {
-        let nbt = simdnbt::borrow::Nbt::read(&mut Cursor::new(input));
+        let nbt = simdnbt::borrow::Nbt::read(&mut McCursor::new(input));
         let nbt = black_box(nbt.unwrap().unwrap());
 
         let data = Base::from_nbt(&nbt).unwrap();
@@ -76,7 +76,7 @@ fn main() {
         // roundtrip
         let mut new_nbt_bytes = Vec::new();
         data.clone().to_nbt().write(&mut new_nbt_bytes);
-        let new_nbt = simdnbt::borrow::Nbt::read(&mut Cursor::new(&new_nbt_bytes[..]))
+        let new_nbt = simdnbt::borrow::Nbt::read(&mut McCursor::new(&new_nbt_bytes[..]))
             .unwrap()
             .unwrap();
         let new_data = Base::from_nbt(&new_nbt).unwrap();

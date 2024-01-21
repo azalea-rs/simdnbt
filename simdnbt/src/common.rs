@@ -104,7 +104,7 @@ pub fn read_long_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<RawList<'a, i6
     Ok(RawList::new(array_bytes))
 }
 
-fn slice_u8_into_i8(s: &[u8]) -> &[i8] {
+pub(crate) fn slice_u8_into_i8(s: &[u8]) -> &[i8] {
     unsafe { slice::from_raw_parts(s.as_ptr() as *const i8, s.len()) }
 }
 
