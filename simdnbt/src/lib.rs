@@ -1,4 +1,4 @@
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!("../README.md")]
 #![feature(portable_simd)]
 #![feature(array_chunks)]
 
