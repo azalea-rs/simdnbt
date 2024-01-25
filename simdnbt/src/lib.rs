@@ -1,7 +1,6 @@
 #![doc = include_str!("../../README.md")]
 #![feature(portable_simd)]
 #![feature(array_chunks)]
-#![feature(split_array)]
 
 pub mod borrow;
 mod common;
