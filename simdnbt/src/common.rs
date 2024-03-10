@@ -1,4 +1,4 @@
-use std::{io::Cursor, slice};
+use std::{io::Cursor, mem, slice};
 
 use crate::{
     raw_list::RawList,
@@ -171,7 +171,7 @@ pub unsafe fn unchecked_push(data: &mut Vec<u8>, value: u8) {
 /// endian! Use [`slice_into_u8_big_endian`] to get big endian (the endianness that's used in NBT).
 #[inline]
 pub fn slice_into_u8_native_endian<T>(s: &[T]) -> &[u8] {
-    unsafe { slice::from_raw_parts(s.as_ptr() as *const u8, std::mem::size_of_val(s)) }
+    unsafe { slice::from_raw_parts(s.as_ptr() as *const u8, mem::size_of_val(s)) }
 }
 
 /// Convert a slice of any type into a Vec<u8>. This will return the data as big endian (the
@@ -179,4 +179,29 @@ pub fn slice_into_u8_native_endian<T>(s: &[T]) -> &[u8] {
 #[inline]
 pub fn slice_into_u8_big_endian<T: SwappableNumber>(s: &[T]) -> Vec<u8> {
     swap_endianness_as_u8::<T>(slice_into_u8_native_endian(s))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // this test specifically checks with little-endian
+    #[cfg(target_endian = "little")]
+    #[test]
+    fn test_slice_into_u8_native_endian() {
+        assert_eq!(slice_into_u8_native_endian(&[1u16, 2u16]), [1, 0, 2, 0]);
+        assert_eq!(
+            slice_into_u8_native_endian(&[1u32, 2u32]),
+            [1, 0, 0, 0, 2, 0, 0, 0]
+        );
+    }
+
+    #[test]
+    fn test_slice_into_u8_big_endian() {
+        assert_eq!(slice_into_u8_big_endian(&[1u16, 2u16]), [0, 1, 0, 2]);
+        assert_eq!(
+            slice_into_u8_big_endian(&[1u32, 2u32]),
+            [0, 0, 0, 1, 0, 0, 0, 2]
+        );
+    }
 }

@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, mem};
 
 use crate::swap_endianness::{swap_endianness, swap_endianness_as_u8, SwappableNumber};
 
@@ -18,7 +18,7 @@ impl<'a, T> RawList<'a, T> {
     }
 
     pub fn len(&self) -> usize {
-        self.data.len() / std::mem::size_of::<T>()
+        self.data.len() / mem::size_of::<T>()
     }
 
     pub fn is_empty(&self) -> bool {

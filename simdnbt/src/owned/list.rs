@@ -147,7 +147,8 @@ impl NbtList {
                 write_with_u32_length(data, 4, &slice_into_u8_big_endian(floats));
             }
             NbtList::Double(doubles) => {
-                write_with_u32_length(data, 8, &slice_into_u8_big_endian(doubles));
+                let bytes = slice_into_u8_big_endian(doubles);
+                write_with_u32_length(data, 8, &bytes);
             }
             NbtList::ByteArray(byte_arrays) => {
                 write_u32(data, byte_arrays.len() as u32);

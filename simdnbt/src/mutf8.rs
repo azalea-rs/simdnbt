@@ -29,8 +29,8 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         let mask = u8x16::splat(0b10000000);
         let zero = u8x16::splat(0);
         let simd = u8x16::from_array(*chunk);
-        let xor = simd & mask;
-        if xor != zero {
+        let and = simd & mask;
+        if and != zero {
             is_plain_ascii = false;
         }
     }
@@ -40,8 +40,8 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         let mask = u8x8::splat(0b10000000);
         let zero = u8x8::splat(0);
         let simd = u8x8::from_array(*chunk);
-        let xor = simd & mask;
-        if xor != zero {
+        let and = simd & mask;
+        if and != zero {
             is_plain_ascii = false;
         }
     }
@@ -51,8 +51,8 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         let mask = u8x4::splat(0b10000000);
         let zero = u8x4::splat(0);
         let simd = u8x4::from_array(*chunk);
-        let xor = simd & mask;
-        if xor != zero {
+        let and = simd & mask;
+        if and != zero {
             is_plain_ascii = false;
         }
     }
@@ -66,8 +66,8 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         let mask = u8x32::splat(0b10000000);
         let zero = u8x32::splat(0);
         let simd = u8x32::from_array(chunk);
-        let xor = simd & mask;
-        if xor != zero {
+        let and = simd & mask;
+        if and != zero {
             is_plain_ascii = false;
         }
     }

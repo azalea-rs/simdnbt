@@ -588,10 +588,8 @@ impl From<Nbt> for NbtTag {
 mod tests {
     use std::io::Read;
 
-    use byteorder::{WriteBytesExt, BE};
+    use byteorder::WriteBytesExt;
     use flate2::read::GzDecoder;
-
-    use crate::common::{INT_ID, LIST_ID, LONG_ID};
 
     use super::*;
 
