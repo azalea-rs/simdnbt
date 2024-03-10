@@ -355,60 +355,37 @@ impl NbtList {
     pub fn as_nbt_tags(&self) -> Vec<super::NbtTag> {
         match self {
             NbtList::Empty => vec![],
-            NbtList::Byte(bytes) => bytes
-                .iter()
-                .map(|&byte| super::NbtTag::Byte(byte))
-                .collect(),
-            NbtList::Short(shorts) => shorts
-                .to_vec()
-                .into_iter()
-                .map(|short| super::NbtTag::Short(short))
-                .collect(),
-            NbtList::Int(ints) => ints
-                .to_vec()
-                .into_iter()
-                .map(|int| super::NbtTag::Int(int))
-                .collect(),
-            NbtList::Long(longs) => longs
-                .to_vec()
-                .into_iter()
-                .map(|long| super::NbtTag::Long(long))
-                .collect(),
-            NbtList::Float(floats) => floats
-                .to_vec()
-                .into_iter()
-                .map(|float| super::NbtTag::Float(float))
-                .collect(),
-            NbtList::Double(doubles) => doubles
-                .to_vec()
-                .into_iter()
-                .map(|double| super::NbtTag::Double(double))
-                .collect(),
+            NbtList::Byte(bytes) => bytes.iter().copied().map(super::NbtTag::Byte).collect(),
+            NbtList::Short(shorts) => shorts.iter().copied().map(super::NbtTag::Short).collect(),
+            NbtList::Int(ints) => ints.iter().copied().map(super::NbtTag::Int).collect(),
+            NbtList::Long(longs) => longs.iter().copied().map(super::NbtTag::Long).collect(),
+            NbtList::Float(floats) => floats.iter().copied().map(super::NbtTag::Float).collect(),
+            NbtList::Double(doubles) => {
+                doubles.iter().copied().map(super::NbtTag::Double).collect()
+            }
             NbtList::ByteArray(byte_arrays) => byte_arrays
                 .iter()
                 .cloned()
-                .map(|array| super::NbtTag::ByteArray(array))
+                .map(super::NbtTag::ByteArray)
                 .collect(),
-            NbtList::String(strings) => strings
-                .iter()
-                .cloned()
-                .map(|string| super::NbtTag::String(string))
-                .collect(),
-            NbtList::List(lists) => lists
-                .iter()
-                .map(|list| super::NbtTag::List(list.clone()))
-                .collect(),
+            NbtList::String(strings) => {
+                strings.iter().cloned().map(super::NbtTag::String).collect()
+            }
+            NbtList::List(lists) => lists.iter().cloned().map(super::NbtTag::List).collect(),
             NbtList::Compound(compounds) => compounds
                 .iter()
-                .map(|compound| super::NbtTag::Compound(compound.clone()))
+                .cloned()
+                .map(super::NbtTag::Compound)
                 .collect(),
             NbtList::IntArray(int_arrays) => int_arrays
                 .iter()
-                .map(|array| super::NbtTag::IntArray(array.clone()))
+                .cloned()
+                .map(super::NbtTag::IntArray)
                 .collect(),
             NbtList::LongArray(long_arrays) => long_arrays
                 .iter()
-                .map(|array| super::NbtTag::LongArray(array.clone()))
+                .cloned()
+                .map(super::NbtTag::LongArray)
                 .collect(),
         }
     }

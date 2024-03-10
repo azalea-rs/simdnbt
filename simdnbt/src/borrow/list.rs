@@ -315,27 +315,23 @@ impl<'a> NbtList<'a> {
             NbtList::Short(shorts) => shorts
                 .to_vec()
                 .into_iter()
-                .map(|short| super::NbtTag::Short(short))
+                .map(super::NbtTag::Short)
                 .collect(),
-            NbtList::Int(ints) => ints
-                .to_vec()
-                .into_iter()
-                .map(|int| super::NbtTag::Int(int))
-                .collect(),
+            NbtList::Int(ints) => ints.to_vec().into_iter().map(super::NbtTag::Int).collect(),
             NbtList::Long(longs) => longs
                 .to_vec()
                 .into_iter()
-                .map(|long| super::NbtTag::Long(long))
+                .map(super::NbtTag::Long)
                 .collect(),
             NbtList::Float(floats) => floats
                 .to_vec()
                 .into_iter()
-                .map(|float| super::NbtTag::Float(float))
+                .map(super::NbtTag::Float)
                 .collect(),
             NbtList::Double(doubles) => doubles
                 .to_vec()
                 .into_iter()
-                .map(|double| super::NbtTag::Double(double))
+                .map(super::NbtTag::Double)
                 .collect(),
             NbtList::ByteArray(byte_arrays) => byte_arrays
                 .iter()
