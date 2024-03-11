@@ -1,14 +1,19 @@
 use std::{mem, simd::prelude::*};
 
-pub trait SwappableNumber {}
-impl SwappableNumber for u16 {}
-impl SwappableNumber for u32 {}
-impl SwappableNumber for u64 {}
-impl SwappableNumber for i16 {}
-impl SwappableNumber for i32 {}
-impl SwappableNumber for i64 {}
-impl SwappableNumber for f32 {}
-impl SwappableNumber for f64 {}
+mod private {
+    pub trait Sealed {}
+
+    impl Sealed for u16 {}
+    impl Sealed for u32 {}
+    impl Sealed for u64 {}
+    impl Sealed for i16 {}
+    impl Sealed for i32 {}
+    impl Sealed for i64 {}
+    impl Sealed for f32 {}
+    impl Sealed for f64 {}
+}
+pub trait SwappableNumber: private::Sealed {}
+impl<T: private::Sealed> SwappableNumber for T {}
 
 #[inline]
 fn swap_endianness_16bit(bytes: &mut [u8], num: usize) {
