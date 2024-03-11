@@ -71,10 +71,28 @@ Simdnbt ~~cheats~~ takes some shortcuts to be this fast:
 
 Simdnbt is likely the fastest NBT decoder currently in existence.
 
-Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crates (though without actually accessing the data):
+Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crates for decoding [`complex_player.dat`](https://github.com/azalea-rs/simdnbt/blob/master/simdnbt/tests/complex_player.dat):
 
-![simdnbt is ~3x faster than the second fastest nbt crate](https://github.com/azalea-rs/simdnbt/assets/27899617/03a4f916-d162-4a23-aa1a-12f1b11dc903)
+| Library                                                                     | Throughput   |
+| --------------------------------------------------------------------------- | ------------ |
+| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 717.45 MiB/s |
+| [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)   | 329.10 MiB/s |
+| [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                    | 306.58 MiB/s |
+| [azalea_nbt](https://docs.rs/azalea-nbt/latest/azalea_nbt/)                 | 297.28 MiB/s |
+| [valence_nbt](https://docs.rs/valence_nbt/latest/valence_nbt/)              | 236.42 MiB/s |
+| [graphite_binary](https://docs.rs/graphite_binary/latest/graphite_binary/)  | 210.51 MiB/s |
+| [fastnbt](https://docs.rs/fastnbt/latest/fastnbt/)                          | 115.54 MiB/s |
+| [hematite_nbt](https://docs.rs/hematite-nbt/latest/nbt/)                    | 108.91 MiB/s |
 
-And here's a benchmark where it accesses the data and makes it owned:
+And for writing `complex_player.dat`:
+| Library         | Throughput   |
+| ----------------| ------------ |
+| simdnbt::borrow | 2.5914 GiB/s |
+| azalea_nbt      | 2.1096 GiB/s |
+| simdnbt::owned  | 1.9508 GiB/s |
+| graphite_binary | 1.7745 GiB/s |
 
-![simdnbt is only about 50% faster than the second fastest in this one](https://github.com/azalea-rs/simdnbt/assets/27899617/9d716c39-3bff-4703-99d7-2bec91c6b205)
+
+The tables above were made from the [compare benchmark](https://github.com/azalea-rs/simdnbt/tree/master/simdnbt/benches) in this repo.
+Note that the benchmark is somewhat unfair, since `simdnbt::borrow` doesn't fully decode some things like strings and integer arrays until they're used.
+Also keep in mind that if you run your own benchmark you'll get different numbers, but the speeds should be about the same relative to each other.

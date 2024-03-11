@@ -417,37 +417,4 @@ mod tests {
         }
         assert_eq!(ints.len(), 1023);
     }
-
-    // #[test]
-    // fn generate_inttest() {
-    //     use byteorder::WriteBytesExt;
-
-    //     let mut out = Vec::new();
-    //     out.write_u8(COMPOUND_ID).unwrap();
-    //     out.write_u16::<BE>(0).unwrap();
-    //     out.write_u8(LIST_ID).unwrap();
-    //     out.write_u16::<BE>(0).unwrap();
-    //     out.write_u8(INT_ID).unwrap();
-    //     out.write_i32::<BE>(1023).unwrap();
-    //     for i in 0..1023 {
-    //         out.write_i32::<BE>(i).unwrap();
-    //     }
-    //     out.write_u8(END_ID).unwrap();
-
-    //     std::fs::write("tests/inttest1023.nbt", out).unwrap();
-    // }
-
-    // #[test]
-    // fn generate_stringtest() {
-    //     let mut out = Vec::new();
-    //     out.write_u8(COMPOUND_ID).unwrap();
-    //     out.write_u16::<BE>(0).unwrap();
-    //     out.write_u8(LIST_ID).unwrap();
-    //     out.write_u16::<BE>(0).unwrap();
-    //     out.write_u8(STRING_ID).unwrap();
-    //     out.write_i32::<BE>(16).unwrap();
-    //     out.extend_from_slice(&std::fs::read("tests/stringtest.nbt").unwrap().as_slice()[13..]);
-    //     out.write_u8(END_ID).unwrap();
-    //     std::fs::write("tests/stringtest2.nbt", out).unwrap();
-    // }
 }
