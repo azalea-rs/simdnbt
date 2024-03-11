@@ -24,48 +24,58 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     let mut group = c.benchmark_group(format!("compare/{filename}"));
     group.throughput(Throughput::Bytes(input.len() as u64));
 
-    // group.bench_function("simdnbt_borrow_parse", |b| {
-    //     b.iter(|| {
-    //         let input = black_box(input);
-    //         let nbt = simdnbt::borrow::OptionalNbt::new(&mut Cursor::new(input))
-    //             .unwrap()
-    //             .unwrap();
-    //         // let _ = black_box(nbt.list("").unwrap().ints());
-    //         black_box(nbt);
-    //     })
-    // });
-
-    let nbt = simdnbt::borrow::Nbt::read(&mut Cursor::new(input))
-        .unwrap()
-        .unwrap();
-    group.bench_function("simdnbt_borrow_write", |b| {
+    group.bench_function("simdnbt_borrow_parse", |b| {
         b.iter(|| {
-            let mut out = Vec::new();
-            nbt.write(&mut out);
-            black_box(out);
+            let input = black_box(input);
+            let nbt = simdnbt::borrow::Nbt::read(&mut Cursor::new(input))
+                .unwrap()
+                .unwrap();
+            // let _ = black_box(nbt.list("").unwrap().ints());
+            black_box(nbt);
         })
     });
 
     // group.bench_function("simdnbt_owned_parse", |b| {
     //     b.iter(|| {
     //         let input = black_box(input);
-    //         let nbt = simdnbt::owned::OptionalNbt::new(&mut Cursor::new(input))
+    //         let nbt = simdnbt::owned::Nbt::read(&mut Cursor::new(input))
     //             .unwrap()
     //             .unwrap();
     //         // let _ = black_box(nbt.list("").unwrap().ints());
     //         black_box(nbt);
     //     })
     // });
-    let nbt = simdnbt::owned::Nbt::read(&mut Cursor::new(input))
-        .unwrap()
-        .unwrap();
-    group.bench_function("simdnbt_owned_write", |b| {
+
+    group.bench_function("shen_parse", |b| {
+        let mut input = black_box(input.to_vec());
         b.iter(|| {
-            let mut out = Vec::new();
-            nbt.write(&mut out);
-            black_box(out);
+            let nbt = shen_nbt5::NbtValue::from_binary::<shen_nbt5::nbt_version::Java>(&mut input)
+                .unwrap();
+            black_box(nbt);
         })
     });
+
+    // let nbt = simdnbt::borrow::Nbt::read(&mut Cursor::new(input))
+    //     .unwrap()
+    //     .unwrap();
+    // group.bench_function("simdnbt_borrow_write", |b| {
+    //     b.iter(|| {
+    //         let mut out = Vec::new();
+    //         nbt.write(&mut out);
+    //         black_box(out);
+    //     })
+    // });
+
+    // let nbt = simdnbt::owned::Nbt::read(&mut Cursor::new(input))
+    //     .unwrap()
+    //     .unwrap();
+    // group.bench_function("simdnbt_owned_write", |b| {
+    //     b.iter(|| {
+    //         let mut out = Vec::new();
+    //         nbt.write(&mut out);
+    //         black_box(out);
+    //     })
+    // });
 
     // group.bench_function("azalea_parse", |b| {
     //     b.iter(|| {
@@ -75,14 +85,14 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     //     })
     // });
 
-    let nbt = azalea_nbt::Nbt::read(&mut Cursor::new(input)).unwrap();
-    group.bench_function("azalea_write", |b| {
-        b.iter(|| {
-            let mut out = Vec::new();
-            nbt.write(&mut out);
-            black_box(out);
-        })
-    });
+    // let nbt = azalea_nbt::Nbt::read(&mut Cursor::new(input)).unwrap();
+    // group.bench_function("azalea_write", |b| {
+    //     b.iter(|| {
+    //         let mut out = Vec::new();
+    //         nbt.write(&mut out);
+    //         black_box(out);
+    //     })
+    // });
 
     // group.bench_function("graphite_parse", |b| {
     //     b.iter(|| {
@@ -91,13 +101,13 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     //         black_box(nbt);
     //     })
     // });
-    let nbt = graphite_binary::nbt::decode::read(&mut &input[..]).unwrap();
-    group.bench_function("graphite_write", |b| {
-        b.iter(|| {
-            let out = graphite_binary::nbt::encode::write(&nbt);
-            black_box(out);
-        })
-    });
+    // let nbt = graphite_binary::nbt::decode::read(&mut &input[..]).unwrap();
+    // group.bench_function("graphite_write", |b| {
+    //     b.iter(|| {
+    //         let out = graphite_binary::nbt::encode::write(&nbt);
+    //         black_box(out);
+    //     })
+    // });
 
     // group.bench_function("valence_parse", |b| {
     //     b.iter(|| {
