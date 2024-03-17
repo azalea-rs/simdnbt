@@ -104,9 +104,10 @@ impl Mutf8Str {
             // SAFETY: &[u8] and &str are the same layout.
             unsafe { Cow::Borrowed(std::str::from_utf8_unchecked(&self.slice)) }
         } else {
-            match mutf8::decode(&self.slice).expect("Mutf8Str must alwaus be valid MUTF-8") {
-                Cow::Borrowed(b) => Cow::Borrowed(b),
-                Cow::Owned(o) => Cow::Owned(o),
+            match mutf8::decode(&self.slice) {
+                Ok(Cow::Borrowed(b)) => Cow::Borrowed(b),
+                Ok(Cow::Owned(o)) => Cow::Owned(o),
+                Err(_) => Cow::Borrowed(""),
             }
         }
     }
@@ -173,9 +174,10 @@ impl Mutf8String {
             // SAFETY: &[u8] and &str are the same layout.
             unsafe { String::from_utf8_unchecked(self.vec) }
         } else {
-            match mutf8::decode(&self.vec).expect("Mutf8Str must alwaus be valid MUTF-8") {
-                Cow::Borrowed(b) => b.to_owned(),
-                Cow::Owned(o) => o,
+            match mutf8::decode(&self.vec) {
+                Ok(Cow::Borrowed(b)) => b.to_owned(),
+                Ok(Cow::Owned(o)) => o,
+                Err(_) => String::new(),
             }
         }
     }
