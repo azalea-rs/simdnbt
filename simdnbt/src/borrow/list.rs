@@ -29,8 +29,8 @@ pub enum NbtList<'a> {
     Double(RawList<'a, f64>) = DOUBLE_ID,
     ByteArray(Vec<&'a [u8]>) = BYTE_ARRAY_ID,
     String(Vec<&'a Mutf8Str>) = STRING_ID,
-    List(Vec<NbtList<'a>>) = LIST_ID,
-    Compound(Vec<NbtCompound<'a>>) = COMPOUND_ID,
+    List(&'a [NbtList<'a>]) = LIST_ID,
+    Compound(&'a [NbtCompound<'a>]) = COMPOUND_ID,
     IntArray(Vec<RawList<'a, i32>>) = INT_ARRAY_ID,
     LongArray(Vec<RawList<'a, i64>>) = LONG_ARRAY_ID,
 }
@@ -76,20 +76,26 @@ impl<'a> NbtList<'a> {
             LIST_ID => NbtList::List({
                 let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
-                let mut lists = Vec::with_capacity(length.min(128) as usize);
+                // let mut lists = Vec::with_capacity(length.min(128) as usize);
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                let mut tags = alloc_mut.start_unnamed_list_tags(depth);
                 for _ in 0..length {
-                    lists.push(NbtList::read(data, alloc, depth + 1)?)
+                    tags.push(NbtList::read(data, alloc, depth + 1)?)
                 }
-                lists
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                alloc_mut.finish_unnamed_list_tags(tags, depth)
             }),
             COMPOUND_ID => NbtList::Compound({
                 let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
-                let mut compounds = Vec::with_capacity(length.min(128) as usize);
+                // let mut compounds = Vec::with_capacity(length.min(128) as usize);
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                let mut tags = alloc_mut.start_unnamed_compound_tags(depth);
                 for _ in 0..length {
-                    compounds.push(NbtCompound::read_with_depth(data, alloc, depth + 1)?)
+                    tags.push(NbtCompound::read_with_depth(data, alloc, depth + 1)?)
                 }
-                compounds
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                alloc_mut.finish_unnamed_compound_tags(tags, depth)
             }),
             INT_ARRAY_ID => NbtList::IntArray({
                 let length = read_u32(data)?;
@@ -122,7 +128,7 @@ impl<'a> NbtList<'a> {
                 unchecked_push(data, COMPOUND_ID);
                 unchecked_extend(data, &(compounds.len() as u32).to_be_bytes());
             }
-            for compound in compounds {
+            for compound in *compounds {
                 compound.write(data);
             }
             return;
@@ -165,7 +171,7 @@ impl<'a> NbtList<'a> {
             }
             NbtList::List(lists) => {
                 write_u32(data, lists.len() as u32);
-                for list in lists {
+                for list in *lists {
                     list.write(data);
                 }
             }

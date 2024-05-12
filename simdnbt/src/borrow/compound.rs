@@ -18,7 +18,7 @@ pub struct NbtCompound<'a> {
     values: &'a [(&'a Mutf8Str, NbtTag<'a>)],
 }
 
-impl<'a, 'b> NbtCompound<'a> {
+impl<'a> NbtCompound<'a> {
     pub fn read(
         data: &mut Cursor<&'a [u8]>,
         alloc: &UnsafeCell<TagAllocator<'a>>,
@@ -37,7 +37,7 @@ impl<'a, 'b> NbtCompound<'a> {
 
         let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
 
-        let mut tags = alloc_mut.start_compound(depth);
+        let mut tags = alloc_mut.start_named_tags(depth);
         loop {
             let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
             if tag_type == END_ID {
@@ -45,13 +45,13 @@ impl<'a, 'b> NbtCompound<'a> {
             }
             let tag_name = read_string(data)?;
 
-            tags.push(
+            tags.push((
                 tag_name,
                 NbtTag::read_with_type(data, alloc, tag_type, depth)?,
-            );
+            ));
         }
         let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-        let values = alloc_mut.finish_compound(tags);
+        let values = alloc_mut.finish_named_tags(tags, depth);
 
         Ok(Self { values })
     }

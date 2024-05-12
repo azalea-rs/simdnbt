@@ -26,7 +26,8 @@ pub use self::{compound::NbtCompound, list::NbtList};
 pub struct BaseNbt<'a> {
     name: &'a Mutf8Str,
     tag: NbtCompound<'a>,
-    tag_alloc: TagAllocator<'a>,
+    // we need to keep this around so it's not deallocated
+    _tag_alloc: TagAllocator<'a>,
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -54,7 +55,7 @@ impl<'a> Nbt<'a> {
         Ok(Nbt::Some(BaseNbt {
             name,
             tag,
-            tag_alloc: tag_alloc.into_inner(),
+            _tag_alloc: tag_alloc.into_inner(),
         }))
     }
 
