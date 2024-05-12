@@ -60,10 +60,12 @@ The most significant and simple optimization you can do is switching to an alloc
 ## Implementation details
 
 Simdnbt currently makes use of SIMD instructions for two things:
-- swapping the endianness of int arrays
-- checking if a string is plain ascii for faster mutf8 to utf8 conversion
+
+-   swapping the endianness of int arrays
+-   checking if a string is plain ascii for faster mutf8 to utf8 conversion
 
 Simdnbt ~~cheats~~ takes some shortcuts to be this fast:
+
 1. it requires a reference to the original data (to avoid cloning)
 2. it doesn't validate/decode the mutf-8 strings at decode-time
 
@@ -75,7 +77,7 @@ Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crat
 
 | Library                                                                     | Throughput   |
 | --------------------------------------------------------------------------- | ------------ |
-| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 717.45 MiB/s |
+| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 1.0900 GiB/s |
 | [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)   | 329.10 MiB/s |
 | [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                    | 306.58 MiB/s |
 | [azalea_nbt](https://docs.rs/azalea-nbt/latest/azalea_nbt/)                 | 297.28 MiB/s |
@@ -85,13 +87,12 @@ Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crat
 | [hematite_nbt](https://docs.rs/hematite-nbt/latest/nbt/)                    | 108.91 MiB/s |
 
 And for writing `complex_player.dat`:
-| Library         | Throughput   |
+| Library | Throughput |
 | ----------------| ------------ |
 | simdnbt::borrow | 2.5914 GiB/s |
-| azalea_nbt      | 2.1096 GiB/s |
-| simdnbt::owned  | 1.9508 GiB/s |
+| azalea_nbt | 2.1096 GiB/s |
+| simdnbt::owned | 1.9508 GiB/s |
 | graphite_binary | 1.7745 GiB/s |
-
 
 The tables above were made from the [compare benchmark](https://github.com/azalea-rs/simdnbt/tree/master/simdnbt/benches) in this repo.
 Note that the benchmark is somewhat unfair, since `simdnbt::borrow` doesn't fully decode some things like strings and integer arrays until they're used.
