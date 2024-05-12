@@ -2,8 +2,9 @@
 
 mod compound;
 mod list;
+mod tag_alloc;
 
-use std::{io::Cursor, ops::Deref};
+use std::{cell::UnsafeCell, io::Cursor, ops::Deref};
 
 use byteorder::{ReadBytesExt, BE};
 
@@ -17,13 +18,15 @@ use crate::{
     Error, Mutf8Str,
 };
 
+use self::tag_alloc::TagAllocator;
 pub use self::{compound::NbtCompound, list::NbtList};
 
 /// A complete NBT container. This contains a name and a compound tag.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct BaseNbt<'a> {
     name: &'a Mutf8Str,
     tag: NbtCompound<'a>,
+    tag_alloc: TagAllocator<'a>,
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -43,10 +46,16 @@ impl<'a> Nbt<'a> {
         if root_type != COMPOUND_ID {
             return Err(Error::InvalidRootType(root_type));
         }
-        let name = read_string(data)?;
-        let tag = NbtCompound::read_with_depth(data, 0)?;
+        let tag_alloc = UnsafeCell::new(TagAllocator::new());
 
-        Ok(Nbt::Some(BaseNbt { name, tag }))
+        let name = read_string(data)?;
+        let tag = NbtCompound::read_with_depth(data, &tag_alloc, 0)?;
+
+        Ok(Nbt::Some(BaseNbt {
+            name,
+            tag,
+            tag_alloc: tag_alloc.into_inner(),
+        }))
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
@@ -83,6 +92,15 @@ impl<'a> BaseNbt<'a> {
         self.name
     }
 }
+
+impl PartialEq for BaseNbt<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // we don't need to compare the tag allocator since comparing `tag` will
+        // still compare the values of the tags
+        self.name == other.name && self.tag == other.tag
+    }
+}
+
 impl<'a> Deref for BaseNbt<'a> {
     type Target = NbtCompound<'a>;
 
@@ -130,6 +148,7 @@ impl<'a> NbtTag<'a> {
 
     fn read_with_type(
         data: &mut Cursor<&'a [u8]>,
+        alloc: &UnsafeCell<TagAllocator<'a>>,
         tag_type: u8,
         depth: usize,
     ) -> Result<Self, Error> {
@@ -154,9 +173,10 @@ impl<'a> NbtTag<'a> {
             )),
             BYTE_ARRAY_ID => Ok(NbtTag::ByteArray(read_with_u32_length(data, 1)?)),
             STRING_ID => Ok(NbtTag::String(read_string(data)?)),
-            LIST_ID => Ok(NbtTag::List(NbtList::read(data, depth + 1)?)),
+            LIST_ID => Ok(NbtTag::List(NbtList::read(data, alloc, depth + 1)?)),
             COMPOUND_ID => Ok(NbtTag::Compound(NbtCompound::read_with_depth(
                 data,
+                alloc,
                 depth + 1,
             )?)),
             INT_ARRAY_ID => Ok(NbtTag::IntArray(read_int_array(data)?)),
@@ -165,17 +185,23 @@ impl<'a> NbtTag<'a> {
         }
     }
 
-    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
+    pub fn read(
+        data: &mut Cursor<&'a [u8]>,
+        alloc: &UnsafeCell<TagAllocator<'a>>,
+    ) -> Result<Self, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-        Self::read_with_type(data, tag_type, 0)
+        Self::read_with_type(data, alloc, tag_type, 0)
     }
 
-    pub fn read_optional(data: &mut Cursor<&'a [u8]>) -> Result<Option<Self>, Error> {
+    pub fn read_optional(
+        data: &mut Cursor<&'a [u8]>,
+        alloc: &UnsafeCell<TagAllocator<'a>>,
+    ) -> Result<Option<Self>, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if tag_type == END_ID {
             return Ok(None);
         }
-        Ok(Some(Self::read_with_type(data, tag_type, 0)?))
+        Ok(Some(Self::read_with_type(data, alloc, tag_type, 0)?))
     }
 
     pub fn byte(&self) -> Option<i8> {

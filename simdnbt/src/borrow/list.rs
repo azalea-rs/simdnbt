@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{cell::UnsafeCell, io::Cursor};
 
 use byteorder::ReadBytesExt;
 
@@ -13,7 +13,7 @@ use crate::{
     Error, Mutf8Str,
 };
 
-use super::{read_u32, NbtCompound, MAX_DEPTH};
+use super::{read_u32, tag_alloc::TagAllocator, NbtCompound, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[repr(u8)]
@@ -35,7 +35,11 @@ pub enum NbtList<'a> {
     LongArray(Vec<RawList<'a, i64>>) = LONG_ARRAY_ID,
 }
 impl<'a> NbtList<'a> {
-    pub fn read(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+    pub fn read(
+        data: &mut Cursor<&'a [u8]>,
+        alloc: &UnsafeCell<TagAllocator<'a>>,
+        depth: usize,
+    ) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
@@ -74,7 +78,7 @@ impl<'a> NbtList<'a> {
                 // arbitrary number to prevent big allocations
                 let mut lists = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    lists.push(NbtList::read(data, depth + 1)?)
+                    lists.push(NbtList::read(data, alloc, depth + 1)?)
                 }
                 lists
             }),
@@ -83,7 +87,7 @@ impl<'a> NbtList<'a> {
                 // arbitrary number to prevent big allocations
                 let mut compounds = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    compounds.push(NbtCompound::read_with_depth(data, depth + 1)?)
+                    compounds.push(NbtCompound::read_with_depth(data, alloc, depth + 1)?)
                 }
                 compounds
             }),
