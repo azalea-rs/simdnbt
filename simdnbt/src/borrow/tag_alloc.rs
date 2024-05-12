@@ -25,6 +25,7 @@ use crate::Mutf8Str;
 
 use super::{NbtCompound, NbtList, NbtTag};
 
+// this value appears to have the best results on my pc when testing with complex_player.dat
 const MIN_ALLOC_SIZE: usize = 1024;
 
 #[derive(Default)]
