@@ -27,12 +27,12 @@ pub enum NbtList<'a> {
     Long(RawList<'a, i64>) = LONG_ID,
     Float(RawList<'a, f32>) = FLOAT_ID,
     Double(RawList<'a, f64>) = DOUBLE_ID,
-    ByteArray(Vec<&'a [u8]>) = BYTE_ARRAY_ID,
-    String(Vec<&'a Mutf8Str>) = STRING_ID,
+    ByteArray(&'a [&'a [u8]]) = BYTE_ARRAY_ID,
+    String(&'a [&'a Mutf8Str]) = STRING_ID,
     List(&'a [NbtList<'a>]) = LIST_ID,
     Compound(&'a [NbtCompound<'a>]) = COMPOUND_ID,
-    IntArray(Vec<RawList<'a, i32>>) = INT_ARRAY_ID,
-    LongArray(Vec<RawList<'a, i64>>) = LONG_ARRAY_ID,
+    IntArray(&'a [RawList<'a, i32>]) = INT_ARRAY_ID,
+    LongArray(&'a [RawList<'a, i64>]) = LONG_ARRAY_ID,
 }
 impl<'a> NbtList<'a> {
     pub fn read(
@@ -57,77 +57,105 @@ impl<'a> NbtList<'a> {
             DOUBLE_ID => NbtList::Double(RawList::new(read_with_u32_length(data, 8)?)),
             BYTE_ARRAY_ID => NbtList::ByteArray({
                 let length = read_u32(data)?;
-                // arbitrary number to prevent big allocations
-                let mut arrays = Vec::with_capacity(length.min(128) as usize);
-                for _ in 0..length {
-                    arrays.push(read_u8_array(data)?)
-                }
-                arrays
-            }),
-            STRING_ID => NbtList::String({
-                let length = read_u32(data)?;
-                // arbitrary number to prevent big allocations
-                let mut strings = Vec::with_capacity(length.min(128) as usize);
-                for _ in 0..length {
-                    strings.push(read_string(data)?)
-                }
-                strings
-            }),
-            LIST_ID => NbtList::List({
-                let length = read_u32(data)?;
-                // arbitrary number to prevent big allocations
-                // let mut lists = Vec::with_capacity(length.min(128) as usize);
                 let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                let mut tags = alloc_mut.start_unnamed_list_tags(depth);
+                let mut tags = alloc_mut.unnamed_bytearray.start(depth);
                 for _ in 0..length {
-                    let tag = match NbtList::read(data, alloc, depth + 1) {
+                    let tag = match read_u8_array(data) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc_mut.finish_unnamed_list_tags(tags, depth);
-                            return Err(e);
-                        }
-                    };
-                    tags.push(tag)
-                }
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                alloc_mut.finish_unnamed_list_tags(tags, depth)
-            }),
-            COMPOUND_ID => NbtList::Compound({
-                let length = read_u32(data)?;
-                // arbitrary number to prevent big allocations
-                // let mut compounds = Vec::with_capacity(length.min(128) as usize);
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                let mut tags = alloc_mut.start_unnamed_compound_tags(depth);
-                for _ in 0..length {
-                    let tag = match NbtCompound::read_with_depth(data, alloc, depth + 1) {
-                        Ok(tag) => tag,
-                        Err(e) => {
-                            alloc_mut.finish_unnamed_compound_tags(tags, depth);
+                            alloc_mut.unnamed_bytearray.finish(tags, depth);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
                 let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                alloc_mut.finish_unnamed_compound_tags(tags, depth)
+                alloc_mut.unnamed_bytearray.finish(tags, depth)
+            }),
+            STRING_ID => NbtList::String({
+                let length = read_u32(data)?;
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                let mut tags = alloc_mut.unnamed_string.start(depth);
+                for _ in 0..length {
+                    let tag = match read_string(data) {
+                        Ok(tag) => tag,
+                        Err(e) => {
+                            alloc_mut.unnamed_string.finish(tags, depth);
+                            return Err(e);
+                        }
+                    };
+                    tags.push(tag);
+                }
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                alloc_mut.unnamed_string.finish(tags, depth)
+            }),
+            LIST_ID => NbtList::List({
+                let length = read_u32(data)?;
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                let mut tags = alloc_mut.unnamed_list.start(depth);
+                for _ in 0..length {
+                    let tag = match NbtList::read(data, alloc, depth + 1) {
+                        Ok(tag) => tag,
+                        Err(e) => {
+                            alloc_mut.unnamed_list.finish(tags, depth);
+                            return Err(e);
+                        }
+                    };
+                    tags.push(tag)
+                }
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                alloc_mut.unnamed_list.finish(tags, depth)
+            }),
+            COMPOUND_ID => NbtList::Compound({
+                let length = read_u32(data)?;
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                let mut tags = alloc_mut.unnamed_compound.start(depth);
+                for _ in 0..length {
+                    let tag = match NbtCompound::read_with_depth(data, alloc, depth + 1) {
+                        Ok(tag) => tag,
+                        Err(e) => {
+                            alloc_mut.unnamed_compound.finish(tags, depth);
+                            return Err(e);
+                        }
+                    };
+                    tags.push(tag);
+                }
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                alloc_mut.unnamed_compound.finish(tags, depth)
             }),
             INT_ARRAY_ID => NbtList::IntArray({
                 let length = read_u32(data)?;
-                // arbitrary number to prevent big allocations
-                let mut arrays = Vec::with_capacity(length.min(128) as usize);
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                let mut tags = alloc_mut.unnamed_intarray.start(depth);
                 for _ in 0..length {
-                    arrays.push(read_int_array(data)?)
+                    let tag = match read_int_array(data) {
+                        Ok(tag) => tag,
+                        Err(e) => {
+                            alloc_mut.unnamed_intarray.finish(tags, depth);
+                            return Err(e);
+                        }
+                    };
+                    tags.push(tag);
                 }
-                arrays
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                alloc_mut.unnamed_intarray.finish(tags, depth)
             }),
             LONG_ARRAY_ID => NbtList::LongArray({
                 let length = read_u32(data)?;
-                // arbitrary number to prevent big allocations
-                let mut arrays = Vec::with_capacity(length.min(128) as usize);
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                let mut tags = alloc_mut.unnamed_longarray.start(depth);
                 for _ in 0..length {
-                    arrays.push(read_long_array(data)?)
+                    let tag = match read_long_array(data) {
+                        Ok(tag) => tag,
+                        Err(e) => {
+                            alloc_mut.unnamed_longarray.finish(tags, depth);
+                            return Err(e);
+                        }
+                    };
+                    tags.push(tag);
                 }
-                arrays
+                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+                alloc_mut.unnamed_longarray.finish(tags, depth)
             }),
             _ => return Err(Error::UnknownTagId(tag_type)),
         })
@@ -179,7 +207,7 @@ impl<'a> NbtList<'a> {
             }
             NbtList::String(strings) => {
                 write_u32(data, strings.len() as u32);
-                for string in strings {
+                for string in *strings {
                     write_string(data, string);
                 }
             }
@@ -194,13 +222,13 @@ impl<'a> NbtList<'a> {
             }
             NbtList::IntArray(int_arrays) => {
                 write_u32(data, int_arrays.len() as u32);
-                for array in int_arrays {
+                for array in *int_arrays {
                     write_with_u32_length(data, 4, array.as_big_endian());
                 }
             }
             NbtList::LongArray(long_arrays) => {
                 write_u32(data, long_arrays.len() as u32);
-                for array in long_arrays {
+                for array in *long_arrays {
                     write_with_u32_length(data, 8, array.as_big_endian());
                 }
             }
@@ -253,7 +281,7 @@ impl<'a> NbtList<'a> {
             _ => None,
         }
     }
-    pub fn byte_arrays(&self) -> Option<&Vec<&[u8]>> {
+    pub fn byte_arrays(&self) -> Option<&[&[u8]]> {
         match self {
             NbtList::ByteArray(byte_arrays) => Some(byte_arrays),
             _ => None,

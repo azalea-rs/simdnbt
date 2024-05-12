@@ -21,7 +21,7 @@ use std::{
     ptr::NonNull,
 };
 
-use crate::Mutf8Str;
+use crate::{raw_list::RawList, Mutf8Str};
 
 use super::{NbtCompound, NbtList, NbtTag};
 
@@ -30,150 +30,69 @@ const MIN_ALLOC_SIZE: usize = 1024;
 
 #[derive(Default)]
 pub struct TagAllocator<'a> {
-    // it's a vec because of the depth thing mentioned earlier, index in the vec = depth
-    named_tags: Vec<TagsAllocation<(&'a Mutf8Str, NbtTag<'a>)>>,
-    // we also have to keep track of old allocations so we can deallocate them later
-    previous_named_tags: Vec<Vec<TagsAllocation<(&'a Mutf8Str, NbtTag<'a>)>>>,
+    pub named: IndividualTagAllocator<(&'a Mutf8Str, NbtTag<'a>)>,
 
     // so remember earlier when i said the depth thing is only necessary because compounds aren't
     // length prefixed? ... well soooo i decided to make arrays store per-depth separately too to
     // avoid exploits where an array with a big length is sent to force it to immediately allocate
     // a lot
-    unnamed_list_tags: Vec<TagsAllocation<NbtList<'a>>>,
-    previous_unnamed_list_tags: Vec<Vec<TagsAllocation<NbtList<'a>>>>,
-
-    unnamed_compound_tags: Vec<TagsAllocation<NbtCompound<'a>>>,
-    previous_unnamed_compound_tags: Vec<Vec<TagsAllocation<NbtCompound<'a>>>>,
+    pub unnamed_list: IndividualTagAllocator<NbtList<'a>>,
+    pub unnamed_compound: IndividualTagAllocator<NbtCompound<'a>>,
+    pub unnamed_bytearray: IndividualTagAllocator<&'a [u8]>,
+    pub unnamed_string: IndividualTagAllocator<&'a Mutf8Str>,
+    pub unnamed_intarray: IndividualTagAllocator<RawList<'a, i32>>,
+    pub unnamed_longarray: IndividualTagAllocator<RawList<'a, i64>>,
 }
 
 impl<'a> TagAllocator<'a> {
     pub fn new() -> Self {
         Self::default()
     }
+}
 
-    pub fn start_named_tags(
-        &mut self,
-        depth: usize,
-    ) -> ContiguousTagsAllocator<(&'a Mutf8Str, NbtTag<'a>)> {
-        start_allocating_tags_with_depth(depth, &mut self.named_tags, &mut self.previous_named_tags)
-    }
-    pub fn finish_named_tags(
-        &mut self,
-        alloc: ContiguousTagsAllocator<(&'a Mutf8Str, NbtTag<'a>)>,
-        depth: usize,
-    ) -> &'a [(&'a Mutf8Str, NbtTag)] {
-        finish_allocating_tags_with_depth(
-            alloc,
-            depth,
-            &mut self.named_tags,
-            &mut self.previous_named_tags,
-        )
-    }
+pub struct IndividualTagAllocator<T> {
+    // it's a vec because of the depth thing mentioned earlier, index in the vec = depth
+    current: Vec<TagsAllocation<T>>,
+    // we also have to keep track of old allocations so we can deallocate them later
+    previous: Vec<Vec<TagsAllocation<T>>>,
+}
+impl<T> IndividualTagAllocator<T>
+where
+    T: Clone,
+{
+    pub fn start(&mut self, depth: usize) -> ContiguousTagsAllocator<T> {
+        // make sure we have enough space for this depth
+        // (also note that depth is reused for compounds and arrays so we might have to push
+        // more than once)
+        for _ in self.current.len()..=depth {
+            self.current.push(Default::default());
+            self.previous.push(Default::default());
+        }
 
-    pub fn start_unnamed_list_tags(
-        &mut self,
-        depth: usize,
-    ) -> ContiguousTagsAllocator<NbtList<'a>> {
-        start_allocating_tags_with_depth(
-            depth,
-            &mut self.unnamed_list_tags,
-            &mut self.previous_unnamed_list_tags,
-        )
-    }
-    pub fn finish_unnamed_list_tags(
-        &mut self,
-        alloc: ContiguousTagsAllocator<NbtList<'a>>,
-        depth: usize,
-    ) -> &'a [NbtList<'a>] {
-        finish_allocating_tags_with_depth(
-            alloc,
-            depth,
-            &mut self.unnamed_list_tags,
-            &mut self.previous_unnamed_list_tags,
-        )
-    }
+        let alloc = self.current[depth].clone();
 
-    pub fn start_unnamed_compound_tags(
-        &mut self,
-        depth: usize,
-    ) -> ContiguousTagsAllocator<NbtCompound<'a>> {
-        start_allocating_tags_with_depth(
-            depth,
-            &mut self.unnamed_compound_tags,
-            &mut self.previous_unnamed_compound_tags,
-        )
+        start_allocating_tags(alloc)
     }
-    pub fn finish_unnamed_compound_tags(
-        &mut self,
-        alloc: ContiguousTagsAllocator<NbtCompound<'a>>,
-        depth: usize,
-    ) -> &'a [NbtCompound<'a>] {
-        finish_allocating_tags_with_depth(
-            alloc,
-            depth,
-            &mut self.unnamed_compound_tags,
-            &mut self.previous_unnamed_compound_tags,
-        )
+    pub fn finish<'a>(&mut self, alloc: ContiguousTagsAllocator<T>, depth: usize) -> &'a [T] {
+        finish_allocating_tags(alloc, &mut self.current[depth], &mut self.previous[depth])
     }
 }
-impl Drop for TagAllocator<'_> {
+impl<T> Default for IndividualTagAllocator<T> {
+    fn default() -> Self {
+        Self {
+            current: Default::default(),
+            previous: Default::default(),
+        }
+    }
+}
+impl<T> Drop for IndividualTagAllocator<T> {
     fn drop(&mut self) {
-        self.named_tags
-            .iter_mut()
-            .for_each(TagsAllocation::deallocate);
-        self.previous_named_tags
-            .iter_mut()
-            .flatten()
-            .for_each(TagsAllocation::deallocate);
-
-        self.unnamed_list_tags
-            .iter_mut()
-            .for_each(TagsAllocation::deallocate);
-        self.previous_unnamed_list_tags
-            .iter_mut()
-            .flatten()
-            .for_each(TagsAllocation::deallocate);
-
-        self.unnamed_compound_tags
-            .iter_mut()
-            .for_each(TagsAllocation::deallocate);
-        self.previous_unnamed_compound_tags
+        self.current.iter_mut().for_each(TagsAllocation::deallocate);
+        self.previous
             .iter_mut()
             .flatten()
             .for_each(TagsAllocation::deallocate);
     }
-}
-
-pub fn start_allocating_tags_with_depth<T>(
-    depth: usize,
-    tags: &mut Vec<TagsAllocation<T>>,
-    previous_allocs: &mut Vec<Vec<TagsAllocation<T>>>,
-) -> ContiguousTagsAllocator<T>
-where
-    T: Clone,
-{
-    // make sure we have enough space for this depth
-    // (also note that depth is reused for compounds and arrays so we might have to push
-    // more than once)
-    for _ in tags.len()..=depth {
-        tags.push(Default::default());
-        previous_allocs.push(Default::default());
-    }
-
-    let alloc = tags[depth].clone();
-
-    start_allocating_tags(alloc)
-}
-fn finish_allocating_tags_with_depth<'a, T>(
-    alloc: ContiguousTagsAllocator<T>,
-    depth: usize,
-    tags: &mut [TagsAllocation<T>],
-    previous_allocs: &mut [Vec<TagsAllocation<T>>],
-) -> &'a [T]
-where
-    T: Clone,
-{
-    finish_allocating_tags(alloc, &mut tags[depth], &mut previous_allocs[depth])
 }
 
 fn start_allocating_tags<T>(alloc: TagsAllocation<T>) -> ContiguousTagsAllocator<T> {

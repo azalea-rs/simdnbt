@@ -37,7 +37,7 @@ impl<'a> NbtCompound<'a> {
 
         let alloc_mut = unsafe { alloc.get().as_mut().unwrap_unchecked() };
 
-        let mut tags = alloc_mut.start_named_tags(depth);
+        let mut tags = alloc_mut.named.start(depth);
         loop {
             let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
             if tag_type == END_ID {
@@ -47,7 +47,7 @@ impl<'a> NbtCompound<'a> {
             let tag_name = match read_string(data) {
                 Ok(name) => name,
                 Err(_) => {
-                    alloc_mut.finish_named_tags(tags, depth);
+                    alloc_mut.named.finish(tags, depth);
                     // the only error read_string can return is UnexpectedEof, so this makes it
                     // slightly faster
                     return Err(Error::UnexpectedEof);
@@ -56,14 +56,14 @@ impl<'a> NbtCompound<'a> {
             let tag = match NbtTag::read_with_type(data, alloc, tag_type, depth) {
                 Ok(tag) => tag,
                 Err(e) => {
-                    alloc_mut.finish_named_tags(tags, depth);
+                    alloc_mut.named.finish(tags, depth);
                     return Err(e);
                 }
             };
             tags.push((tag_name, tag));
         }
         let alloc_mut = unsafe { alloc.get().as_mut().unwrap_unchecked() };
-        let values = alloc_mut.finish_named_tags(tags, depth);
+        let values = alloc_mut.named.finish(tags, depth);
 
         Ok(Self { values })
     }
