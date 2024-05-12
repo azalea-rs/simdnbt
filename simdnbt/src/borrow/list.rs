@@ -80,7 +80,14 @@ impl<'a> NbtList<'a> {
                 let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
                 let mut tags = alloc_mut.start_unnamed_list_tags(depth);
                 for _ in 0..length {
-                    tags.push(NbtList::read(data, alloc, depth + 1)?)
+                    let tag = match NbtList::read(data, alloc, depth + 1) {
+                        Ok(tag) => tag,
+                        Err(e) => {
+                            alloc_mut.finish_unnamed_list_tags(tags, depth);
+                            return Err(e);
+                        }
+                    };
+                    tags.push(tag)
                 }
                 let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
                 alloc_mut.finish_unnamed_list_tags(tags, depth)
@@ -92,7 +99,14 @@ impl<'a> NbtList<'a> {
                 let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
                 let mut tags = alloc_mut.start_unnamed_compound_tags(depth);
                 for _ in 0..length {
-                    tags.push(NbtCompound::read_with_depth(data, alloc, depth + 1)?)
+                    let tag = match NbtCompound::read_with_depth(data, alloc, depth + 1) {
+                        Ok(tag) => tag,
+                        Err(e) => {
+                            alloc_mut.finish_unnamed_compound_tags(tags, depth);
+                            return Err(e);
+                        }
+                    };
+                    tags.push(tag);
                 }
                 let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
                 alloc_mut.finish_unnamed_compound_tags(tags, depth)

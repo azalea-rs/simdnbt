@@ -35,7 +35,7 @@ impl<'a> NbtCompound<'a> {
             return Err(Error::MaxDepthExceeded);
         }
 
-        let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+        let alloc_mut = unsafe { alloc.get().as_mut().unwrap_unchecked() };
 
         let mut tags = alloc_mut.start_named_tags(depth);
         loop {
@@ -43,14 +43,26 @@ impl<'a> NbtCompound<'a> {
             if tag_type == END_ID {
                 break;
             }
-            let tag_name = read_string(data)?;
 
-            tags.push((
-                tag_name,
-                NbtTag::read_with_type(data, alloc, tag_type, depth)?,
-            ));
+            let tag_name = match read_string(data) {
+                Ok(name) => name,
+                Err(_) => {
+                    alloc_mut.finish_named_tags(tags, depth);
+                    // the only error read_string can return is UnexpectedEof, so this makes it
+                    // slightly faster
+                    return Err(Error::UnexpectedEof);
+                }
+            };
+            let tag = match NbtTag::read_with_type(data, alloc, tag_type, depth) {
+                Ok(tag) => tag,
+                Err(e) => {
+                    alloc_mut.finish_named_tags(tags, depth);
+                    return Err(e);
+                }
+            };
+            tags.push((tag_name, tag));
         }
-        let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
+        let alloc_mut = unsafe { alloc.get().as_mut().unwrap_unchecked() };
         let values = alloc_mut.finish_named_tags(tags, depth);
 
         Ok(Self { values })

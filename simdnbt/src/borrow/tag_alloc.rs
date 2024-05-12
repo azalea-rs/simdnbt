@@ -261,6 +261,7 @@ pub struct ContiguousTagsAllocator<T> {
 }
 
 impl<T> ContiguousTagsAllocator<T> {
+    #[inline(never)]
     fn grow(&mut self) {
         let new_cap = if self.is_new_allocation {
             // this makes sure we don't allocate 0 bytes
@@ -297,6 +298,7 @@ impl<T> ContiguousTagsAllocator<T> {
         self.alloc.len = self.size;
     }
 
+    #[inline]
     pub fn push(&mut self, value: T) {
         // check if we need to reallocate
         if self.alloc.len == self.alloc.cap {
@@ -305,7 +307,8 @@ impl<T> ContiguousTagsAllocator<T> {
 
         // push the new tag
         unsafe {
-            std::ptr::write(self.alloc.ptr.as_ptr().add(self.alloc.len), value);
+            let end = self.alloc.ptr.as_ptr().add(self.alloc.len);
+            std::ptr::write(end, value);
         }
         self.alloc.len += 1;
         self.size += 1;
