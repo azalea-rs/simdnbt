@@ -2,7 +2,7 @@ use thiserror::Error;
 
 use crate::common::MAX_DEPTH;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum Error {
     #[error("Invalid root type {0}")]
     InvalidRootType(u8),

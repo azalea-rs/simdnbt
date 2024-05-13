@@ -2,6 +2,7 @@
 
 mod compound;
 mod list;
+mod tag_alloc;
 
 use std::{io::Cursor, ops::Deref};
 
@@ -17,13 +18,16 @@ use crate::{
     Error, Mutf8Str,
 };
 
+use self::tag_alloc::TagAllocator;
 pub use self::{compound::NbtCompound, list::NbtList};
 
 /// A complete NBT container. This contains a name and a compound tag.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct BaseNbt<'a> {
     name: &'a Mutf8Str,
     tag: NbtCompound<'a>,
+    // we need to keep this around so it's not deallocated
+    _tag_alloc: TagAllocator<'a>,
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -43,10 +47,16 @@ impl<'a> Nbt<'a> {
         if root_type != COMPOUND_ID {
             return Err(Error::InvalidRootType(root_type));
         }
-        let name = read_string(data)?;
-        let tag = NbtCompound::read_with_depth(data, 0)?;
+        let tag_alloc = TagAllocator::new();
 
-        Ok(Nbt::Some(BaseNbt { name, tag }))
+        let name = read_string(data)?;
+        let tag = NbtCompound::read_with_depth(data, &tag_alloc, 0)?;
+
+        Ok(Nbt::Some(BaseNbt {
+            name,
+            tag,
+            _tag_alloc: tag_alloc,
+        }))
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
@@ -83,6 +93,15 @@ impl<'a> BaseNbt<'a> {
         self.name
     }
 }
+
+impl PartialEq for BaseNbt<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // we don't need to compare the tag allocator since comparing `tag` will
+        // still compare the values of the tags
+        self.name == other.name && self.tag == other.tag
+    }
+}
+
 impl<'a> Deref for BaseNbt<'a> {
     type Target = NbtCompound<'a>;
 
@@ -101,35 +120,45 @@ impl<'a> BaseNbt<'a> {
 }
 
 /// A single NBT tag.
-#[repr(u8)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum NbtTag<'a> {
-    Byte(i8) = BYTE_ID,
-    Short(i16) = SHORT_ID,
-    Int(i32) = INT_ID,
-    Long(i64) = LONG_ID,
-    Float(f32) = FLOAT_ID,
-    Double(f64) = DOUBLE_ID,
-    ByteArray(&'a [u8]) = BYTE_ARRAY_ID,
-    String(&'a Mutf8Str) = STRING_ID,
-    List(NbtList<'a>) = LIST_ID,
-    Compound(NbtCompound<'a>) = COMPOUND_ID,
-    IntArray(RawList<'a, i32>) = INT_ARRAY_ID,
-    LongArray(RawList<'a, i64>) = LONG_ARRAY_ID,
+    Byte(i8),
+    Short(i16),
+    Int(i32),
+    Long(i64),
+    Float(f32),
+    Double(f64),
+    ByteArray(&'a [u8]),
+    String(&'a Mutf8Str),
+    List(NbtList<'a>),
+    Compound(NbtCompound<'a>),
+    IntArray(RawList<'a, i32>),
+    LongArray(RawList<'a, i64>),
 }
 impl<'a> NbtTag<'a> {
     /// Get the numerical ID of the tag type.
     #[inline]
     pub fn id(&self) -> u8 {
-        // SAFETY: Because `Self` is marked `repr(u8)`, its layout is a `repr(C)`
-        // `union` between `repr(C)` structs, each of which has the `u8`
-        // discriminant as its first field, so we can read the discriminant
-        // without offsetting the pointer.
-        unsafe { *<*const _>::from(self).cast::<u8>() }
+        match self {
+            NbtTag::Byte(_) => BYTE_ID,
+            NbtTag::Short(_) => SHORT_ID,
+            NbtTag::Int(_) => INT_ID,
+            NbtTag::Long(_) => LONG_ID,
+            NbtTag::Float(_) => FLOAT_ID,
+            NbtTag::Double(_) => DOUBLE_ID,
+            NbtTag::ByteArray(_) => BYTE_ARRAY_ID,
+            NbtTag::String(_) => STRING_ID,
+            NbtTag::List(_) => LIST_ID,
+            NbtTag::Compound(_) => COMPOUND_ID,
+            NbtTag::IntArray(_) => INT_ARRAY_ID,
+            NbtTag::LongArray(_) => LONG_ARRAY_ID,
+        }
     }
 
+    #[inline(always)]
     fn read_with_type(
         data: &mut Cursor<&'a [u8]>,
+        alloc: &TagAllocator<'a>,
         tag_type: u8,
         depth: usize,
     ) -> Result<Self, Error> {
@@ -154,9 +183,10 @@ impl<'a> NbtTag<'a> {
             )),
             BYTE_ARRAY_ID => Ok(NbtTag::ByteArray(read_with_u32_length(data, 1)?)),
             STRING_ID => Ok(NbtTag::String(read_string(data)?)),
-            LIST_ID => Ok(NbtTag::List(NbtList::read(data, depth + 1)?)),
+            LIST_ID => Ok(NbtTag::List(NbtList::read(data, alloc, depth + 1)?)),
             COMPOUND_ID => Ok(NbtTag::Compound(NbtCompound::read_with_depth(
                 data,
+                alloc,
                 depth + 1,
             )?)),
             INT_ARRAY_ID => Ok(NbtTag::IntArray(read_int_array(data)?)),
@@ -165,17 +195,20 @@ impl<'a> NbtTag<'a> {
         }
     }
 
-    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
+    pub fn read(data: &mut Cursor<&'a [u8]>, alloc: &TagAllocator<'a>) -> Result<Self, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-        Self::read_with_type(data, tag_type, 0)
+        Self::read_with_type(data, alloc, tag_type, 0)
     }
 
-    pub fn read_optional(data: &mut Cursor<&'a [u8]>) -> Result<Option<Self>, Error> {
+    pub fn read_optional(
+        data: &mut Cursor<&'a [u8]>,
+        alloc: &TagAllocator<'a>,
+    ) -> Result<Option<Self>, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if tag_type == END_ID {
             return Ok(None);
         }
-        Ok(Some(Self::read_with_type(data, tag_type, 0)?))
+        Ok(Some(Self::read_with_type(data, alloc, tag_type, 0)?))
     }
 
     pub fn byte(&self) -> Option<i8> {
@@ -416,5 +449,18 @@ mod tests {
             assert_eq!(i as i64, item);
         }
         assert_eq!(ints.len(), 1023);
+    }
+
+    #[test]
+    fn compound_eof() {
+        let mut data = Vec::new();
+        data.write_u8(COMPOUND_ID).unwrap(); // root type
+        data.write_u16::<BE>(0).unwrap(); // root name length
+        data.write_u8(COMPOUND_ID).unwrap(); // first element type
+        data.write_u16::<BE>(0).unwrap(); // first element name length
+                                          // eof
+
+        let res = Nbt::read(&mut Cursor::new(&data));
+        assert_eq!(res, Err(Error::UnexpectedEof));
     }
 }

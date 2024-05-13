@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{io::Cursor, mem::MaybeUninit};
 
 use byteorder::ReadBytesExt;
 
@@ -10,42 +10,87 @@ use crate::{
     Error, Mutf8Str,
 };
 
-use super::{list::NbtList, NbtTag};
+use super::{list::NbtList, tag_alloc::TagAllocator, NbtTag};
 
 /// A list of named tags. The order of the tags is preserved.
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct NbtCompound<'a> {
-    values: Vec<(&'a Mutf8Str, NbtTag<'a>)>,
+    values: &'a [(&'a Mutf8Str, NbtTag<'a>)],
 }
 
 impl<'a> NbtCompound<'a> {
-    pub fn from_values(values: Vec<(&'a Mutf8Str, NbtTag<'a>)>) -> Self {
-        Self { values }
+    pub fn read(data: &mut Cursor<&'a [u8]>, alloc: &TagAllocator<'a>) -> Result<Self, Error> {
+        Self::read_with_depth(data, alloc, 0)
     }
 
-    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<Self, Error> {
-        Self::read_with_depth(data, 0)
-    }
-
-    pub fn read_with_depth(data: &mut Cursor<&'a [u8]>, depth: usize) -> Result<Self, Error> {
+    pub fn read_with_depth(
+        data: &mut Cursor<&'a [u8]>,
+        alloc: &TagAllocator<'a>,
+        depth: usize,
+    ) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
-        let mut values = Vec::with_capacity(4);
+
+        let mut tags = alloc.get().named.start(depth);
+
+        let mut tags_buffer = unsafe {
+            MaybeUninit::<[MaybeUninit<(&Mutf8Str, NbtTag<'a>)>; 4]>::uninit().assume_init()
+        };
+        let mut tags_buffer_len: usize = 0;
+
         loop {
-            let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+            let tag_type = match data.read_u8() {
+                Ok(tag_type) => tag_type,
+                Err(_) => {
+                    alloc.get().named.finish(tags, depth);
+                    return Err(Error::UnexpectedEof);
+                }
+            };
             if tag_type == END_ID {
                 break;
             }
-            let tag_name = read_string(data)?;
 
-            values.push((tag_name, NbtTag::read_with_type(data, tag_type, depth)?));
+            let tag_name = match read_string(data) {
+                Ok(name) => name,
+                Err(_) => {
+                    alloc.get().named.finish(tags, depth);
+                    // the only error read_string can return is UnexpectedEof, so this makes it
+                    // slightly faster
+                    return Err(Error::UnexpectedEof);
+                }
+            };
+            let tag = match NbtTag::read_with_type(data, alloc, tag_type, depth) {
+                Ok(tag) => tag,
+                Err(e) => {
+                    alloc.get().named.finish(tags, depth);
+                    return Err(e);
+                }
+            };
+
+            tags_buffer[tags_buffer_len] = MaybeUninit::new((tag_name, tag));
+            tags_buffer_len += 1;
+
+            if tags_buffer_len == tags_buffer.len() {
+                // writing the tags in groups like this is slightly faster
+                for i in 0..tags_buffer_len {
+                    tags.push(unsafe { tags_buffer.get_unchecked(i).assume_init_read() });
+                }
+                tags_buffer_len = 0;
+            }
         }
+
+        for i in 0..tags_buffer_len {
+            tags.push(unsafe { tags_buffer.get_unchecked(i).assume_init_read() });
+        }
+
+        let values = alloc.get().named.finish(tags, depth);
+
         Ok(Self { values })
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
-        for (name, tag) in &self.values {
+        for (name, tag) in self.values {
             // reserve 4 bytes extra so we can avoid reallocating for small tags
             data.reserve(1 + 2 + name.len() + 4);
             // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
@@ -109,7 +154,7 @@ impl<'a> NbtCompound<'a> {
     pub fn get(&self, name: &str) -> Option<&NbtTag<'a>> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
-        for (key, value) in &self.values {
+        for (key, value) in self.values {
             if key == &name {
                 return Some(value);
             }
@@ -121,7 +166,7 @@ impl<'a> NbtCompound<'a> {
     pub fn contains(&self, name: &str) -> bool {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
-        for (key, _) in &self.values {
+        for (key, _) in self.values {
             if key == &name {
                 return true;
             }
