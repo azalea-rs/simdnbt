@@ -77,7 +77,7 @@ Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crat
 
 | Library                                                                     | Throughput   |
 | --------------------------------------------------------------------------- | ------------ |
-| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 1.0900 GiB/s |
+| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 1.7619 GiB/s |
 | [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)   | 329.10 MiB/s |
 | [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                    | 306.58 MiB/s |
 | [azalea_nbt](https://docs.rs/azalea-nbt/latest/azalea_nbt/)                 | 297.28 MiB/s |

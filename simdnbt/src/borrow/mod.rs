@@ -155,6 +155,7 @@ impl<'a> NbtTag<'a> {
         }
     }
 
+    #[inline(always)]
     fn read_with_type(
         data: &mut Cursor<&'a [u8]>,
         alloc: &TagAllocator<'a>,
