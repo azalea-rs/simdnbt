@@ -90,9 +90,9 @@ And for writing `complex_player.dat`:
 
 | Library         | Throughput   |
 | --------------- | ------------ |
-| simdnbt::borrow | 2.4670 GiB/s |
+| simdnbt::borrow | 2.6116 GiB/s |
+| simdnbt::owned  | 2.5033 GiB/s |
 | azalea_nbt      | 2.4152 GiB/s |
-| simdnbt::owned  | 1.9660 GiB/s |
 | graphite_binary | 1.8804 GiB/s |
 
 The tables above were made from the [compare benchmark](https://github.com/azalea-rs/simdnbt/tree/master/simdnbt/benches) in this repo.

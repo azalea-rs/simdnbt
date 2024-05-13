@@ -279,6 +279,7 @@ impl NbtTag {
     ///
     /// This function is unsafe because it doesn't check that there's enough space in the data.
     /// 4 bytes MUST be reserved before calling this function.
+    #[inline]
     unsafe fn unchecked_write_without_tag_type(&self, data: &mut Vec<u8>) {
         match self {
             NbtTag::Byte(byte) => unsafe {
