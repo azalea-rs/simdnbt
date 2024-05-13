@@ -120,31 +120,39 @@ impl<'a> BaseNbt<'a> {
 }
 
 /// A single NBT tag.
-#[repr(u8)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum NbtTag<'a> {
-    Byte(i8) = BYTE_ID,
-    Short(i16) = SHORT_ID,
-    Int(i32) = INT_ID,
-    Long(i64) = LONG_ID,
-    Float(f32) = FLOAT_ID,
-    Double(f64) = DOUBLE_ID,
-    ByteArray(&'a [u8]) = BYTE_ARRAY_ID,
-    String(&'a Mutf8Str) = STRING_ID,
-    List(NbtList<'a>) = LIST_ID,
-    Compound(NbtCompound<'a>) = COMPOUND_ID,
-    IntArray(RawList<'a, i32>) = INT_ARRAY_ID,
-    LongArray(RawList<'a, i64>) = LONG_ARRAY_ID,
+    Byte(i8),
+    Short(i16),
+    Int(i32),
+    Long(i64),
+    Float(f32),
+    Double(f64),
+    ByteArray(&'a [u8]),
+    String(&'a Mutf8Str),
+    List(NbtList<'a>),
+    Compound(NbtCompound<'a>),
+    IntArray(RawList<'a, i32>),
+    LongArray(RawList<'a, i64>),
 }
 impl<'a> NbtTag<'a> {
     /// Get the numerical ID of the tag type.
     #[inline]
     pub fn id(&self) -> u8 {
-        // SAFETY: Because `Self` is marked `repr(u8)`, its layout is a `repr(C)`
-        // `union` between `repr(C)` structs, each of which has the `u8`
-        // discriminant as its first field, so we can read the discriminant
-        // without offsetting the pointer.
-        unsafe { *<*const _>::from(self).cast::<u8>() }
+        match self {
+            NbtTag::Byte(_) => BYTE_ID,
+            NbtTag::Short(_) => SHORT_ID,
+            NbtTag::Int(_) => INT_ID,
+            NbtTag::Long(_) => LONG_ID,
+            NbtTag::Float(_) => FLOAT_ID,
+            NbtTag::Double(_) => DOUBLE_ID,
+            NbtTag::ByteArray(_) => BYTE_ARRAY_ID,
+            NbtTag::String(_) => STRING_ID,
+            NbtTag::List(_) => LIST_ID,
+            NbtTag::Compound(_) => COMPOUND_ID,
+            NbtTag::IntArray(_) => INT_ARRAY_ID,
+            NbtTag::LongArray(_) => LONG_ARRAY_ID,
+        }
     }
 
     fn read_with_type(
