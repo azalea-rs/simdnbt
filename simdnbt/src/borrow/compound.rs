@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, io::Cursor};
+use std::io::Cursor;
 
 use byteorder::ReadBytesExt;
 
@@ -19,27 +19,28 @@ pub struct NbtCompound<'a> {
 }
 
 impl<'a> NbtCompound<'a> {
-    pub fn read(
-        data: &mut Cursor<&'a [u8]>,
-        alloc: &UnsafeCell<TagAllocator<'a>>,
-    ) -> Result<Self, Error> {
+    pub fn read(data: &mut Cursor<&'a [u8]>, alloc: &TagAllocator<'a>) -> Result<Self, Error> {
         Self::read_with_depth(data, alloc, 0)
     }
 
     pub fn read_with_depth(
         data: &mut Cursor<&'a [u8]>,
-        alloc: &UnsafeCell<TagAllocator<'a>>,
+        alloc: &TagAllocator<'a>,
         depth: usize,
     ) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
 
-        let alloc_mut = unsafe { alloc.get().as_mut().unwrap_unchecked() };
-
-        let mut tags = alloc_mut.named.start(depth);
+        let mut tags = alloc.get().named.start(depth);
         loop {
-            let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+            let tag_type = match data.read_u8() {
+                Ok(tag_type) => tag_type,
+                Err(_) => {
+                    alloc.get().named.finish(tags, depth);
+                    return Err(Error::UnexpectedEof);
+                }
+            };
             if tag_type == END_ID {
                 break;
             }
@@ -47,7 +48,7 @@ impl<'a> NbtCompound<'a> {
             let tag_name = match read_string(data) {
                 Ok(name) => name,
                 Err(_) => {
-                    alloc_mut.named.finish(tags, depth);
+                    alloc.get().named.finish(tags, depth);
                     // the only error read_string can return is UnexpectedEof, so this makes it
                     // slightly faster
                     return Err(Error::UnexpectedEof);
@@ -56,14 +57,13 @@ impl<'a> NbtCompound<'a> {
             let tag = match NbtTag::read_with_type(data, alloc, tag_type, depth) {
                 Ok(tag) => tag,
                 Err(e) => {
-                    alloc_mut.named.finish(tags, depth);
+                    alloc.get().named.finish(tags, depth);
                     return Err(e);
                 }
             };
             tags.push((tag_name, tag));
         }
-        let alloc_mut = unsafe { alloc.get().as_mut().unwrap_unchecked() };
-        let values = alloc_mut.named.finish(tags, depth);
+        let values = alloc.get().named.finish(tags, depth);
 
         Ok(Self { values })
     }

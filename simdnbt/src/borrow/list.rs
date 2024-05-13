@@ -1,4 +1,4 @@
-use std::{cell::UnsafeCell, io::Cursor};
+use std::io::Cursor;
 
 use byteorder::ReadBytesExt;
 
@@ -37,7 +37,7 @@ pub enum NbtList<'a> {
 impl<'a> NbtList<'a> {
     pub fn read(
         data: &mut Cursor<&'a [u8]>,
-        alloc: &UnsafeCell<TagAllocator<'a>>,
+        alloc: &TagAllocator<'a>,
         depth: usize,
     ) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
@@ -57,105 +57,93 @@ impl<'a> NbtList<'a> {
             DOUBLE_ID => NbtList::Double(RawList::new(read_with_u32_length(data, 8)?)),
             BYTE_ARRAY_ID => NbtList::ByteArray({
                 let length = read_u32(data)?;
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                let mut tags = alloc_mut.unnamed_bytearray.start(depth);
+                let mut tags = alloc.get().unnamed_bytearray.start(depth);
                 for _ in 0..length {
                     let tag = match read_u8_array(data) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc_mut.unnamed_bytearray.finish(tags, depth);
+                            alloc.get().unnamed_bytearray.finish(tags, depth);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                alloc_mut.unnamed_bytearray.finish(tags, depth)
+                alloc.get().unnamed_bytearray.finish(tags, depth)
             }),
             STRING_ID => NbtList::String({
                 let length = read_u32(data)?;
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                let mut tags = alloc_mut.unnamed_string.start(depth);
+                let mut tags = alloc.get().unnamed_string.start(depth);
                 for _ in 0..length {
                     let tag = match read_string(data) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc_mut.unnamed_string.finish(tags, depth);
+                            alloc.get().unnamed_string.finish(tags, depth);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                alloc_mut.unnamed_string.finish(tags, depth)
+                alloc.get().unnamed_string.finish(tags, depth)
             }),
             LIST_ID => NbtList::List({
                 let length = read_u32(data)?;
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                let mut tags = alloc_mut.unnamed_list.start(depth);
+                let mut tags = alloc.get().unnamed_list.start(depth);
                 for _ in 0..length {
                     let tag = match NbtList::read(data, alloc, depth + 1) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc_mut.unnamed_list.finish(tags, depth);
+                            alloc.get().unnamed_list.finish(tags, depth);
                             return Err(e);
                         }
                     };
                     tags.push(tag)
                 }
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                alloc_mut.unnamed_list.finish(tags, depth)
+                alloc.get().unnamed_list.finish(tags, depth)
             }),
             COMPOUND_ID => NbtList::Compound({
                 let length = read_u32(data)?;
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                let mut tags = alloc_mut.unnamed_compound.start(depth);
+                let mut tags = alloc.get().unnamed_compound.start(depth);
                 for _ in 0..length {
                     let tag = match NbtCompound::read_with_depth(data, alloc, depth + 1) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc_mut.unnamed_compound.finish(tags, depth);
+                            alloc.get().unnamed_compound.finish(tags, depth);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                alloc_mut.unnamed_compound.finish(tags, depth)
+                alloc.get().unnamed_compound.finish(tags, depth)
             }),
             INT_ARRAY_ID => NbtList::IntArray({
                 let length = read_u32(data)?;
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                let mut tags = alloc_mut.unnamed_intarray.start(depth);
+                let mut tags = alloc.get().unnamed_intarray.start(depth);
                 for _ in 0..length {
                     let tag = match read_int_array(data) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc_mut.unnamed_intarray.finish(tags, depth);
+                            alloc.get().unnamed_intarray.finish(tags, depth);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                alloc_mut.unnamed_intarray.finish(tags, depth)
+                alloc.get().unnamed_intarray.finish(tags, depth)
             }),
             LONG_ARRAY_ID => NbtList::LongArray({
                 let length = read_u32(data)?;
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                let mut tags = alloc_mut.unnamed_longarray.start(depth);
+                let mut tags = alloc.get().unnamed_longarray.start(depth);
                 for _ in 0..length {
                     let tag = match read_long_array(data) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc_mut.unnamed_longarray.finish(tags, depth);
+                            alloc.get().unnamed_longarray.finish(tags, depth);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
-                let alloc_mut = unsafe { alloc.get().as_mut().unwrap() };
-                alloc_mut.unnamed_longarray.finish(tags, depth)
+                alloc.get().unnamed_longarray.finish(tags, depth)
             }),
             _ => return Err(Error::UnknownTagId(tag_type)),
         })

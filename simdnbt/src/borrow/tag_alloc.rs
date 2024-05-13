@@ -17,6 +17,7 @@
 
 use std::{
     alloc::{self, Layout},
+    cell::UnsafeCell,
     fmt,
     ptr::NonNull,
 };
@@ -29,7 +30,20 @@ use super::{NbtCompound, NbtList, NbtTag};
 const MIN_ALLOC_SIZE: usize = 1024;
 
 #[derive(Default)]
-pub struct TagAllocator<'a> {
+pub struct TagAllocator<'a>(UnsafeCell<TagAllocatorImpl<'a>>);
+impl<'a> TagAllocator<'a> {
+    pub fn new() -> Self {
+        Self(UnsafeCell::new(TagAllocatorImpl::new()))
+    }
+    // shhhhh
+    #[allow(clippy::mut_from_ref)]
+    pub fn get(&self) -> &mut TagAllocatorImpl<'a> {
+        unsafe { self.0.get().as_mut().unwrap_unchecked() }
+    }
+}
+
+#[derive(Default)]
+pub struct TagAllocatorImpl<'a> {
     pub named: IndividualTagAllocator<(&'a Mutf8Str, NbtTag<'a>)>,
 
     // so remember earlier when i said the depth thing is only necessary because compounds aren't
@@ -44,7 +58,7 @@ pub struct TagAllocator<'a> {
     pub unnamed_longarray: IndividualTagAllocator<RawList<'a, i64>>,
 }
 
-impl<'a> TagAllocator<'a> {
+impl<'a> TagAllocatorImpl<'a> {
     pub fn new() -> Self {
         Self::default()
     }

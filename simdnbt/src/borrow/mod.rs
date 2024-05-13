@@ -4,7 +4,7 @@ mod compound;
 mod list;
 mod tag_alloc;
 
-use std::{cell::UnsafeCell, io::Cursor, ops::Deref};
+use std::{io::Cursor, ops::Deref};
 
 use byteorder::{ReadBytesExt, BE};
 
@@ -47,7 +47,7 @@ impl<'a> Nbt<'a> {
         if root_type != COMPOUND_ID {
             return Err(Error::InvalidRootType(root_type));
         }
-        let tag_alloc = UnsafeCell::new(TagAllocator::new());
+        let tag_alloc = TagAllocator::new();
 
         let name = read_string(data)?;
         let tag = NbtCompound::read_with_depth(data, &tag_alloc, 0)?;
@@ -55,7 +55,7 @@ impl<'a> Nbt<'a> {
         Ok(Nbt::Some(BaseNbt {
             name,
             tag,
-            _tag_alloc: tag_alloc.into_inner(),
+            _tag_alloc: tag_alloc,
         }))
     }
 
@@ -149,7 +149,7 @@ impl<'a> NbtTag<'a> {
 
     fn read_with_type(
         data: &mut Cursor<&'a [u8]>,
-        alloc: &UnsafeCell<TagAllocator<'a>>,
+        alloc: &TagAllocator<'a>,
         tag_type: u8,
         depth: usize,
     ) -> Result<Self, Error> {
@@ -186,17 +186,14 @@ impl<'a> NbtTag<'a> {
         }
     }
 
-    pub fn read(
-        data: &mut Cursor<&'a [u8]>,
-        alloc: &UnsafeCell<TagAllocator<'a>>,
-    ) -> Result<Self, Error> {
+    pub fn read(data: &mut Cursor<&'a [u8]>, alloc: &TagAllocator<'a>) -> Result<Self, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         Self::read_with_type(data, alloc, tag_type, 0)
     }
 
     pub fn read_optional(
         data: &mut Cursor<&'a [u8]>,
-        alloc: &UnsafeCell<TagAllocator<'a>>,
+        alloc: &TagAllocator<'a>,
     ) -> Result<Option<Self>, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if tag_type == END_ID {
@@ -443,5 +440,18 @@ mod tests {
             assert_eq!(i as i64, item);
         }
         assert_eq!(ints.len(), 1023);
+    }
+
+    #[test]
+    fn compound_eof() {
+        let mut data = Vec::new();
+        data.write_u8(COMPOUND_ID).unwrap(); // root type
+        data.write_u16::<BE>(0).unwrap(); // root name length
+        data.write_u8(COMPOUND_ID).unwrap(); // first element type
+        data.write_u16::<BE>(0).unwrap(); // first element name length
+                                          // eof
+
+        let res = Nbt::read(&mut Cursor::new(&data));
+        assert_eq!(res, Err(Error::UnexpectedEof));
     }
 }
