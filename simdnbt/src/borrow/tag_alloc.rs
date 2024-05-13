@@ -74,6 +74,7 @@ impl<T> IndividualTagAllocator<T>
 where
     T: Clone,
 {
+    #[inline]
     pub fn start(&mut self, depth: usize) -> ContiguousTagsAllocator<T> {
         // make sure we have enough space for this depth
         // (also note that depth is reused for compounds and arrays so we might have to push
@@ -87,6 +88,7 @@ where
 
         start_allocating_tags(alloc)
     }
+    #[inline]
     pub fn finish<'a>(&mut self, alloc: ContiguousTagsAllocator<T>, depth: usize) -> &'a [T] {
         finish_allocating_tags(alloc, &mut self.current[depth], &mut self.previous[depth])
     }
@@ -109,6 +111,7 @@ impl<T> Drop for IndividualTagAllocator<T> {
     }
 }
 
+#[inline]
 fn start_allocating_tags<T>(alloc: TagsAllocation<T>) -> ContiguousTagsAllocator<T> {
     let is_new_allocation = alloc.cap == 0;
     ContiguousTagsAllocator {
@@ -117,6 +120,7 @@ fn start_allocating_tags<T>(alloc: TagsAllocation<T>) -> ContiguousTagsAllocator
         size: 0,
     }
 }
+#[inline]
 fn finish_allocating_tags<'a, T>(
     alloc: ContiguousTagsAllocator<T>,
     current_alloc: &mut TagsAllocation<T>,
