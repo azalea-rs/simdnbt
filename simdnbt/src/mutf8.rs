@@ -92,14 +92,14 @@ impl Mutf8Str {
     #[inline]
     pub fn from_str(s: &str) -> Cow<Mutf8Str> {
         match mutf8::encode(s) {
-            Cow::Borrowed(b) => Cow::Borrowed(Mutf8Str::from_slice(b)),
-            Cow::Owned(o) => Cow::Owned(Mutf8String { vec: o }),
+            Cow::Borrowed(slice) => Cow::Borrowed(Mutf8Str::from_slice(slice)),
+            Cow::Owned(vec) => Cow::Owned(Mutf8String { vec }),
         }
     }
 
     #[inline]
     pub fn to_str(&self) -> Cow<str> {
-        // fast check to skip if none of the bytes have the top bit set or are null
+        // fast check to skip if none of the bytes have the top bit set
         if is_plain_ascii(&self.slice) {
             // SAFETY: &[u8] and &str are the same layout.
             unsafe { Cow::Borrowed(std::str::from_utf8_unchecked(&self.slice)) }

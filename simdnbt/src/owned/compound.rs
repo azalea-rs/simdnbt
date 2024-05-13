@@ -1,4 +1,7 @@
-use std::{io::Cursor, mem};
+use std::{
+    io::Cursor,
+    mem::{self, MaybeUninit},
+};
 
 use byteorder::ReadBytesExt;
 
@@ -33,6 +36,12 @@ impl NbtCompound {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
+
+        let mut tags_buffer = unsafe {
+            MaybeUninit::<[MaybeUninit<(Mutf8String, NbtTag)>; 8]>::uninit().assume_init()
+        };
+        let mut tags_buffer_len: usize = 0;
+
         let mut values = Vec::with_capacity(8);
         loop {
             let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
@@ -40,9 +49,23 @@ impl NbtCompound {
                 break;
             }
             let tag_name = read_string(data)?.to_owned();
+            let tag = NbtTag::read_with_type(data, tag_type, depth)?;
 
-            values.push((tag_name, NbtTag::read_with_type(data, tag_type, depth)?));
+            tags_buffer[tags_buffer_len] = MaybeUninit::new((tag_name, tag));
+            tags_buffer_len += 1;
+            if tags_buffer_len == tags_buffer.len() {
+                // writing the tags in groups like this is slightly faster
+                for i in 0..tags_buffer_len {
+                    values.push(unsafe { tags_buffer.get_unchecked(i).assume_init_read() });
+                }
+                tags_buffer_len = 0;
+            }
         }
+
+        for i in 0..tags_buffer_len {
+            values.push(unsafe { tags_buffer.get_unchecked(i).assume_init_read() });
+        }
+
         Ok(Self { values })
     }
 
