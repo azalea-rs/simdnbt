@@ -42,7 +42,10 @@ debug = true
 
 [[bench]]
 harness = false
-name = "nbt"
+name = "nbt_borrow"
+[[bench]]
+harness = false
+name = "nbt_owned"
 
 [[bench]]
 harness = false

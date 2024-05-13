@@ -21,18 +21,18 @@ fn bench_file(filename: &str, c: &mut Criterion) {
 
     let mut decoded_src_stream = Cursor::new(&decoded_src[..]);
 
-    let mut group = c.benchmark_group(format!("nbt/{filename}"));
+    let mut group = c.benchmark_group(format!("nbt_owned/{filename}"));
 
     group.throughput(Throughput::Bytes(decoded_src.len() as u64));
 
     group.bench_function("Decode", |b| {
         b.iter(|| {
-            black_box(simdnbt::borrow::Nbt::read(&mut decoded_src_stream).unwrap());
+            black_box(simdnbt::owned::Nbt::read(&mut decoded_src_stream).unwrap());
             decoded_src_stream.set_position(0);
         })
     });
 
-    let nbt = simdnbt::borrow::Nbt::read(&mut decoded_src_stream)
+    let nbt = simdnbt::owned::Nbt::read(&mut decoded_src_stream)
         .unwrap()
         .unwrap();
     group.bench_function("Get", |b| {
@@ -41,6 +41,13 @@ fn bench_file(filename: &str, c: &mut Criterion) {
             for (k, _) in level.iter() {
                 black_box(level.get(black_box(&k.to_str())));
             }
+        })
+    });
+    group.bench_function("Encode", |b| {
+        b.iter(|| {
+            let mut out = Vec::new();
+            nbt.write(&mut out);
+            black_box(out);
         })
     });
     group.finish();
