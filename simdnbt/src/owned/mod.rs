@@ -226,6 +226,7 @@ impl NbtTag {
         unsafe { *<*const _>::from(self).cast::<u8>() }
     }
 
+    #[inline(always)]
     fn read_with_type(data: &mut Cursor<&[u8]>, tag_type: u8, depth: usize) -> Result<Self, Error> {
         match tag_type {
             BYTE_ID => Ok(NbtTag::Byte(
