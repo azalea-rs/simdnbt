@@ -77,23 +77,23 @@ Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crat
 
 | Library                                                                     | Throughput   |
 | --------------------------------------------------------------------------- | ------------ |
-| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 1.7619 GiB/s |
-| [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)   | 329.10 MiB/s |
-| [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                    | 306.58 MiB/s |
-| [azalea_nbt](https://docs.rs/azalea-nbt/latest/azalea_nbt/)                 | 297.28 MiB/s |
-| [valence_nbt](https://docs.rs/valence_nbt/latest/valence_nbt/)              | 236.42 MiB/s |
-| [graphite_binary](https://docs.rs/graphite_binary/latest/graphite_binary/)  | 210.51 MiB/s |
-| [fastnbt](https://docs.rs/fastnbt/latest/fastnbt/)                          | 115.54 MiB/s |
-| [hematite_nbt](https://docs.rs/hematite-nbt/latest/nbt/)                    | 108.91 MiB/s |
+| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 1.6795 GiB/s |
+| [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)   | 811.08 MiB/s |
+| [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                    | 606.68 MiB/s |
+| [graphite_binary](https://docs.rs/graphite_binary/latest/graphite_binary/)  | 363.94 MiB/s |
+| [azalea_nbt](https://docs.rs/azalea-nbt/latest/azalea_nbt/)                 | 330.46 MiB/s |
+| [valence_nbt](https://docs.rs/valence_nbt/latest/valence_nbt/)              | 279.58 MiB/s |
+| [fastnbt](https://docs.rs/fastnbt/latest/fastnbt/)                          | 162.92 MiB/s |
+| [hematite_nbt](https://docs.rs/hematite-nbt/latest/nbt/)                    | 180.22 MiB/s |
 
 And for writing `complex_player.dat`:
 
 | Library         | Throughput   |
 | --------------- | ------------ |
-| simdnbt::borrow | 2.5914 GiB/s |
-| azalea_nbt      | 2.1096 GiB/s |
-| simdnbt::owned  | 1.9508 GiB/s |
-| graphite_binary | 1.7745 GiB/s |
+| simdnbt::borrow | 2.4670 GiB/s |
+| azalea_nbt      | 2.4152 GiB/s |
+| simdnbt::owned  | 1.9660 GiB/s |
+| graphite_binary | 1.8804 GiB/s |
 
 The tables above were made from the [compare benchmark](https://github.com/azalea-rs/simdnbt/tree/master/simdnbt/benches) in this repo.
 Note that the benchmark is somewhat unfair, since `simdnbt::borrow` doesn't fully decode some things like strings and integer arrays until they're used.

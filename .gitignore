@@ -5,3 +5,7 @@
 flamegraph.svg
 perf.data
 perf.data.old
+
+# sometimes i make this file when i pipe benchmark results to a file,
+# don't wanna accidentally commit it
+benchmark_result.txt
