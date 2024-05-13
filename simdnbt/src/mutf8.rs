@@ -7,6 +7,8 @@ use std::{
     simd::prelude::*,
 };
 
+use crate::thin_slices::Slice16Bit;
+
 /// A M-UTF8 string slice. This is how strings are represented internally in NBT.
 #[derive(Eq, PartialEq)]
 pub struct Mutf8Str {
@@ -85,6 +87,11 @@ impl Mutf8Str {
     pub fn from_slice(slice: &[u8]) -> &Mutf8Str {
         // SAFETY: &[u8] and &Mutf8Str are the same layout.
         unsafe { mem::transmute::<&[u8], &Mutf8Str>(slice) }
+    }
+
+    #[inline]
+    pub fn from_slice_16bit(slice: Slice16Bit<[u8]>) -> Slice16Bit<Mutf8Str> {
+        Slice16Bit::new(slice.as_ptr(), slice.len())
     }
 
     // we can't implement FromStr on Cow<Mutf8Str>

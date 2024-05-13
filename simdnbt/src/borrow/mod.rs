@@ -15,6 +15,7 @@ use crate::{
         LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     raw_list::RawList,
+    thin_slices::{Slice16Bit, Slice32Bit},
     Error, Mutf8Str,
 };
 
@@ -24,7 +25,7 @@ pub use self::{compound::NbtCompound, list::NbtList};
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug)]
 pub struct BaseNbt<'a> {
-    name: &'a Mutf8Str,
+    name: Slice16Bit<'a, Mutf8Str>,
     tag: NbtCompound<'a>,
     // we need to keep this around so it's not deallocated
     _tag_alloc: TagAllocator<'a>,
@@ -89,7 +90,7 @@ impl<'a> Nbt<'a> {
 
 impl<'a> BaseNbt<'a> {
     /// Get the name of the NBT compound. This is often an empty string.
-    pub fn name(&self) -> &'a Mutf8Str {
+    pub fn name(&self) -> Slice16Bit<'a, Mutf8Str> {
         self.name
     }
 }
@@ -113,7 +114,7 @@ impl<'a> Deref for BaseNbt<'a> {
 impl<'a> BaseNbt<'a> {
     pub fn write(&self, data: &mut Vec<u8>) {
         data.push(COMPOUND_ID);
-        write_string(data, self.name);
+        write_string(data, &self.name);
         self.tag.write(data);
         data.push(END_ID);
     }
@@ -128,8 +129,8 @@ pub enum NbtTag<'a> {
     Long(i64),
     Float(f32),
     Double(f64),
-    ByteArray(&'a [u8]),
-    String(&'a Mutf8Str),
+    ByteArray(Slice32Bit<'a, [u8]>),
+    String(Slice16Bit<'a, Mutf8Str>),
     List(NbtList<'a>),
     Compound(NbtCompound<'a>),
     IntArray(RawList<'a, i32>),
@@ -293,7 +294,7 @@ impl<'a> NbtTag<'a> {
             NbtTag::Float(float) => crate::owned::NbtTag::Float(*float),
             NbtTag::Double(double) => crate::owned::NbtTag::Double(*double),
             NbtTag::ByteArray(byte_array) => crate::owned::NbtTag::ByteArray(byte_array.to_vec()),
-            NbtTag::String(string) => crate::owned::NbtTag::String((*string).to_owned()),
+            NbtTag::String(string) => crate::owned::NbtTag::String((&**string).to_owned()),
             NbtTag::List(list) => crate::owned::NbtTag::List(list.to_owned()),
             NbtTag::Compound(compound) => crate::owned::NbtTag::Compound(compound.to_owned()),
             NbtTag::IntArray(int_array) => crate::owned::NbtTag::IntArray(int_array.to_vec()),

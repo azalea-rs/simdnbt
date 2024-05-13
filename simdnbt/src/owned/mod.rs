@@ -48,7 +48,7 @@ impl Nbt {
         if root_type != COMPOUND_ID {
             return Err(Error::InvalidRootType(root_type));
         }
-        let name = read_string(data)?.to_owned();
+        let name = (*read_string(data)?).to_owned();
         let tag = NbtCompound::read_with_depth(data, 0)?;
 
         Ok(Nbt::Some(BaseNbt { name, tag }))
@@ -247,8 +247,8 @@ impl NbtTag {
             DOUBLE_ID => Ok(NbtTag::Double(
                 data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?,
             )),
-            BYTE_ARRAY_ID => Ok(NbtTag::ByteArray(read_with_u32_length(data, 1)?.to_owned())),
-            STRING_ID => Ok(NbtTag::String(read_string(data)?.to_owned())),
+            BYTE_ARRAY_ID => Ok(NbtTag::ByteArray(read_with_u32_length(data, 1)?.to_vec())),
+            STRING_ID => Ok(NbtTag::String((*read_string(data)?).to_owned())),
             LIST_ID => Ok(NbtTag::List(NbtList::read(data, depth + 1)?)),
             COMPOUND_ID => Ok(NbtTag::Compound(NbtCompound::read_with_depth(
                 data,
@@ -319,13 +319,13 @@ impl NbtTag {
                 unsafe {
                     unchecked_extend(data, &int_array.len().to_be_bytes());
                 }
-                data.extend_from_slice(&slice_into_u8_big_endian(int_array));
+                data.extend_from_slice(&slice_into_u8_big_endian(int_array.as_slice().into()));
             }
             NbtTag::LongArray(long_array) => {
                 unsafe {
                     unchecked_extend(data, &long_array.len().to_be_bytes());
                 }
-                data.extend_from_slice(&slice_into_u8_big_endian(long_array));
+                data.extend_from_slice(&slice_into_u8_big_endian(long_array.as_slice().into()));
             }
         }
     }

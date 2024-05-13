@@ -3,6 +3,7 @@ use std::{io::Cursor, mem, slice};
 use crate::{
     raw_list::RawList,
     swap_endianness::{swap_endianness_as_u8, SwappableNumber},
+    thin_slices::{Slice16Bit, Slice32Bit},
     Error, Mutf8Str,
 };
 
@@ -54,7 +55,7 @@ pub fn read_u16(data: &mut Cursor<&[u8]>) -> Result<u16, Error> {
 pub fn read_with_u16_length<'a>(
     data: &mut Cursor<&'a [u8]>,
     width: usize,
-) -> Result<&'a [u8], Error> {
+) -> Result<Slice16Bit<'a, [u8]>, Error> {
     let length = read_u16(data)?;
     let length_in_bytes = length as usize * width;
     // make sure we don't read more than the length
@@ -63,14 +64,17 @@ pub fn read_with_u16_length<'a>(
     }
     let start_position = data.position() as usize;
     data.set_position(data.position() + length_in_bytes as u64);
-    Ok(&data.get_ref()[start_position..start_position + length_in_bytes])
+    Ok(Slice16Bit::new(
+        data.get_ref().as_ptr().wrapping_add(start_position),
+        length_in_bytes as u16,
+    ))
 }
 
 #[inline(never)]
 pub fn read_with_u32_length<'a>(
     data: &mut Cursor<&'a [u8]>,
     width: usize,
-) -> Result<&'a [u8], Error> {
+) -> Result<Slice32Bit<'a, [u8]>, Error> {
     let length = read_u32(data)?;
     let length_in_bytes = length as usize * width;
     // make sure we don't read more than the length
@@ -79,19 +83,23 @@ pub fn read_with_u32_length<'a>(
     }
     let start_position = data.position() as usize;
     data.set_position(data.position() + length_in_bytes as u64);
-    Ok(&data.get_ref()[start_position..start_position + length_in_bytes])
+    // Ok(&data.get_ref()[start_position..start_position + length_in_bytes])
+    Ok(Slice32Bit::new(
+        data.get_ref().as_ptr().wrapping_add(start_position),
+        length_in_bytes as u32,
+    ))
 }
 
-pub fn read_string<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a Mutf8Str, Error> {
+pub fn read_string<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Slice16Bit<'a, Mutf8Str>, Error> {
     let data = read_with_u16_length(data, 1)?;
-    Ok(Mutf8Str::from_slice(data))
+    Ok(Mutf8Str::from_slice_16bit(data))
 }
 
-pub fn read_u8_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a [u8], Error> {
+pub fn read_u8_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Slice32Bit<'a, [u8]>, Error> {
     read_with_u32_length(data, 1)
 }
-pub fn read_i8_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a [i8], Error> {
-    Ok(slice_u8_into_i8(read_u8_array(data)?))
+pub fn read_i8_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Slice32Bit<'a, [i8]>, Error> {
+    Ok(slice_32bit_u8_into_i8(read_u8_array(data)?))
 }
 
 pub fn read_int_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<RawList<'a, i32>, Error> {
@@ -107,9 +115,15 @@ pub fn read_long_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<RawList<'a, i6
 fn slice_u8_into_i8(s: &[u8]) -> &[i8] {
     unsafe { slice::from_raw_parts(s.as_ptr() as *const i8, s.len()) }
 }
-
 pub fn slice_i8_into_u8(s: &[i8]) -> &[u8] {
     unsafe { slice::from_raw_parts(s.as_ptr() as *const u8, s.len()) }
+}
+
+fn slice_32bit_u8_into_i8(s: Slice32Bit<[u8]>) -> Slice32Bit<[i8]> {
+    Slice32Bit::new(s.as_ptr(), s.len())
+}
+fn slice_32bit_i8_into_u8(s: Slice32Bit<[i8]>) -> Slice32Bit<[u8]> {
+    Slice32Bit::new(s.as_ptr(), s.len())
 }
 
 #[inline(always)]
@@ -170,14 +184,17 @@ pub unsafe fn unchecked_push(data: &mut Vec<u8>, value: u8) {
 /// Convert a slice of any type into a slice of u8. This will probably return the data as little
 /// endian! Use [`slice_into_u8_big_endian`] to get big endian (the endianness that's used in NBT).
 #[inline]
-pub fn slice_into_u8_native_endian<T>(s: &[T]) -> &[u8] {
-    unsafe { slice::from_raw_parts(s.as_ptr() as *const u8, mem::size_of_val(s)) }
+pub fn slice_into_u8_native_endian<T>(s: Slice32Bit<'_, [T]>) -> Slice32Bit<'_, [u8]> {
+    Slice32Bit::new(
+        s.as_ptr() as *const u8,
+        s.len() * mem::size_of::<T>() as u32,
+    )
 }
 
 /// Convert a slice of any type into a Vec<u8>. This will return the data as big endian (the
 /// endianness that's used in NBT).
 #[inline]
-pub fn slice_into_u8_big_endian<T: SwappableNumber>(s: &[T]) -> Vec<u8> {
+pub fn slice_into_u8_big_endian<T: SwappableNumber>(s: Slice32Bit<'_, [T]>) -> Vec<u8> {
     swap_endianness_as_u8::<T>(slice_into_u8_native_endian(s))
 }
 
@@ -189,18 +206,24 @@ mod tests {
     #[cfg(target_endian = "little")]
     #[test]
     fn test_slice_into_u8_native_endian() {
-        assert_eq!(slice_into_u8_native_endian(&[1u16, 2u16]), [1, 0, 2, 0]);
         assert_eq!(
-            slice_into_u8_native_endian(&[1u32, 2u32]),
-            [1, 0, 0, 0, 2, 0, 0, 0]
+            slice_into_u8_native_endian([1u16, 2u16].as_slice().into()),
+            [1, 0, 2, 0].as_slice().into()
+        );
+        assert_eq!(
+            slice_into_u8_native_endian([1u32, 2u32].as_slice().into()),
+            [1, 0, 0, 0, 2, 0, 0, 0].as_slice().into()
         );
     }
 
     #[test]
     fn test_slice_into_u8_big_endian() {
-        assert_eq!(slice_into_u8_big_endian(&[1u16, 2u16]), [0, 1, 0, 2]);
         assert_eq!(
-            slice_into_u8_big_endian(&[1u32, 2u32]),
+            slice_into_u8_big_endian([1u16, 2u16].as_slice().into()),
+            [0, 1, 0, 2]
+        );
+        assert_eq!(
+            slice_into_u8_big_endian([1u32, 2u32].as_slice().into()),
             [0, 0, 0, 1, 0, 0, 0, 2]
         );
     }

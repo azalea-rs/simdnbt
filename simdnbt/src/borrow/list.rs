@@ -10,6 +10,7 @@ use crate::{
         FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
     },
     raw_list::RawList,
+    thin_slices::{Slice16Bit, Slice32Bit},
     Error, Mutf8Str,
 };
 
@@ -21,18 +22,18 @@ use super::{read_u32, tag_alloc::TagAllocator, NbtCompound, MAX_DEPTH};
 pub enum NbtList<'a> {
     #[default]
     Empty = END_ID,
-    Byte(&'a [i8]) = BYTE_ID,
+    Byte(Slice32Bit<'a, [i8]>) = BYTE_ID,
     Short(RawList<'a, i16>) = SHORT_ID,
     Int(RawList<'a, i32>) = INT_ID,
     Long(RawList<'a, i64>) = LONG_ID,
     Float(RawList<'a, f32>) = FLOAT_ID,
     Double(RawList<'a, f64>) = DOUBLE_ID,
-    ByteArray(&'a [&'a [u8]]) = BYTE_ARRAY_ID,
-    String(&'a [&'a Mutf8Str]) = STRING_ID,
-    List(&'a [NbtList<'a>]) = LIST_ID,
-    Compound(&'a [NbtCompound<'a>]) = COMPOUND_ID,
-    IntArray(&'a [RawList<'a, i32>]) = INT_ARRAY_ID,
-    LongArray(&'a [RawList<'a, i64>]) = LONG_ARRAY_ID,
+    ByteArray(Slice32Bit<'a, [Slice32Bit<'a, [u8]>]>) = BYTE_ARRAY_ID,
+    String(Slice32Bit<'a, [Slice16Bit<'a, Mutf8Str>]>) = STRING_ID,
+    List(Slice32Bit<'a, [NbtList<'a>]>) = LIST_ID,
+    Compound(Slice32Bit<'a, [NbtCompound<'a>]>) = COMPOUND_ID,
+    IntArray(Slice32Bit<'a, [RawList<'a, i32>]>) = INT_ARRAY_ID,
+    LongArray(Slice32Bit<'a, [RawList<'a, i64>]>) = LONG_ARRAY_ID,
 }
 impl<'a> NbtList<'a> {
     pub fn read(
@@ -158,7 +159,7 @@ impl<'a> NbtList<'a> {
                 unchecked_push(data, COMPOUND_ID);
                 unchecked_extend(data, &(compounds.len() as u32).to_be_bytes());
             }
-            for compound in *compounds {
+            for compound in &**compounds {
                 compound.write(data);
             }
             return;
@@ -195,13 +196,13 @@ impl<'a> NbtList<'a> {
             }
             NbtList::String(strings) => {
                 write_u32(data, strings.len() as u32);
-                for string in *strings {
+                for string in &**strings {
                     write_string(data, string);
                 }
             }
             NbtList::List(lists) => {
                 write_u32(data, lists.len() as u32);
-                for list in *lists {
+                for list in &**lists {
                     list.write(data);
                 }
             }
@@ -210,13 +211,13 @@ impl<'a> NbtList<'a> {
             }
             NbtList::IntArray(int_arrays) => {
                 write_u32(data, int_arrays.len() as u32);
-                for array in *int_arrays {
+                for array in &**int_arrays {
                     write_with_u32_length(data, 4, array.as_big_endian());
                 }
             }
             NbtList::LongArray(long_arrays) => {
                 write_u32(data, long_arrays.len() as u32);
-                for array in *long_arrays {
+                for array in &**long_arrays {
                     write_with_u32_length(data, 8, array.as_big_endian());
                 }
             }
@@ -269,13 +270,13 @@ impl<'a> NbtList<'a> {
             _ => None,
         }
     }
-    pub fn byte_arrays(&self) -> Option<&[&[u8]]> {
+    pub fn byte_arrays(&self) -> Option<&[Slice32Bit<'a, [u8]>]> {
         match self {
             NbtList::ByteArray(byte_arrays) => Some(byte_arrays),
             _ => None,
         }
     }
-    pub fn strings(&self) -> Option<&[&Mutf8Str]> {
+    pub fn strings(&self) -> Option<&[Slice16Bit<Mutf8Str>]> {
         match self {
             NbtList::String(strings) => Some(strings),
             _ => None,
@@ -319,7 +320,7 @@ impl<'a> NbtList<'a> {
                 byte_arrays.iter().map(|array| array.to_vec()).collect(),
             ),
             NbtList::String(strings) => crate::owned::NbtList::String(
-                strings.iter().map(|&string| string.to_owned()).collect(),
+                strings.iter().map(|&string| (*string).to_owned()).collect(),
             ),
             NbtList::List(lists) => {
                 crate::owned::NbtList::List(lists.iter().map(|list| list.to_owned()).collect())

@@ -7,6 +7,7 @@ use crate::{
         read_string, unchecked_extend, unchecked_push, unchecked_write_string, write_string,
         END_ID, MAX_DEPTH,
     },
+    thin_slices::{Slice16Bit, Slice32Bit},
     Error, Mutf8Str,
 };
 
@@ -15,7 +16,7 @@ use super::{list::NbtList, tag_alloc::TagAllocator, NbtTag};
 /// A list of named tags. The order of the tags is preserved.
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct NbtCompound<'a> {
-    values: &'a [(&'a Mutf8Str, NbtTag<'a>)],
+    values: Slice32Bit<'a, [(Slice16Bit<'a, Mutf8Str>, NbtTag<'a>)]>,
 }
 
 impl<'a> NbtCompound<'a> {
@@ -35,7 +36,8 @@ impl<'a> NbtCompound<'a> {
         let mut tags = alloc.get().named.start(depth);
 
         let mut tags_buffer = unsafe {
-            MaybeUninit::<[MaybeUninit<(&Mutf8Str, NbtTag<'a>)>; 4]>::uninit().assume_init()
+            MaybeUninit::<[MaybeUninit<(Slice16Bit<Mutf8Str>, NbtTag<'a>)>; 4]>::uninit()
+                .assume_init()
         };
         let mut tags_buffer_len: usize = 0;
 
@@ -90,9 +92,9 @@ impl<'a> NbtCompound<'a> {
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
-        for (name, tag) in self.values {
+        for (name, tag) in &*self.values {
             // reserve 4 bytes extra so we can avoid reallocating for small tags
-            data.reserve(1 + 2 + name.len() + 4);
+            data.reserve(1 + 2 + name.len() as usize + 4);
             // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
             // 4 bytes of tag data.
             unsafe {
@@ -154,8 +156,8 @@ impl<'a> NbtCompound<'a> {
     pub fn get(&self, name: &str) -> Option<&NbtTag<'a>> {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
-        for (key, value) in self.values {
-            if key == &name {
+        for (key, value) in &*self.values {
+            if &**key == name {
                 return Some(value);
             }
         }
@@ -166,8 +168,8 @@ impl<'a> NbtCompound<'a> {
     pub fn contains(&self, name: &str) -> bool {
         let name = Mutf8Str::from_str(name);
         let name = name.as_ref();
-        for (key, _) in self.values {
-            if key == &name {
+        for (key, _) in &*self.values {
+            if &**key == name {
                 return true;
             }
         }
@@ -212,9 +214,9 @@ impl<'a> NbtCompound<'a> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&Mutf8Str, &NbtTag<'a>)> {
-        self.values.iter().map(|(k, v)| (*k, v))
+        self.values.iter().map(|(k, v)| (&**k, v))
     }
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> u32 {
         self.values.len()
     }
     pub fn is_empty(&self) -> bool {
@@ -226,7 +228,7 @@ impl<'a> NbtCompound<'a> {
             values: self
                 .values
                 .iter()
-                .map(|(k, v)| ((*k).to_owned(), v.to_owned()))
+                .map(|(k, v)| ((**k).to_owned(), v.to_owned()))
                 .collect(),
         }
     }

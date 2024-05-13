@@ -22,7 +22,11 @@ use std::{
     ptr::NonNull,
 };
 
-use crate::{raw_list::RawList, Mutf8Str};
+use crate::{
+    raw_list::RawList,
+    thin_slices::{Slice16Bit, Slice32Bit},
+    Mutf8Str,
+};
 
 use super::{NbtCompound, NbtList, NbtTag};
 
@@ -44,7 +48,7 @@ impl<'a> TagAllocator<'a> {
 
 #[derive(Default)]
 pub struct TagAllocatorImpl<'a> {
-    pub named: IndividualTagAllocator<(&'a Mutf8Str, NbtTag<'a>)>,
+    pub named: IndividualTagAllocator<(Slice16Bit<'a, Mutf8Str>, NbtTag<'a>)>,
 
     // so remember earlier when i said the depth thing is only necessary because compounds aren't
     // length prefixed? ... well soooo i decided to make arrays store per-depth separately too to
@@ -52,8 +56,8 @@ pub struct TagAllocatorImpl<'a> {
     // a lot
     pub unnamed_list: IndividualTagAllocator<NbtList<'a>>,
     pub unnamed_compound: IndividualTagAllocator<NbtCompound<'a>>,
-    pub unnamed_bytearray: IndividualTagAllocator<&'a [u8]>,
-    pub unnamed_string: IndividualTagAllocator<&'a Mutf8Str>,
+    pub unnamed_bytearray: IndividualTagAllocator<Slice32Bit<'a, [u8]>>,
+    pub unnamed_string: IndividualTagAllocator<Slice16Bit<'a, Mutf8Str>>,
     pub unnamed_intarray: IndividualTagAllocator<RawList<'a, i32>>,
     pub unnamed_longarray: IndividualTagAllocator<RawList<'a, i64>>,
 }
@@ -87,7 +91,11 @@ where
 
         start_allocating_tags(alloc)
     }
-    pub fn finish<'a>(&mut self, alloc: ContiguousTagsAllocator<T>, depth: usize) -> &'a [T] {
+    pub fn finish<'a>(
+        &mut self,
+        alloc: ContiguousTagsAllocator<T>,
+        depth: usize,
+    ) -> Slice32Bit<'a, [T]> {
         finish_allocating_tags(alloc, &mut self.current[depth], &mut self.previous[depth])
     }
 }
@@ -121,16 +129,17 @@ fn finish_allocating_tags<'a, T>(
     alloc: ContiguousTagsAllocator<T>,
     current_alloc: &mut TagsAllocation<T>,
     previous_allocs: &mut Vec<TagsAllocation<T>>,
-) -> &'a [T] {
+) -> Slice32Bit<'a, [T]> {
     let slice = unsafe {
-        std::slice::from_raw_parts(
+        Slice32Bit::new(
             alloc
                 .alloc
                 .ptr
                 .as_ptr()
                 .add(alloc.alloc.len)
-                .sub(alloc.size),
-            alloc.size,
+                .sub(alloc.size)
+                .cast(),
+            alloc.size as u32,
         )
     };
 

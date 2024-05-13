@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![feature(portable_simd)]
 #![feature(array_chunks)]
+#![feature(ptr_metadata)]
 
 pub mod borrow;
 mod common;
@@ -9,6 +10,7 @@ mod mutf8;
 pub mod owned;
 pub mod raw_list;
 pub mod swap_endianness;
+mod thin_slices;
 mod traits;
 
 pub use error::{DeserializeError, Error};

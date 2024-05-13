@@ -47,7 +47,7 @@ impl NbtList {
                 data.set_position(data.position() + 4);
                 NbtList::Empty
             }
-            BYTE_ID => NbtList::Byte(read_i8_array(data)?.to_owned()),
+            BYTE_ID => NbtList::Byte(read_i8_array(data)?.to_vec()),
             SHORT_ID => NbtList::Short(swap_endianness(read_with_u32_length(data, 2)?)),
             INT_ID => NbtList::Int(swap_endianness(read_with_u32_length(data, 4)?)),
             LONG_ID => NbtList::Long(swap_endianness(read_with_u32_length(data, 8)?)),
@@ -67,7 +67,7 @@ impl NbtList {
                 // arbitrary number to prevent big allocations
                 let mut strings = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
-                    strings.push(read_string(data)?.to_owned())
+                    strings.push((*read_string(data)?).to_owned())
                 }
                 strings
             }),
@@ -135,19 +135,23 @@ impl NbtList {
                 write_with_u32_length(data, 1, slice_i8_into_u8(bytes));
             }
             NbtList::Short(shorts) => {
-                write_with_u32_length(data, 2, &slice_into_u8_big_endian(shorts));
+                write_with_u32_length(data, 2, &slice_into_u8_big_endian(shorts.as_slice().into()));
             }
             NbtList::Int(ints) => {
-                write_with_u32_length(data, 4, &slice_into_u8_big_endian(ints));
+                write_with_u32_length(data, 4, &slice_into_u8_big_endian(ints.as_slice().into()));
             }
             NbtList::Long(longs) => {
-                write_with_u32_length(data, 8, &slice_into_u8_big_endian(longs));
+                write_with_u32_length(data, 8, &slice_into_u8_big_endian(longs.as_slice().into()));
             }
             NbtList::Float(floats) => {
-                write_with_u32_length(data, 4, &slice_into_u8_big_endian(floats));
+                write_with_u32_length(data, 4, &slice_into_u8_big_endian(floats.as_slice().into()));
             }
             NbtList::Double(doubles) => {
-                write_with_u32_length(data, 8, &slice_into_u8_big_endian(doubles));
+                write_with_u32_length(
+                    data,
+                    8,
+                    &slice_into_u8_big_endian(doubles.as_slice().into()),
+                );
             }
             NbtList::ByteArray(byte_arrays) => {
                 write_u32(data, byte_arrays.len() as u32);
@@ -173,13 +177,21 @@ impl NbtList {
             NbtList::IntArray(int_arrays) => {
                 write_u32(data, int_arrays.len() as u32);
                 for array in int_arrays {
-                    write_with_u32_length(data, 4, &slice_into_u8_big_endian(array));
+                    write_with_u32_length(
+                        data,
+                        4,
+                        &slice_into_u8_big_endian(array.as_slice().into()),
+                    );
                 }
             }
             NbtList::LongArray(long_arrays) => {
                 write_u32(data, long_arrays.len() as u32);
                 for array in long_arrays {
-                    write_with_u32_length(data, 8, &slice_into_u8_big_endian(array));
+                    write_with_u32_length(
+                        data,
+                        8,
+                        &slice_into_u8_big_endian(array.as_slice().into()),
+                    );
                 }
             }
         }

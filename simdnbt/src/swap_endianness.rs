@@ -1,5 +1,7 @@
 use std::{mem, simd::prelude::*};
 
+use crate::thin_slices::Slice32Bit;
+
 mod private {
     pub trait Sealed {}
 
@@ -274,7 +276,7 @@ fn swap_endianness_from_type<T: SwappableNumber>(items: &mut [u8]) {
 
 /// Swaps the endianness of the given data and return it as a `Vec<u8>`.
 #[inline]
-pub fn swap_endianness_as_u8<T: SwappableNumber>(data: &[u8]) -> Vec<u8> {
+pub fn swap_endianness_as_u8<T: SwappableNumber>(data: Slice32Bit<'_, [u8]>) -> Vec<u8> {
     let mut items = data.to_vec();
     swap_endianness_from_type::<T>(&mut items);
 
@@ -282,22 +284,22 @@ pub fn swap_endianness_as_u8<T: SwappableNumber>(data: &[u8]) -> Vec<u8> {
 }
 
 #[inline]
-pub fn swap_endianness<T: SwappableNumber>(data: &[u8]) -> Vec<T> {
-    let width_of_t = mem::size_of::<T>();
+pub fn swap_endianness<T: SwappableNumber>(data: Slice32Bit<'_, [u8]>) -> Vec<T> {
+    let width_of_t = mem::size_of::<T>() as u32;
     let length_of_vec_t = data.len() / width_of_t;
 
     // the data must be a multiple of the item width, otherwise it's UB
     assert_eq!(data.len() % width_of_t, 0);
 
     // have the vec be of T initially so it's aligned
-    let mut vec_t = Vec::<T>::with_capacity(length_of_vec_t);
+    let mut vec_t = Vec::<T>::with_capacity(length_of_vec_t as usize);
     let mut vec_u8: Vec<u8> = {
         let ptr = vec_t.as_mut_ptr() as *mut u8;
         mem::forget(vec_t);
         // SAFETY: the new capacity is correct since we checked that data.len() is a multiple of width_of_t
-        unsafe { Vec::from_raw_parts(ptr, 0, data.len()) }
+        unsafe { Vec::from_raw_parts(ptr, 0, data.len() as usize) }
     };
-    vec_u8.extend_from_slice(data);
+    vec_u8.extend_from_slice(&data);
 
     swap_endianness_from_type::<T>(&mut vec_u8);
 
@@ -306,7 +308,7 @@ pub fn swap_endianness<T: SwappableNumber>(data: &[u8]) -> Vec<T> {
     let ptr = vec_u8.as_mut_ptr() as *mut T;
     mem::forget(vec_u8);
     // SAFETY: The length won't be greater than the length of the original data
-    unsafe { Vec::from_raw_parts(ptr, length_of_vec_t, length_of_vec_t) }
+    unsafe { Vec::from_raw_parts(ptr, length_of_vec_t as usize, length_of_vec_t as usize) }
 }
 
 #[cfg(test)]
@@ -316,21 +318,21 @@ mod tests {
     #[test]
     fn test_swap_endianness_u16() {
         assert_eq!(
-            swap_endianness_as_u8::<u16>(&[1, 2, 3, 4, 5, 6, 7, 8]),
+            swap_endianness_as_u8::<u16>([1, 2, 3, 4, 5, 6, 7, 8].as_slice().into()),
             [2, 1, 4, 3, 6, 5, 8, 7]
         );
     }
     #[test]
     fn test_swap_endianness_u32() {
         assert_eq!(
-            swap_endianness_as_u8::<u32>(&[1, 2, 3, 4, 5, 6, 7, 8]),
+            swap_endianness_as_u8::<u32>([1, 2, 3, 4, 5, 6, 7, 8].as_slice().into()),
             [4, 3, 2, 1, 8, 7, 6, 5]
         );
     }
     #[test]
     fn test_swap_endianness_u64() {
         assert_eq!(
-            swap_endianness_as_u8::<u64>(&[1, 2, 3, 4, 5, 6, 7, 8]),
+            swap_endianness_as_u8::<u64>([1, 2, 3, 4, 5, 6, 7, 8].as_slice().into()),
             [8, 7, 6, 5, 4, 3, 2, 1]
         );
     }
@@ -338,7 +340,11 @@ mod tests {
     #[test]
     fn test_swap_endianness_u64_vec() {
         assert_eq!(
-            swap_endianness::<u64>(&[1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1]),
+            swap_endianness::<u64>(
+                [1, 2, 3, 4, 5, 6, 7, 8, 8, 7, 6, 5, 4, 3, 2, 1]
+                    .as_slice()
+                    .into()
+            ),
             vec![
                 u64::from_le_bytes([8, 7, 6, 5, 4, 3, 2, 1]),
                 u64::from_le_bytes([1, 2, 3, 4, 5, 6, 7, 8])

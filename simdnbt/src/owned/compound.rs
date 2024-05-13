@@ -48,7 +48,7 @@ impl NbtCompound {
             if tag_type == END_ID {
                 break;
             }
-            let tag_name = read_string(data)?.to_owned();
+            let tag_name: Mutf8String = (*read_string(data)?).to_owned();
             let tag = NbtTag::read_with_type(data, tag_type, depth)?;
 
             tags_buffer[tags_buffer_len] = MaybeUninit::new((tag_name, tag));
