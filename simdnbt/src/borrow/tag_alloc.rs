@@ -232,6 +232,21 @@ impl<T> ContiguousTagsAllocator<T> {
     }
 
     #[inline]
+    pub fn extend_from_slice(&mut self, slice: &[T]) {
+        while self.alloc.len + slice.len() > self.alloc.cap {
+            self.grow();
+        }
+
+        // copy the slice
+        unsafe {
+            let end = self.alloc.ptr.as_ptr().add(self.alloc.len);
+            std::ptr::copy_nonoverlapping(slice.as_ptr(), end, slice.len());
+        }
+        self.alloc.len += slice.len();
+        self.size += slice.len();
+    }
+
+    #[inline]
     pub fn push(&mut self, value: T) {
         // check if we need to reallocate
         if self.alloc.len == self.alloc.cap {

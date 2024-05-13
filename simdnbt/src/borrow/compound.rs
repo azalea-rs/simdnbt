@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{io::Cursor, mem::MaybeUninit};
 
 use byteorder::ReadBytesExt;
 
@@ -33,6 +33,12 @@ impl<'a> NbtCompound<'a> {
         }
 
         let mut tags = alloc.get().named.start(depth);
+
+        let mut tags_buffer = unsafe {
+            MaybeUninit::<[MaybeUninit<(&Mutf8Str, NbtTag<'a>)>; 4]>::uninit().assume_init()
+        };
+        let mut tags_buffer_len: usize = 0;
+
         loop {
             let tag_type = match data.read_u8() {
                 Ok(tag_type) => tag_type,
@@ -61,8 +67,23 @@ impl<'a> NbtCompound<'a> {
                     return Err(e);
                 }
             };
-            tags.push((tag_name, tag));
+
+            tags_buffer[tags_buffer_len] = MaybeUninit::new((tag_name, tag));
+            tags_buffer_len += 1;
+
+            if tags_buffer_len == tags_buffer.len() {
+                // writing the tags in groups like this is slightly faster
+                for i in 0..tags_buffer_len {
+                    tags.push(unsafe { tags_buffer.get_unchecked(i).assume_init_read() });
+                }
+                tags_buffer_len = 0;
+            }
         }
+
+        for i in 0..tags_buffer_len {
+            tags.push(unsafe { tags_buffer.get_unchecked(i).assume_init_read() });
+        }
+
         let values = alloc.get().named.finish(tags, depth);
 
         Ok(Self { values })
