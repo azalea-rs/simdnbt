@@ -37,7 +37,7 @@ pub enum NbtList {
     LongArray(Vec<Vec<i64>>) = LONG_ARRAY_ID,
 }
 impl NbtList {
-    pub fn read(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
+    pub(crate) fn read(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }

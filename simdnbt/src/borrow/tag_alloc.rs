@@ -29,6 +29,8 @@ use super::{NbtCompound, NbtList, NbtTag};
 // this value appears to have the best results on my pc when testing with complex_player.dat
 const MIN_ALLOC_SIZE: usize = 1024;
 
+/// The data structure that contains all the parsed NBT tags. This must stay in scope for as long
+/// as the borrowed NBT exists.
 #[derive(Default)]
 pub struct TagAllocator<'a>(UnsafeCell<TagAllocatorImpl<'a>>);
 impl<'a> TagAllocator<'a> {
@@ -233,21 +235,6 @@ impl<T> ContiguousTagsAllocator<T> {
         self.alloc.ptr = NonNull::new(new_ptr).unwrap();
         self.alloc.cap = new_cap;
         self.alloc.len = self.size;
-    }
-
-    #[inline]
-    pub fn extend_from_slice(&mut self, slice: &[T]) {
-        while self.alloc.len + slice.len() > self.alloc.cap {
-            self.grow();
-        }
-
-        // copy the slice
-        unsafe {
-            let end = self.alloc.ptr.as_ptr().add(self.alloc.len);
-            std::ptr::copy_nonoverlapping(slice.as_ptr(), end, slice.len());
-        }
-        self.alloc.len += slice.len();
-        self.size += slice.len();
     }
 
     #[inline]

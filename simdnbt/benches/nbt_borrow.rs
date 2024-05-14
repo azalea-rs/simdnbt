@@ -27,14 +27,12 @@ fn bench_file(filename: &str, c: &mut Criterion) {
 
     group.bench_function("Decode", |b| {
         b.iter(|| {
-            black_box(simdnbt::borrow::Nbt::read(&mut input_stream).unwrap());
+            black_box(simdnbt::borrow::read(&mut input_stream).unwrap());
             input_stream.set_position(0);
         })
     });
 
-    let nbt = simdnbt::borrow::Nbt::read(&mut input_stream)
-        .unwrap()
-        .unwrap();
+    let nbt = simdnbt::borrow::read(&mut input_stream).unwrap().unwrap();
     group.bench_function("Get", |b| {
         b.iter(|| {
             let level = nbt.compound("abilities").unwrap();

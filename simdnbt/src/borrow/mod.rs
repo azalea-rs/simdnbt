@@ -21,6 +21,51 @@ use crate::{
 use self::tag_alloc::TagAllocator;
 pub use self::{compound::NbtCompound, list::NbtList};
 
+/// Read a normal root NBT compound. This is either empty or has a name and compound tag.
+///
+/// Returns `Ok(Nbt::None)` if there is no data.
+pub fn read<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
+    Nbt::read(data)
+}
+/// Read a root NBT compound, but without reading the name. This is used in Minecraft when reading
+/// NBT over the network.
+///
+/// This is similar to [`read_tag`], but returns an [`Nbt`] instead (guaranteeing it'll be either
+/// empty or a compound).
+pub fn read_unnamed<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
+    Nbt::read_unnamed(data)
+}
+/// Read a compound tag. This may have any number of items.
+pub fn read_compound<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtCompound<'a>, Error> {
+    let tag_alloc = TagAllocator::new();
+    let tag = unsafe { NbtCompound::read(data, &tag_alloc) }?;
+    Ok(BaseNbtCompound {
+        tag,
+        _tag_alloc: tag_alloc,
+    })
+}
+/// Read an NBT tag, without reading its name. This may be any type of tag except for an end tag. If you need to be able to
+/// handle end tags, use [`read_optional_tag`].
+pub fn read_tag<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtTag<'a>, Error> {
+    let tag_alloc = TagAllocator::new();
+    let tag = unsafe { NbtTag::read(data, &tag_alloc) }?;
+    Ok(BaseNbtTag {
+        tag,
+        _tag_alloc: tag_alloc,
+    })
+}
+/// Read any NBT tag, without reading its name. This may be any type of tag, including an end tag.
+///
+/// Returns `Ok(None)` if there is no data.
+pub fn read_optional_tag<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Option<BaseNbtTag<'a>>, Error> {
+    let tag_alloc = TagAllocator::new();
+    let tag = unsafe { NbtTag::read_optional(data, &tag_alloc) }?;
+    Ok(tag.map(|tag| BaseNbtTag {
+        tag,
+        _tag_alloc: tag_alloc,
+    }))
+}
+
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug)]
 pub struct BaseNbt<'a> {
@@ -30,6 +75,20 @@ pub struct BaseNbt<'a> {
     _tag_alloc: TagAllocator<'a>,
 }
 
+/// A nameless NBT container. This only contains a compound tag. This contains a `TagAllocator`,
+/// so it can exist independently from a [`BaseNbt`].
+pub struct BaseNbtCompound<'a> {
+    tag: NbtCompound<'a>,
+    _tag_alloc: TagAllocator<'a>,
+}
+
+/// A nameless NBT tag.
+pub struct BaseNbtTag<'a> {
+    tag: NbtTag<'a>,
+    _tag_alloc: TagAllocator<'a>,
+}
+
+/// Either a complete NBT container, or nothing.
 #[derive(Debug, PartialEq, Default)]
 pub enum Nbt<'a> {
     Some(BaseNbt<'a>),
@@ -38,8 +97,8 @@ pub enum Nbt<'a> {
 }
 
 impl<'a> Nbt<'a> {
-    /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
-    pub fn read(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
+    /// Reads NBT from the given data. Returns `Ok(Nbt::None)` if there is no data.
+    fn read(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
         let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(Nbt::None);
@@ -50,10 +109,29 @@ impl<'a> Nbt<'a> {
         let tag_alloc = TagAllocator::new();
 
         let name = read_string(data)?;
-        let tag = NbtCompound::read_with_depth(data, &tag_alloc, 0, 0)?;
+        let tag = unsafe { NbtCompound::read(data, &tag_alloc) }?;
 
         Ok(Nbt::Some(BaseNbt {
             name,
+            tag,
+            _tag_alloc: tag_alloc,
+        }))
+    }
+
+    fn read_unnamed(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
+        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        if root_type == END_ID {
+            return Ok(Nbt::None);
+        }
+        if root_type != COMPOUND_ID {
+            return Err(Error::InvalidRootType(root_type));
+        }
+        let tag_alloc = TagAllocator::new();
+
+        let tag = unsafe { NbtCompound::read(data, &tag_alloc) }?;
+
+        Ok(Nbt::Some(BaseNbt {
+            name: Mutf8Str::from_slice(&[]),
             tag,
             _tag_alloc: tag_alloc,
         }))
@@ -109,6 +187,20 @@ impl<'a> Deref for BaseNbt<'a> {
         &self.tag
     }
 }
+impl<'a> Deref for BaseNbtCompound<'a> {
+    type Target = NbtCompound<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tag
+    }
+}
+impl<'a> Deref for BaseNbtTag<'a> {
+    type Target = NbtTag<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.tag
+    }
+}
 
 impl<'a> BaseNbt<'a> {
     pub fn write(&self, data: &mut Vec<u8>) {
@@ -135,7 +227,7 @@ pub enum NbtTag<'a> {
     IntArray(RawList<'a, i32>),
     LongArray(RawList<'a, i64>),
 }
-impl<'a> NbtTag<'a> {
+impl<'a, 'b> NbtTag<'a> {
     /// Get the numerical ID of the tag type.
     #[inline]
     pub fn id(&self) -> u8 {
@@ -155,8 +247,10 @@ impl<'a> NbtTag<'a> {
         }
     }
 
+    /// # Safety
+    /// The given TagAllocator must be valid for the lifetime of all the tags in this NBT.
     #[inline(always)]
-    fn read_with_type(
+    unsafe fn read_with_type(
         data: &mut Cursor<&'a [u8]>,
         alloc: &TagAllocator<'a>,
         tag_type: u8,
@@ -202,12 +296,16 @@ impl<'a> NbtTag<'a> {
         }
     }
 
-    pub fn read(data: &mut Cursor<&'a [u8]>, alloc: &TagAllocator<'a>) -> Result<Self, Error> {
+    /// # Safety
+    /// The given TagAllocator must be valid for the lifetime of all the tags in this NBT.
+    unsafe fn read(data: &mut Cursor<&'a [u8]>, alloc: &TagAllocator<'a>) -> Result<Self, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         Self::read_with_type(data, alloc, tag_type, 0, 0)
     }
 
-    pub fn read_optional(
+    /// # Safety
+    /// The given TagAllocator must be valid for the lifetime of all the tags in this NBT.
+    unsafe fn read_optional(
         data: &mut Cursor<&'a [u8]>,
         alloc: &TagAllocator<'a>,
     ) -> Result<Option<Self>, Error> {
@@ -475,5 +573,25 @@ mod tests {
 
         let res = Nbt::read(&mut Cursor::new(&data));
         assert_eq!(res, Err(Error::UnexpectedEof));
+    }
+
+    #[test]
+    fn read_complexplayer_with_given_alloc() {
+        let src = include_bytes!("../../tests/complex_player.dat").to_vec();
+        let mut src_slice = src.as_slice();
+        let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
+        let mut decoded_src = Vec::new();
+        decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
+
+        let mut decoded_src_as_tag = Vec::new();
+        decoded_src_as_tag.push(COMPOUND_ID);
+        decoded_src_as_tag.extend_from_slice(&decoded_src);
+        decoded_src_as_tag.push(END_ID);
+
+        let nbt = super::read_tag(&mut Cursor::new(&decoded_src_as_tag)).unwrap();
+        let nbt = nbt.compound().unwrap().compound("").unwrap();
+
+        assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
+        assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
     }
 }

@@ -28,11 +28,11 @@ impl NbtCompound {
         Self { values }
     }
 
-    pub fn read(data: &mut Cursor<&[u8]>) -> Result<Self, Error> {
+    pub(crate) fn read(data: &mut Cursor<&[u8]>) -> Result<Self, Error> {
         Self::read_with_depth(data, 0)
     }
 
-    pub fn read_with_depth_and_capacity(
+    pub(crate) fn read_with_depth_and_capacity(
         data: &mut Cursor<&[u8]>,
         depth: usize,
         capacity: usize,
@@ -73,7 +73,7 @@ impl NbtCompound {
         Ok(Self { values })
     }
 
-    pub fn read_with_depth(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
+    pub(crate) fn read_with_depth(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
         Self::read_with_depth_and_capacity(data, depth, 8)
     }
 

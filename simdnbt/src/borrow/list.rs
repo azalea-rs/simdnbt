@@ -35,7 +35,9 @@ pub enum NbtList<'a> {
     LongArray(&'a [RawList<'a, i64>]) = LONG_ARRAY_ID,
 }
 impl<'a> NbtList<'a> {
-    pub fn read(
+    /// # Safety
+    /// The given TagAllocator must be valid for the lifetime of all the tags in this NBT.
+    pub(crate) unsafe fn read(
         data: &mut Cursor<&'a [u8]>,
         alloc: &TagAllocator<'a>,
         compound_depth: usize,
@@ -105,12 +107,10 @@ impl<'a> NbtList<'a> {
                 let length = read_u32(data)?;
                 let mut tags = alloc.get().unnamed_compound.start(list_depth);
                 for _ in 0..length {
-                    let tag = match NbtCompound::read_with_depth(
-                        data,
-                        alloc,
-                        compound_depth + 1,
-                        list_depth,
-                    ) {
+                    let tag_res = unsafe {
+                        NbtCompound::read_with_depth(data, alloc, compound_depth + 1, list_depth)
+                    };
+                    let tag = match tag_res {
                         Ok(tag) => tag,
                         Err(e) => {
                             alloc.get().unnamed_compound.finish(tags, list_depth);

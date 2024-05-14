@@ -18,10 +18,9 @@ The difference is that the "borrow" variant requires you to keep a reference to 
 ```rust,no_run
 use std::borrow::Cow;
 use std::io::Cursor;
-use simdnbt::borrow::Nbt;
 
 fn example(item_bytes: &[u8]) {
-    let nbt = Nbt::read(&mut Cursor::new(item_bytes))
+    let nbt = simdnbt::borrow::read(&mut Cursor::new(item_bytes))
         .unwrap()
         .unwrap();
     let skyblock_id: Cow<str> = nbt

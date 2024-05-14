@@ -163,6 +163,10 @@ impl Borrow<Mutf8Str> for Mutf8String {
 }
 
 impl Mutf8String {
+    pub fn new() -> Self {
+        Self { vec: Vec::new() }
+    }
+
     #[inline]
     pub fn as_str(&self) -> &Mutf8Str {
         Mutf8Str::from_slice(self.vec.as_slice())

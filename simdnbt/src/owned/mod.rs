@@ -1,4 +1,5 @@
-//! The owned variant of NBT. This is useful if you're writing data from scratch or if you can't keep a reference to the original data.
+//! The owned variant of NBT. This is useful if you're writing NBT or if you can't keep a reference
+//! to the original data.
 
 mod compound;
 mod list;
@@ -20,6 +21,36 @@ use crate::{
 
 pub use self::{compound::NbtCompound, list::NbtList};
 
+/// Read a normal root NBT compound. This is either empty or has a name and compound tag.
+///
+/// Returns `Ok(Nbt::None)` if there is no data.
+pub fn read(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
+    Nbt::read(data)
+}
+/// Read a root NBT compound, but without reading the name. This is used in Minecraft when reading
+/// NBT over the network.
+///
+/// This is similar to [`read_tag`], but returns an [`Nbt`] instead (guaranteeing it'll be either
+/// empty or a compound).
+pub fn read_unnamed(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
+    Nbt::read_unnamed(data)
+}
+/// Read a compound tag. This may have any number of items.
+pub fn read_compound(data: &mut Cursor<&[u8]>) -> Result<NbtCompound, Error> {
+    NbtCompound::read(data)
+}
+/// Read an NBT tag, without reading its name. This may be any type of tag except for an end tag. If you need to be able to
+/// handle end tags, use [`read_optional_tag`].
+pub fn read_tag(data: &mut Cursor<&[u8]>) -> Result<NbtTag, Error> {
+    NbtTag::read(data)
+}
+/// Read any NBT tag, without reading its name. This may be any type of tag, including an end tag.
+///
+/// Returns `Ok(None)` if there is no data.
+pub fn read_optional_tag(data: &mut Cursor<&[u8]>) -> Result<Option<NbtTag>, Error> {
+    Ok(NbtTag::read_optional(data)?)
+}
+
 /// A complete NBT container. This contains a name and a compound tag.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct BaseNbt {
@@ -39,8 +70,8 @@ impl Nbt {
         Self::Some(BaseNbt { name, tag })
     }
 
-    /// Reads NBT from the given data. Returns `Ok(None)` if there is no data.
-    pub fn read(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
+    /// Reads NBT from the given data. Returns `Ok(Nbt::None)` if there is no data.
+    fn read(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
         let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(Nbt::None);
@@ -49,12 +80,12 @@ impl Nbt {
             return Err(Error::InvalidRootType(root_type));
         }
         let name = read_string(data)?.to_owned();
-        let tag = NbtCompound::read_with_depth(data, 0)?;
+        let tag = NbtCompound::read(data)?;
 
         Ok(Nbt::Some(BaseNbt { name, tag }))
     }
 
-    pub fn read_unnamed(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
+    fn read_unnamed(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
         let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(Nbt::None);
@@ -62,7 +93,7 @@ impl Nbt {
         if root_type != COMPOUND_ID {
             return Err(Error::InvalidRootType(root_type));
         }
-        let tag = NbtCompound::read_with_depth(data, 0)?;
+        let tag = NbtCompound::read(data)?;
 
         Ok(Nbt::Some(BaseNbt {
             name: Mutf8String::from(""),

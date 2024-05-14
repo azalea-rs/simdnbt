@@ -19,11 +19,18 @@ pub struct NbtCompound<'a> {
 }
 
 impl<'a> NbtCompound<'a> {
-    pub fn read(data: &mut Cursor<&'a [u8]>, alloc: &TagAllocator<'a>) -> Result<Self, Error> {
+    /// # Safety
+    /// The given TagAllocator must be valid for the lifetime of all the tags in this NBT.
+    pub(crate) unsafe fn read(
+        data: &mut Cursor<&'a [u8]>,
+        alloc: &TagAllocator<'a>,
+    ) -> Result<Self, Error> {
         Self::read_with_depth(data, alloc, 0, 0)
     }
 
-    pub fn read_with_depth(
+    /// # Safety
+    /// The given TagAllocator must be valid for the lifetime of all the tags in this NBT.
+    pub(crate) unsafe fn read_with_depth(
         data: &mut Cursor<&'a [u8]>,
         alloc: &TagAllocator<'a>,
         compound_depth: usize,
