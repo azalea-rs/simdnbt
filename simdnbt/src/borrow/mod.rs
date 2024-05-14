@@ -360,6 +360,12 @@ mod tests {
     }
 
     #[test]
+    fn read_realworld() {
+        let src = include_bytes!("../../tests/realworld.nbt").to_vec();
+        let _nbt = Nbt::read(&mut Cursor::new(&src[..])).unwrap().unwrap();
+    }
+
+    #[test]
     fn read_write_complex_player() {
         let src = include_bytes!("../../tests/complex_player.dat").to_vec();
         let mut src_slice = src.as_slice();
