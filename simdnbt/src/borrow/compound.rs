@@ -20,19 +20,20 @@ pub struct NbtCompound<'a> {
 
 impl<'a> NbtCompound<'a> {
     pub fn read(data: &mut Cursor<&'a [u8]>, alloc: &TagAllocator<'a>) -> Result<Self, Error> {
-        Self::read_with_depth(data, alloc, 0)
+        Self::read_with_depth(data, alloc, 0, 0)
     }
 
     pub fn read_with_depth(
         data: &mut Cursor<&'a [u8]>,
         alloc: &TagAllocator<'a>,
-        depth: usize,
+        compound_depth: usize,
+        list_depth: usize,
     ) -> Result<Self, Error> {
-        if depth > MAX_DEPTH {
+        if compound_depth + list_depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
 
-        let mut tags = alloc.get().named.start(depth);
+        let mut tags = alloc.get().named.start(compound_depth);
 
         let mut tags_buffer = unsafe {
             MaybeUninit::<[MaybeUninit<(&Mutf8Str, NbtTag<'a>)>; 4]>::uninit().assume_init()
@@ -43,7 +44,7 @@ impl<'a> NbtCompound<'a> {
             let tag_type = match data.read_u8() {
                 Ok(tag_type) => tag_type,
                 Err(_) => {
-                    alloc.get().named.finish(tags, depth);
+                    alloc.get().named.finish(tags, compound_depth);
                     return Err(Error::UnexpectedEof);
                 }
             };
@@ -54,19 +55,20 @@ impl<'a> NbtCompound<'a> {
             let tag_name = match read_string(data) {
                 Ok(name) => name,
                 Err(_) => {
-                    alloc.get().named.finish(tags, depth);
+                    alloc.get().named.finish(tags, compound_depth);
                     // the only error read_string can return is UnexpectedEof, so this makes it
                     // slightly faster
                     return Err(Error::UnexpectedEof);
                 }
             };
-            let tag = match NbtTag::read_with_type(data, alloc, tag_type, depth) {
-                Ok(tag) => tag,
-                Err(e) => {
-                    alloc.get().named.finish(tags, depth);
-                    return Err(e);
-                }
-            };
+            let tag =
+                match NbtTag::read_with_type(data, alloc, tag_type, compound_depth, list_depth) {
+                    Ok(tag) => tag,
+                    Err(e) => {
+                        alloc.get().named.finish(tags, compound_depth);
+                        return Err(e);
+                    }
+                };
 
             tags_buffer[tags_buffer_len] = MaybeUninit::new((tag_name, tag));
             tags_buffer_len += 1;
@@ -84,7 +86,7 @@ impl<'a> NbtCompound<'a> {
             tags.push(unsafe { tags_buffer.get_unchecked(i).assume_init_read() });
         }
 
-        let values = alloc.get().named.finish(tags, depth);
+        let values = alloc.get().named.finish(tags, compound_depth);
 
         Ok(Self { values })
     }

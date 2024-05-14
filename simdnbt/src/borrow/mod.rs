@@ -50,7 +50,7 @@ impl<'a> Nbt<'a> {
         let tag_alloc = TagAllocator::new();
 
         let name = read_string(data)?;
-        let tag = NbtCompound::read_with_depth(data, &tag_alloc, 0)?;
+        let tag = NbtCompound::read_with_depth(data, &tag_alloc, 0, 0)?;
 
         Ok(Nbt::Some(BaseNbt {
             name,
@@ -160,7 +160,8 @@ impl<'a> NbtTag<'a> {
         data: &mut Cursor<&'a [u8]>,
         alloc: &TagAllocator<'a>,
         tag_type: u8,
-        depth: usize,
+        compound_depth: usize,
+        list_depth: usize,
     ) -> Result<Self, Error> {
         match tag_type {
             BYTE_ID => Ok(NbtTag::Byte(
@@ -183,11 +184,17 @@ impl<'a> NbtTag<'a> {
             )),
             BYTE_ARRAY_ID => Ok(NbtTag::ByteArray(read_with_u32_length(data, 1)?)),
             STRING_ID => Ok(NbtTag::String(read_string(data)?)),
-            LIST_ID => Ok(NbtTag::List(NbtList::read(data, alloc, depth + 1)?)),
+            LIST_ID => Ok(NbtTag::List(NbtList::read(
+                data,
+                alloc,
+                compound_depth,
+                list_depth + 1,
+            )?)),
             COMPOUND_ID => Ok(NbtTag::Compound(NbtCompound::read_with_depth(
                 data,
                 alloc,
-                depth + 1,
+                compound_depth + 1,
+                list_depth,
             )?)),
             INT_ARRAY_ID => Ok(NbtTag::IntArray(read_int_array(data)?)),
             LONG_ARRAY_ID => Ok(NbtTag::LongArray(read_long_array(data)?)),
@@ -197,7 +204,7 @@ impl<'a> NbtTag<'a> {
 
     pub fn read(data: &mut Cursor<&'a [u8]>, alloc: &TagAllocator<'a>) -> Result<Self, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-        Self::read_with_type(data, alloc, tag_type, 0)
+        Self::read_with_type(data, alloc, tag_type, 0, 0)
     }
 
     pub fn read_optional(
@@ -208,7 +215,7 @@ impl<'a> NbtTag<'a> {
         if tag_type == END_ID {
             return Ok(None);
         }
-        Ok(Some(Self::read_with_type(data, alloc, tag_type, 0)?))
+        Ok(Some(Self::read_with_type(data, alloc, tag_type, 0, 0)?))
     }
 
     pub fn byte(&self) -> Option<i8> {
