@@ -1,6 +1,6 @@
 [package]
 name = "simdnbt"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 description = "an unnecessarily fast nbt decoder"
 license = "MIT"
@@ -12,7 +12,7 @@ repository = "https://github.com/azalea-rs/simdnbt"
 byteorder = "1.5.0"
 flate2 = "^1.0.30"
 residua-mutf8 = "2.0.0"
-simdnbt-derive = { version = "0.4.0", path = "../simdnbt-derive", optional = true }
+simdnbt-derive = { version = "0.5.2", path = "../simdnbt-derive", optional = true }
 thiserror = "1.0.60"
 valence_nbt = { version = "0.8.0", features = ["binary"] }
 
