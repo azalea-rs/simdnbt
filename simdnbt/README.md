@@ -12,7 +12,7 @@ cargo add simdnbt
 
 ### Deserializing
 
-For deserializing, you'll likely want either [simdnbt::borrow::Nbt::read](https://docs.rs/simdnbt/latest/simdnbt/borrow/enum.Nbt.html#method.read) or [simdnbt::owned::Nbt::read](https://docs.rs/simdnbt/latest/simdnbt/owned/enum.Nbt.html#method.read).
+For deserializing, you'll likely want either [simdnbt::borrow::read](https://docs.rs/simdnbt/latest/simdnbt/borrow/fn.read.html) or [simdnbt::owned::read](https://docs.rs/simdnbt/latest/simdnbt/owned/fn.read.html).
 The difference is that the "borrow" variant requires you to keep a reference to the original buffer, but is significantly faster.
 
 ```rust,no_run

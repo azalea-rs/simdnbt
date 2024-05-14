@@ -229,6 +229,9 @@ impl<'a> NbtCompound<'a> {
     pub fn is_empty(&self) -> bool {
         self.values.is_empty()
     }
+    pub fn keys(&self) -> impl Iterator<Item = &Mutf8Str> {
+        self.values.iter().map(|(k, _)| *k)
+    }
 
     pub fn to_owned(&self) -> crate::owned::NbtCompound {
         crate::owned::NbtCompound {
