@@ -32,7 +32,11 @@ impl NbtCompound {
         Self::read_with_depth(data, 0)
     }
 
-    pub fn read_with_depth(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
+    pub fn read_with_depth_and_capacity(
+        data: &mut Cursor<&[u8]>,
+        depth: usize,
+        capacity: usize,
+    ) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
@@ -42,7 +46,7 @@ impl NbtCompound {
         };
         let mut tags_buffer_len: usize = 0;
 
-        let mut values = Vec::with_capacity(8);
+        let mut values = Vec::with_capacity(capacity);
         loop {
             let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
             if tag_type == END_ID {
@@ -67,6 +71,10 @@ impl NbtCompound {
         }
 
         Ok(Self { values })
+    }
+
+    pub fn read_with_depth(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
+        Self::read_with_depth_and_capacity(data, depth, 8)
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {

@@ -84,8 +84,11 @@ impl NbtList {
                 let length = read_u32(data)?;
                 // arbitrary number to prevent big allocations
                 let mut compounds = Vec::with_capacity(length.min(128) as usize);
+                let mut capacity: usize = 8;
                 for _ in 0..length {
-                    compounds.push(NbtCompound::read_with_depth(data, depth + 1)?)
+                    let tag = NbtCompound::read_with_depth_and_capacity(data, depth + 1, capacity)?;
+                    capacity = tag.len();
+                    compounds.push(tag);
                 }
                 compounds
             }),
