@@ -55,7 +55,7 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     let extra_checks = if struct_attrs.deny_unknown_fields {
         quote! {
             if !nbt.is_empty() {
-                return Err(simdnbt::DeserializeError::UnknownField(nbt.keys().next().unwrap().clone()));
+                return Err(simdnbt::DeserializeError::UnknownField(nbt.keys().next().unwrap().to_string()));
             }
         }
     } else {
