@@ -66,6 +66,23 @@ pub fn read_with_u16_length<'a>(
     Ok(&data.get_ref()[start_position..start_position + length_in_bytes])
 }
 
+pub fn skip_string<'a>(data: &mut Cursor<&'a [u8]>) -> Result<(), Error> {
+    let remaining_slice = &data.get_ref()[data.position() as usize..data.get_ref().len()];
+    if remaining_slice.len() < 2 {
+        return Err(Error::UnexpectedEof);
+    }
+
+    let length = u16::from_be_bytes([remaining_slice[0], remaining_slice[1]]);
+    let length_in_bytes = length as usize;
+
+    // make sure we don't read more than the length
+    if data.get_ref().len() < data.position() as usize + length_in_bytes + 2 {
+        return Err(Error::UnexpectedEof);
+    }
+    data.set_position(data.position() + 2 + length_in_bytes as u64);
+    Ok(())
+}
+
 #[inline(never)]
 pub fn read_with_u32_length<'a>(
     data: &mut Cursor<&'a [u8]>,

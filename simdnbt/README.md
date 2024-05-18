@@ -19,20 +19,20 @@ The difference is that the "borrow" variant requires you to keep a reference to 
 use std::borrow::Cow;
 use std::io::Cursor;
 
-fn example(item_bytes: &[u8]) {
-    let nbt = simdnbt::borrow::read(&mut Cursor::new(item_bytes))
-        .unwrap()
-        .unwrap();
-    let skyblock_id: Cow<str> = nbt
-        .list("i")
-        .and_then(|i| i.compounds())
-        .and_then(|i| i.get(0))
-        .and_then(|i| i.compound("tag"))
-        .and_then(|tag| tag.compound("ExtraAttributes"))
-        .and_then(|ea| ea.string("id"))
-        .map(|id| id.to_string_lossy())
-        .unwrap_or_default();
-}
+// fn example(item_bytes: &[u8]) {
+//     let nbt = simdnbt::borrow::read(&mut Cursor::new(item_bytes))
+//         .unwrap()
+//         .unwrap();
+//     let skyblock_id: Cow<str> = nbt
+//         .list("i")
+//         .and_then(|i| i.compounds())
+//         .and_then(|i| i.get(0))
+//         .and_then(|i| i.compound("tag"))
+//         .and_then(|tag| tag.compound("ExtraAttributes"))
+//         .and_then(|ea| ea.string("id"))
+//         .map(|id| id.to_string_lossy())
+//         .unwrap_or_default();
+// }
 ```
 
 ### Serializing

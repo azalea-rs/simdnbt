@@ -64,7 +64,7 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 
     let output = quote! {
         impl #generics simdnbt::Deserialize for #ident #generics #where_clause {
-            fn from_compound(mut nbt: &simdnbt::borrow::NbtCompound) -> Result<Self, simdnbt::DeserializeError> {
+            fn from_compound(mut nbt: simdnbt::borrow::NbtCompound) -> Result<Self, simdnbt::DeserializeError> {
                 let value = Self {
                     #(#field_deserializers),*
                 };
