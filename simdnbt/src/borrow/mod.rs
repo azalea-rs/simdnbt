@@ -3,6 +3,7 @@
 mod compound;
 mod list;
 mod tag_alloc;
+mod tape;
 
 use std::{io::Cursor, ops::Deref};
 
