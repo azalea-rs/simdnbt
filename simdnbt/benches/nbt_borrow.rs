@@ -48,10 +48,11 @@ fn bench_file(filename: &str, c: &mut Criterion) {
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn bench(c: &mut Criterion) {
-    bench_file("bigtest.nbt", c);
-    bench_file("simple_player.dat", c);
+    bench_file("hypixel.nbt", c);
     bench_file("complex_player.dat", c);
     bench_file("level.dat", c);
+    bench_file("bigtest.nbt", c);
+    bench_file("simple_player.dat", c);
 
     // bench_file("stringtest.nbt", c);
     // bench_file("inttest16.nbt", c);

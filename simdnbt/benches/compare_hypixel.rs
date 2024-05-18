@@ -22,7 +22,7 @@ pub fn bench_read_file(filename: &str, c: &mut Criterion) {
     }
     let input = input.as_slice();
 
-    let mut group = c.benchmark_group(format!("compare_realworld/{filename}"));
+    let mut group = c.benchmark_group(format!("compare_hypixel/{filename}"));
     group.throughput(Throughput::Bytes(input.len() as u64));
 
     {
@@ -353,7 +353,7 @@ fn graphite_items_from_nbt(nbt: graphite_binary::nbt::NBT) -> Option<Vec<Option<
 }
 
 fn bench(c: &mut Criterion) {
-    bench_read_file("realworld.nbt", c);
+    bench_read_file("hypixel.nbt", c);
 }
 
 criterion_group!(benches, bench);

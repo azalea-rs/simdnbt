@@ -458,8 +458,8 @@ mod tests {
     }
 
     #[test]
-    fn read_realworld() {
-        let src = include_bytes!("../../tests/realworld.nbt").to_vec();
+    fn read_hypixel() {
+        let src = include_bytes!("../../tests/hypixel.nbt").to_vec();
         let _nbt = Nbt::read(&mut Cursor::new(&src[..])).unwrap().unwrap();
     }
 

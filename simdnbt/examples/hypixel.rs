@@ -65,7 +65,7 @@ pub struct Base {
 }
 
 fn main() {
-    let input = black_box(include_bytes!("../tests/realworld.nbt"));
+    let input = black_box(include_bytes!("../tests/hypixel.nbt"));
 
     for _ in 0..1 {
         let nbt = simdnbt::borrow::read(&mut Cursor::new(input));
