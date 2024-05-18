@@ -82,6 +82,6 @@ fn main() {
         let new_data = Base::from_nbt(&new_nbt).unwrap();
         assert_eq!(data, new_data);
 
-        println!("data: {:?}", data.items);
+        // println!("data: {:?}", data.items);
     }
 }

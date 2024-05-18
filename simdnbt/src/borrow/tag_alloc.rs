@@ -19,6 +19,7 @@ use std::{
     alloc::{self, Layout},
     cell::UnsafeCell,
     fmt,
+    mem::MaybeUninit,
     ptr::NonNull,
 };
 
@@ -46,14 +47,13 @@ impl<'a> TagAllocator<'a> {
 
 #[derive(Default)]
 pub struct TagAllocatorImpl<'a> {
-    pub named: IndividualTagAllocator<(&'a Mutf8Str, NbtTag<'a>)>,
+    pub named: IndividualTagAllocatorWithDepth<(&'a Mutf8Str, NbtTag<'a>)>,
 
-    // so remember earlier when i said the depth thing is only necessary because compounds aren't
-    // length prefixed? ... well soooo i decided to make arrays store per-depth separately too to
-    // avoid exploits where an array with a big length is sent to force it to immediately allocate
-    // a lot
-    pub unnamed_list: IndividualTagAllocator<NbtList<'a>>,
-    pub unnamed_compound: IndividualTagAllocator<NbtCompound<'a>>,
+    // lists of lists
+    pub unnamed_list: IndividualTagAllocatorWithDepth<NbtList<'a>>,
+    // lists of compounds
+    pub unnamed_compound: IndividualTagAllocatorWithDepth<NbtCompound<'a>>,
+
     pub unnamed_bytearray: IndividualTagAllocator<&'a [u8]>,
     pub unnamed_string: IndividualTagAllocator<&'a Mutf8Str>,
     pub unnamed_intarray: IndividualTagAllocator<RawList<'a, i32>>,
@@ -67,12 +67,49 @@ impl<'a> TagAllocatorImpl<'a> {
 }
 
 pub struct IndividualTagAllocator<T> {
+    current: TagsAllocation<T>,
+    // we keep track of old allocations so we can deallocate them later
+    previous: Vec<TagsAllocation<T>>,
+}
+impl<T> IndividualTagAllocator<T>
+where
+    T: Clone,
+{
+    #[inline]
+    pub fn start(&mut self) -> ContiguousTagsAllocator<T> {
+        let alloc = self.current.clone();
+
+        start_allocating_tags(alloc)
+    }
+    #[inline]
+    pub fn finish<'a>(&mut self, alloc: ContiguousTagsAllocator<T>) -> &'a [T] {
+        finish_allocating_tags(alloc, &mut self.current, &mut self.previous)
+    }
+}
+impl<T> Default for IndividualTagAllocator<T> {
+    fn default() -> Self {
+        Self {
+            current: Default::default(),
+            previous: Default::default(),
+        }
+    }
+}
+impl<T> Drop for IndividualTagAllocator<T> {
+    fn drop(&mut self) {
+        self.current.deallocate();
+        self.previous
+            .iter_mut()
+            .for_each(TagsAllocation::deallocate);
+    }
+}
+
+pub struct IndividualTagAllocatorWithDepth<T> {
     // it's a vec because of the depth thing mentioned earlier, index in the vec = depth
     current: Vec<TagsAllocation<T>>,
     // we also have to keep track of old allocations so we can deallocate them later
     previous: Vec<Vec<TagsAllocation<T>>>,
 }
-impl<T> IndividualTagAllocator<T>
+impl<T> IndividualTagAllocatorWithDepth<T>
 where
     T: Clone,
 {
@@ -95,7 +132,7 @@ where
         finish_allocating_tags(alloc, &mut self.current[depth], &mut self.previous[depth])
     }
 }
-impl<T> Default for IndividualTagAllocator<T> {
+impl<T> Default for IndividualTagAllocatorWithDepth<T> {
     fn default() -> Self {
         Self {
             current: Default::default(),
@@ -103,7 +140,7 @@ impl<T> Default for IndividualTagAllocator<T> {
         }
     }
 }
-impl<T> Drop for IndividualTagAllocator<T> {
+impl<T> Drop for IndividualTagAllocatorWithDepth<T> {
     fn drop(&mut self) {
         self.current.iter_mut().for_each(TagsAllocation::deallocate);
         self.previous
@@ -200,16 +237,12 @@ pub struct ContiguousTagsAllocator<T> {
 }
 
 impl<T> ContiguousTagsAllocator<T> {
-    #[inline(never)]
-    fn grow(&mut self) {
-        let new_cap = if self.is_new_allocation {
-            // this makes sure we don't allocate 0 bytes
-            std::cmp::max(self.alloc.cap * 2, MIN_ALLOC_SIZE)
-        } else {
-            // reuse the previous cap, since it's not unlikely that we'll have another compound
-            // with a similar
-            self.alloc.cap
-        };
+    /// Grow the capacity to the new amount.
+    ///
+    /// # Safety
+    /// Must be at least the current capacity.
+    unsafe fn grow_to(&mut self, new_cap: usize) {
+        debug_assert!(new_cap >= self.alloc.cap, "{new_cap} < {}", self.alloc.cap);
 
         let new_layout = Layout::array::<T>(new_cap).unwrap();
 
@@ -235,6 +268,37 @@ impl<T> ContiguousTagsAllocator<T> {
         self.alloc.ptr = NonNull::new(new_ptr).unwrap();
         self.alloc.cap = new_cap;
         self.alloc.len = self.size;
+    }
+
+    #[inline(never)]
+    fn grow(&mut self) {
+        let new_cap = if self.is_new_allocation {
+            // this makes sure we don't allocate 0 bytes
+            std::cmp::max(self.alloc.cap * 2, MIN_ALLOC_SIZE)
+        } else {
+            // reuse the previous cap, since it's not unlikely that we'll have another compound
+            // with a similar
+            self.alloc.cap
+        };
+
+        unsafe { self.grow_to(new_cap) };
+    }
+
+    #[allow(dead_code)]
+    pub fn allocate(&mut self, size: usize) -> &mut [MaybeUninit<T>] {
+        // check if we need to reallocate
+        if self.alloc.len + size > self.alloc.cap {
+            // unsafe { self.grow_to(self.size + size) }
+            let new_cap = std::cmp::max(self.alloc.cap, self.size + size);
+            unsafe { self.grow_to(new_cap) }
+        }
+
+        let start = unsafe { self.alloc.ptr.as_ptr().add(self.alloc.len) };
+
+        self.alloc.len += size;
+        self.size += size;
+
+        unsafe { std::slice::from_raw_parts_mut(start.cast(), size) }
     }
 
     #[inline]

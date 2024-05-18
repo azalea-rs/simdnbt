@@ -60,33 +60,33 @@ impl<'a> NbtList<'a> {
             DOUBLE_ID => NbtList::Double(RawList::new(read_with_u32_length(data, 8)?)),
             BYTE_ARRAY_ID => NbtList::ByteArray({
                 let length = read_u32(data)?;
-                let mut tags = alloc.get().unnamed_bytearray.start(0);
+                let mut tags = alloc.get().unnamed_bytearray.start();
                 for _ in 0..length {
                     let tag = match read_u8_array(data) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc.get().unnamed_bytearray.finish(tags, 0);
+                            alloc.get().unnamed_bytearray.finish(tags);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
-                alloc.get().unnamed_bytearray.finish(tags, 0)
+                alloc.get().unnamed_bytearray.finish(tags)
             }),
             STRING_ID => NbtList::String({
                 let length = read_u32(data)?;
-                let mut tags = alloc.get().unnamed_string.start(0);
+                let mut tags = alloc.get().unnamed_string.start();
                 for _ in 0..length {
                     let tag = match read_string(data) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc.get().unnamed_string.finish(tags, 0);
+                            alloc.get().unnamed_string.finish(tags);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
-                alloc.get().unnamed_string.finish(tags, 0)
+                alloc.get().unnamed_string.finish(tags)
             }),
             LIST_ID => NbtList::List({
                 let length = read_u32(data)?;
@@ -123,33 +123,33 @@ impl<'a> NbtList<'a> {
             }),
             INT_ARRAY_ID => NbtList::IntArray({
                 let length = read_u32(data)?;
-                let mut tags = alloc.get().unnamed_intarray.start(0);
+                let mut tags = alloc.get().unnamed_intarray.start();
                 for _ in 0..length {
                     let tag = match read_int_array(data) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc.get().unnamed_intarray.finish(tags, 0);
+                            alloc.get().unnamed_intarray.finish(tags);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
-                alloc.get().unnamed_intarray.finish(tags, 0)
+                alloc.get().unnamed_intarray.finish(tags)
             }),
             LONG_ARRAY_ID => NbtList::LongArray({
                 let length = read_u32(data)?;
-                let mut tags = alloc.get().unnamed_longarray.start(0);
+                let mut tags = alloc.get().unnamed_longarray.start();
                 for _ in 0..length {
                     let tag = match read_long_array(data) {
                         Ok(tag) => tag,
                         Err(e) => {
-                            alloc.get().unnamed_longarray.finish(tags, 0);
+                            alloc.get().unnamed_longarray.finish(tags);
                             return Err(e);
                         }
                     };
                     tags.push(tag);
                 }
-                alloc.get().unnamed_longarray.finish(tags, 0)
+                alloc.get().unnamed_longarray.finish(tags)
             }),
             _ => return Err(Error::UnknownTagId(tag_type)),
         })
