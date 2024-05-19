@@ -1,7 +1,33 @@
 use std::fmt::{self, Debug};
 
+use crate::common::{
+    BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LONG_ARRAY_ID,
+    LONG_ID, SHORT_ID, STRING_ID,
+};
+
 pub struct MainTape {
-    pub elements: Vec<TapeElement>,
+    elements: Vec<TapeElement>,
+}
+impl MainTape {
+    #[inline]
+    pub fn push(&mut self, element: TapeElement) {
+        self.elements.push(element);
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.elements.len()
+    }
+
+    #[inline]
+    pub unsafe fn get_unchecked_mut(&mut self, index: usize) -> &mut TapeElement {
+        self.elements.get_unchecked_mut(index)
+    }
+
+    #[inline]
+    pub fn as_ptr(&self) -> *const TapeElement {
+        self.elements.as_ptr()
+    }
 }
 impl Debug for MainTape {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -178,17 +204,17 @@ impl From<UnalignedU16> for u16 {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TapeTagKind {
-    Byte,
-    Short,
-    Int,
-    Long,
-    Float,
-    Double,
-    ByteArray,
-    String,
-    Compound,
-    IntArray,
-    LongArray,
+    Byte = BYTE_ID,
+    Short = SHORT_ID,
+    Int = INT_ID,
+    Long = LONG_ID,
+    Float = FLOAT_ID,
+    Double = DOUBLE_ID,
+    ByteArray = BYTE_ARRAY_ID,
+    String = STRING_ID,
+    Compound = COMPOUND_ID,
+    IntArray = INT_ARRAY_ID,
+    LongArray = LONG_ARRAY_ID,
 
     EmptyList,
     ByteList,

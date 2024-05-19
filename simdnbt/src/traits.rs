@@ -4,7 +4,7 @@ use crate::DeserializeError;
 
 pub trait Deserialize: Sized {
     fn from_nbt(nbt: &crate::borrow::BaseNbt) -> Result<Self, DeserializeError> {
-        Self::from_compound(nbt.compound())
+        Self::from_compound(nbt.as_compound())
     }
 
     fn from_compound(compound: crate::borrow::NbtCompound) -> Result<Self, DeserializeError>;

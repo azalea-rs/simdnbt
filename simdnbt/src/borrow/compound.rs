@@ -1,23 +1,24 @@
-use std::{io::Cursor, mem::MaybeUninit};
-
-use byteorder::ReadBytesExt;
+use std::{hint::unreachable_unchecked, mem::MaybeUninit};
 
 use crate::{
     common::{
-        read_string, skip_string, unchecked_extend, unchecked_push, unchecked_write_string,
-        write_string, END_ID, MAX_DEPTH,
+        read_int_array, read_long_array, read_string, read_with_u32_length, unchecked_extend,
+        unchecked_push, unchecked_write_string, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID,
+        DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID,
+        MAX_DEPTH, SHORT_ID, STRING_ID,
     },
+    reader::Reader,
     Error, Mutf8Str,
 };
 
 use super::{
     extra_tapes::ExtraTapes,
-    list::NbtList,
-    tape::{MainTape, TapeElement, TapeTagKind, TapeTagValue, UnalignedU16},
+    list::{self, NbtList},
+    tape::{TapeElement, TapeTagKind, TapeTagValue, UnalignedU16},
     NbtTag, Tapes,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct NbtCompound<'a: 'tape, 'tape> {
     pub(crate) element: *const TapeElement, // includes the initial compound element
     pub(crate) extra_tapes: &'tape ExtraTapes<'a>,
@@ -25,136 +26,138 @@ pub struct NbtCompound<'a: 'tape, 'tape> {
 
 impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
     pub(crate) fn read(
-        data: &mut Cursor<&'a [u8]>,
+        // compounds have no header so nothing to read
+        _data: &mut Reader<'a>,
         tapes: &'tape mut Tapes<'a>,
+        stack: &mut ParsingStack,
     ) -> Result<(), Error> {
-        Self::read_with_depth(data, tapes, 0)
-    }
+        let index_of_compound_element = tapes.main.len();
 
-    pub(crate) fn read_with_depth(
-        data: &mut Cursor<&'a [u8]>,
-        tapes: &'tape mut Tapes<'a>,
-        depth: usize,
-    ) -> Result<(), Error> {
-        if depth > MAX_DEPTH {
-            return Err(Error::MaxDepthExceeded);
-        }
-
-        let index_of_compound_element = tapes.main.elements.len();
-        tapes.main.elements.push(TapeElement {
+        stack.push(ParsingStackElement::Compound {
+            index_of_compound_element: index_of_compound_element as u32,
+        })?;
+        tapes.main.push(TapeElement {
             kind: (
                 TapeTagKind::Compound,
                 TapeTagValue {
-                    // this gets overridden later
+                    // this gets overwritten later
                     compound: (0.into(), 0.into()),
                 },
             ),
         });
 
-        loop {
-            let tag_type = match data.read_u8() {
-                Ok(tag_type) => tag_type,
-                Err(_) => {
-                    return Err(Error::UnexpectedEof);
-                }
-            };
-            if tag_type == END_ID {
-                break;
-            }
-
-            let tag_name_pointer = data.get_ref().as_ptr() as u64 + data.position();
-            debug_assert_eq!(tag_name_pointer >> 56, 0);
-            if let Err(e) = skip_string(data) {
-                return Err(e);
-            };
-            tapes.main.elements.push(TapeElement {
-                name: tag_name_pointer,
-            });
-            match NbtTag::read_with_type(data, tapes, tag_type, depth) {
-                Ok(tag) => tag,
-                Err(e) => {
-                    return Err(e);
-                }
-            };
-        }
-
-        let index_after_end_element = tapes.main.elements.len();
-        unsafe {
-            tapes
-                .main
-                .elements
-                .get_unchecked_mut(index_of_compound_element)
-                .kind
-                .1
-                .compound = (
-                0.into(),
-                ((index_after_end_element - index_of_compound_element) as u32).into(),
-            );
-        };
-
         Ok(())
     }
 
-    // pub fn write(&self, data: &mut Vec<u8>) {
-    //     for (name, tag) in self.values {
-    //         // reserve 4 bytes extra so we can avoid reallocating for small tags
-    //         data.reserve(1 + 2 + name.len() + 4);
-    //         // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
-    //         // 4 bytes of tag data.
-    //         unsafe {
-    //             unchecked_push(data, tag.id());
-    //             unchecked_write_string(data, name);
-    //         }
-    //         match tag {
-    //             NbtTag::Byte(byte) => unsafe {
-    //                 unchecked_push(data, *byte as u8);
-    //             },
-    //             NbtTag::Short(short) => unsafe {
-    //                 unchecked_extend(data, &short.to_be_bytes());
-    //             },
-    //             NbtTag::Int(int) => unsafe {
-    //                 unchecked_extend(data, &int.to_be_bytes());
-    //             },
-    //             NbtTag::Long(long) => {
-    //                 data.extend_from_slice(&long.to_be_bytes());
-    //             }
-    //             NbtTag::Float(float) => unsafe {
-    //                 unchecked_extend(data, &float.to_be_bytes());
-    //             },
-    //             NbtTag::Double(double) => {
-    //                 data.extend_from_slice(&double.to_be_bytes());
-    //             }
-    //             NbtTag::ByteArray(byte_array) => {
-    //                 unsafe {
-    //                     unchecked_extend(data, &byte_array.len().to_be_bytes());
-    //                 }
-    //                 data.extend_from_slice(byte_array);
-    //             }
-    //             NbtTag::String(string) => {
-    //                 write_string(data, string);
-    //             }
-    //             NbtTag::List(list) => {
-    //                 list.write(data);
-    //             }
-    //             NbtTag::Compound(compound) => {
-    //                 compound.write(data);
-    //             }
-    //             NbtTag::IntArray(int_array) => {
-    //                 unsafe {
-    //                     unchecked_extend(data, &int_array.len().to_be_bytes());
-    //                 }
-    //                 data.extend_from_slice(int_array.as_big_endian());
-    //             }
-    //             NbtTag::LongArray(long_array) => {
-    //                 unsafe {
-    //                     unchecked_extend(data, &long_array.len().to_be_bytes());
-    //                 }
-    //                 data.extend_from_slice(long_array.as_big_endian());
-    //             }
-    //         }
-    //     }
-    //     data.push(END_ID);
-    // }
+    pub fn write(&self, data: &mut Vec<u8>) {
+        for (name, tag) in self.iter() {
+            // reserve 4 bytes extra so we can avoid reallocating for small tags
+            data.reserve(1 + 2 + name.len() + 4);
+            // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
+            // 4 bytes of tag data.
+            unsafe {
+                unchecked_push(data, tag.id());
+                unchecked_write_string(data, name);
+            }
+
+            let (kind, _) = tag.element();
+            match kind {
+                //         NbtTag::Byte(byte) => unsafe {
+                //             unchecked_push(data, *byte as u8);
+                //         },
+                TapeTagKind::Byte => unsafe {
+                    unchecked_push(data, tag.byte().unwrap() as u8);
+                }, //         NbtTag::Short(short) => unsafe {
+                //             unchecked_extend(data, &short.to_be_bytes());
+                //         },
+                TapeTagKind::Short => unsafe {
+                    unchecked_extend(data, &tag.short().unwrap().to_be_bytes());
+                }, //         NbtTag::Int(int) => unsafe {
+                //             unchecked_extend(data, &int.to_be_bytes());
+                //         },
+                TapeTagKind::Int => unsafe {
+                    unchecked_extend(data, &tag.int().unwrap().to_be_bytes());
+                }, //         NbtTag::Long(long) => {
+                //             data.extend_from_slice(&long.to_be_bytes());
+                //         }
+                TapeTagKind::Long => {
+                    data.extend_from_slice(&tag.long().unwrap().to_be_bytes());
+                } //         NbtTag::Float(float) => unsafe {
+                //             unchecked_extend(data, &float.to_be_bytes());
+                //         },
+                TapeTagKind::Float => unsafe {
+                    unchecked_extend(data, &tag.float().unwrap().to_be_bytes());
+                }, //         NbtTag::Double(double) => {
+                //             data.extend_from_slice(&double.to_be_bytes());
+                //         }
+                TapeTagKind::Double => {
+                    data.extend_from_slice(&tag.double().unwrap().to_be_bytes());
+                } //         NbtTag::ByteArray(byte_array) => {
+                //             unsafe {
+                //                 unchecked_extend(data, &byte_array.len().to_be_bytes());
+                //             }
+                //             data.extend_from_slice(byte_array);
+                //         }
+                TapeTagKind::ByteArray => {
+                    let byte_array = tag.byte_array().unwrap();
+                    unsafe {
+                        unchecked_extend(data, &byte_array.len().to_be_bytes());
+                    }
+                    data.extend_from_slice(byte_array);
+                } //         NbtTag::String(string) => {
+                //             write_string(data, string);
+                //         }
+                TapeTagKind::String => {
+                    let string = tag.string().unwrap();
+                    write_string(data, string);
+                } //         NbtTag::List(list) => {
+                //             list.write(data);
+                //         }
+                _ if kind.is_list() => {
+                    tag.list().unwrap().write(data);
+                } //         NbtTag::Compound(compound) => {
+                //             compound.write(data);
+                //         }
+                TapeTagKind::Compound => {
+                    tag.compound().unwrap().write(data);
+                } //         NbtTag::IntArray(int_array) => {
+                //             unsafe {
+                //                 unchecked_extend(data, &int_array.len().to_be_bytes());
+                //             }
+                //             data.extend_from_slice(int_array.as_big_endian());
+                //         }
+                TapeTagKind::IntArray => {
+                    let int_array = list::u32_prefixed_list_to_rawlist::<i32>(
+                        TapeTagKind::IntArray,
+                        self.element,
+                    )
+                    .unwrap();
+                    unsafe {
+                        unchecked_extend(data, &int_array.len().to_be_bytes());
+                    }
+                    data.extend_from_slice(int_array.as_big_endian());
+                } //         NbtTag::LongArray(long_array) => {
+                //             unsafe {
+                //                 unchecked_extend(data, &long_array.len().to_be_bytes());
+                //             }
+                //             data.extend_from_slice(long_array.as_big_endian());
+                //         }
+                TapeTagKind::LongArray => {
+                    let long_array = list::u32_prefixed_list_to_rawlist::<i64>(
+                        TapeTagKind::LongArray,
+                        self.element,
+                    )
+                    .unwrap();
+                    unsafe {
+                        unchecked_extend(data, &long_array.len().to_be_bytes());
+                    }
+                    data.extend_from_slice(long_array.as_big_endian());
+                }
+                _ => unreachable!("Invalid tag kind {kind:?}"),
+            }
+        }
+        data.push(END_ID);
+    }
 
     #[inline]
     pub fn get(&self, name: &str) -> Option<NbtTag<'a, 'tape>> {
@@ -198,10 +201,10 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
     pub fn double(&self, name: &str) -> Option<f64> {
         self.get(name).and_then(|tag| tag.double())
     }
-    pub fn byte_array(&self, name: &str) -> Option<&[u8]> {
+    pub fn byte_array(&self, name: &str) -> Option<&'a [u8]> {
         self.get(name).and_then(|tag| tag.byte_array())
     }
-    pub fn string(&self, name: &str) -> Option<&Mutf8Str> {
+    pub fn string(&self, name: &str) -> Option<&'a Mutf8Str> {
         self.get(name).and_then(|tag| tag.string())
     }
     pub fn list(&self, name: &str) -> Option<NbtList<'a, 'tape>> {
@@ -227,9 +230,8 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
         debug_assert_eq!(kind, TapeTagKind::Compound);
 
         let max_tape_offset = u32::from(unsafe { value.list_list.1 }) as usize;
-        let tape_slice = unsafe {
-            std::slice::from_raw_parts((self.element as *const TapeElement).add(1), max_tape_offset)
-        };
+        let tape_slice =
+            unsafe { std::slice::from_raw_parts(self.element.add(1), max_tape_offset) };
 
         CompoundIter {
             current_tape_offset: 0,
@@ -263,6 +265,7 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+    #[allow(clippy::type_complexity)]
     pub fn keys(
         &self,
     ) -> std::iter::Map<
@@ -282,6 +285,12 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
     }
 }
 
+impl PartialEq for NbtCompound<'_, '_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter().eq(other.iter())
+    }
+}
+
 pub struct CompoundIter<'a: 'tape, 'tape> {
     current_tape_offset: usize,
     max_tape_offset: usize,
@@ -292,30 +301,270 @@ impl<'a: 'tape, 'tape> Iterator for CompoundIter<'a, 'tape> {
     type Item = (&'a Mutf8Str, NbtTag<'a, 'tape>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            if self.current_tape_offset + 1 >= self.max_tape_offset {
-                return None;
-            }
+        if self.current_tape_offset + 1 >= self.max_tape_offset {
+            return None;
+        }
 
-            let name_length_ptr = unsafe { self.tape[self.current_tape_offset].name };
-            let name_length_ptr = name_length_ptr as *const UnalignedU16;
-            let name_length = u16::from(unsafe { *name_length_ptr }).swap_bytes();
-            let name_pointer = unsafe { name_length_ptr.add(1) as *const u8 };
-            let name_slice =
-                unsafe { std::slice::from_raw_parts(name_pointer, name_length as usize) };
-            let name = Mutf8Str::from_slice(name_slice);
+        let name_length_ptr = unsafe { self.tape[self.current_tape_offset].name };
+        let name_length_ptr = name_length_ptr as *const UnalignedU16;
+        let name_length = u16::from(unsafe { *name_length_ptr }).swap_bytes();
+        let name_pointer = unsafe { name_length_ptr.add(1) as *const u8 };
+        let name_slice = unsafe { std::slice::from_raw_parts(name_pointer, name_length as usize) };
+        let name = Mutf8Str::from_slice(name_slice);
 
-            self.current_tape_offset += 1;
+        self.current_tape_offset += 1;
 
-            let element = unsafe { self.tape.as_ptr().add(self.current_tape_offset as usize) };
-            let tag = NbtTag {
-                element,
-                extra_tapes: self.extra_tapes,
-            };
+        let element = unsafe { self.tape.as_ptr().add(self.current_tape_offset) };
+        let tag = NbtTag {
+            element,
+            extra_tapes: self.extra_tapes,
+        };
 
-            self.current_tape_offset += unsafe { (*element).skip_offset() };
+        self.current_tape_offset += unsafe { (*element).skip_offset() };
 
-            return Some((name, tag));
+        Some((name, tag))
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum ParsingStackElement {
+    Compound { index_of_compound_element: u32 },
+    ListOfLists { index_of_list_element: u32 },
+    ListOfCompounds { index_of_list_element: u32 },
+}
+
+pub struct ParsingStack {
+    stack: [MaybeUninit<ParsingStackElement>; MAX_DEPTH],
+    remaining_elements_in_lists: [u32; MAX_DEPTH],
+    depth: usize,
+}
+
+impl ParsingStack {
+    pub fn new() -> Self {
+        Self {
+            stack: unsafe { MaybeUninit::uninit().assume_init() },
+            remaining_elements_in_lists: [0; MAX_DEPTH],
+            depth: 0,
         }
     }
+
+    #[inline]
+    pub fn push(&mut self, state: ParsingStackElement) -> Result<(), Error> {
+        // self.stack[self.depth] = MaybeUninit::new(state);
+        unsafe { self.stack.get_unchecked_mut(self.depth).write(state) };
+        self.depth += 1;
+
+        if self.depth > MAX_DEPTH {
+            Err(Error::MaxDepthExceeded)
+        } else {
+            Ok(())
+        }
+    }
+
+    #[inline]
+    pub fn set_list_length(&mut self, length: u32) {
+        unsafe {
+            *self
+                .remaining_elements_in_lists
+                .get_unchecked_mut(self.depth - 1) = length;
+        };
+    }
+
+    #[inline]
+    pub fn decrement_list_length(&mut self) {
+        unsafe {
+            *self
+                .remaining_elements_in_lists
+                .get_unchecked_mut(self.depth - 1) -= 1;
+        };
+    }
+
+    #[inline]
+    pub fn remaining_elements_in_list(&self) -> u32 {
+        unsafe {
+            *self
+                .remaining_elements_in_lists
+                .get_unchecked(self.depth - 1)
+        }
+    }
+
+    #[inline]
+    pub fn pop(&mut self) -> ParsingStackElement {
+        self.depth -= 1;
+        unsafe { self.stack.get_unchecked(self.depth).assume_init() }
+    }
+
+    #[inline]
+    pub fn peek(&self) -> ParsingStackElement {
+        unsafe { self.stack.get_unchecked(self.depth - 1).assume_init() }
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.depth == 0
+    }
+
+    #[inline]
+    pub fn peek_mut(&mut self) -> &mut ParsingStackElement {
+        unsafe {
+            self.stack
+                .get_unchecked_mut(self.depth - 1)
+                .as_mut_ptr()
+                .as_mut()
+                .unwrap_unchecked()
+        }
+    }
+}
+
+#[inline(always)]
+pub(crate) fn read_tag<'a>(
+    data: &mut Reader<'a>,
+    tapes: &mut Tapes<'a>,
+    stack: &mut ParsingStack,
+    tag_type: u8,
+) -> Result<(), Error> {
+    match tag_type {
+        COMPOUND_ID => return NbtCompound::read(data, tapes, stack),
+        LIST_ID => return NbtList::read(data, tapes, stack),
+        _ => {}
+    }
+
+    match tag_type {
+        BYTE_ID => {
+            let byte = data.read_i8()?;
+            tapes.main.push(TapeElement {
+                kind: (TapeTagKind::Byte, TapeTagValue { byte }),
+            });
+        }
+        SHORT_ID => {
+            let short = data.read_i16()?;
+            tapes.main.push(TapeElement {
+                kind: (TapeTagKind::Short, TapeTagValue { short }),
+            });
+        }
+        INT_ID => {
+            let int = data.read_i32()?;
+            tapes.main.push(TapeElement {
+                kind: (TapeTagKind::Int, TapeTagValue { int }),
+            });
+        }
+        LONG_ID => {
+            let long = data.read_i64()?;
+            tapes.main.push(TapeElement {
+                kind: (TapeTagKind::Long, TapeTagValue { long: () }),
+            });
+            tapes.main.push(TapeElement { long });
+        }
+        FLOAT_ID => {
+            let float = data.read_f32()?;
+            tapes.main.push(TapeElement {
+                kind: (TapeTagKind::Float, TapeTagValue { float }),
+            });
+        }
+        DOUBLE_ID => {
+            let double = data.read_f64()?;
+            tapes.main.push(TapeElement {
+                kind: (TapeTagKind::Double, TapeTagValue { double: () }),
+            });
+            tapes.main.push(TapeElement { double });
+        }
+        BYTE_ARRAY_ID => {
+            let byte_array_pointer = data.cur as u64;
+            read_with_u32_length(data, 1)?;
+            tapes.main.push(TapeElement {
+                kind: (
+                    TapeTagKind::ByteArray,
+                    TapeTagValue {
+                        byte_array: byte_array_pointer.into(),
+                    },
+                ),
+            });
+        }
+        STRING_ID => {
+            let string_pointer = data.cur as u64;
+
+            // assert that the top 8 bits of the pointer are 0 (because we rely on this)
+            debug_assert_eq!(string_pointer >> 56, 0);
+
+            read_string(data)?;
+
+            tapes.main.push(TapeElement {
+                kind: (
+                    TapeTagKind::String,
+                    TapeTagValue {
+                        string: string_pointer.into(),
+                    },
+                ),
+            });
+        }
+        INT_ARRAY_ID => {
+            let int_array_pointer = data.cur as u64;
+            read_int_array(data)?;
+            tapes.main.push(TapeElement {
+                kind: (
+                    TapeTagKind::IntArray,
+                    TapeTagValue {
+                        int_array: int_array_pointer.into(),
+                    },
+                ),
+            });
+        }
+        LONG_ARRAY_ID => {
+            let long_array_pointer = data.cur as u64;
+            read_long_array(data)?;
+            tapes.main.push(TapeElement {
+                kind: (
+                    TapeTagKind::LongArray,
+                    TapeTagValue {
+                        long_array: long_array_pointer.into(),
+                    },
+                ),
+            });
+        }
+        _ => return Err(Error::UnknownTagId(tag_type)),
+    };
+    Ok(())
+}
+
+#[inline(always)]
+pub(crate) fn read_tag_in_compound<'a>(
+    data: &mut Reader<'a>,
+    tapes: &mut Tapes<'a>,
+    stack: &mut ParsingStack,
+) -> Result<(), Error> {
+    let tag_type = data.read_u8()?;
+    if tag_type == END_ID {
+        handle_compound_end(tapes, stack);
+        return Ok(());
+    }
+
+    let tag_name_pointer = data.cur as u64;
+    debug_assert_eq!(tag_name_pointer >> 56, 0);
+    read_string(data)?;
+    tapes.main.push(TapeElement {
+        name: tag_name_pointer,
+    });
+
+    read_tag(data, tapes, stack, tag_type)
+}
+
+#[inline(always)]
+fn handle_compound_end(tapes: &mut Tapes, stack: &mut ParsingStack) {
+    let ParsingStackElement::Compound {
+        index_of_compound_element,
+    } = stack.pop()
+    else {
+        unsafe { unreachable_unchecked() };
+    };
+    let index_after_end_element = tapes.main.len();
+
+    unsafe {
+        tapes
+            .main
+            .get_unchecked_mut(index_of_compound_element as usize)
+            .kind
+            .1
+            .compound
+            .1 = (index_after_end_element as u32 - index_of_compound_element).into();
+    };
 }

@@ -8,24 +8,24 @@ mod tape;
 use std::{
     fmt::{self, Debug},
     io::Cursor,
-    ops::Deref,
 };
 
-use byteorder::{ReadBytesExt, BE};
+use byteorder::ReadBytesExt;
 
 use crate::{
     common::{
-        read_int_array, read_long_array, read_string, read_u32, read_with_u32_length, write_string,
-        BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
-        LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
+        read_string, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID,
+        FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
     },
-    raw_list::RawList,
+    reader::{Reader, ReaderFromCursor},
     Error, Mutf8Str,
 };
 
 pub use self::{compound::NbtCompound, list::NbtList};
 use self::{
+    compound::{read_tag_in_compound, ParsingStack, ParsingStackElement},
     extra_tapes::ExtraTapes,
+    list::{read_compound_in_list, read_list_in_list},
     tape::{MainTape, TapeElement, TapeTagKind, TapeTagValue, UnalignedU16},
 };
 
@@ -33,7 +33,35 @@ use self::{
 ///
 /// Returns `Ok(Nbt::None)` if there is no data.
 pub fn read<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
-    Nbt::read(data)
+    let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+    if root_type == END_ID {
+        return Ok(Nbt::None);
+    }
+    if root_type != COMPOUND_ID {
+        return Err(Error::InvalidRootType(root_type));
+    }
+    let mut data = ReaderFromCursor::new(data);
+    let name = read_string(&mut data)?;
+
+    let mut tapes = Tapes::new();
+    let mut stack = ParsingStack::new();
+
+    stack.push(ParsingStackElement::Compound {
+        index_of_compound_element: 0,
+    })?;
+    tapes.main.push(TapeElement {
+        kind: (
+            TapeTagKind::Compound,
+            TapeTagValue {
+                // this gets overwritten later
+                compound: (0.into(), 0.into()),
+            },
+        ),
+    });
+
+    read_with_stack(&mut data, &mut tapes, &mut stack)?;
+
+    Ok(Nbt::Some(BaseNbt { name, tapes }))
 }
 /// Read a root NBT compound, but without reading the name. This is used in Minecraft when reading
 /// NBT over the network.
@@ -41,19 +69,56 @@ pub fn read<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
 /// This is similar to [`read_tag`], but returns an [`Nbt`] instead (guaranteeing it'll be either
 /// empty or a compound).
 pub fn read_unnamed<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
-    Nbt::read_unnamed(data)
+    let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+    if root_type == END_ID {
+        return Ok(Nbt::None);
+    }
+    if root_type != COMPOUND_ID {
+        return Err(Error::InvalidRootType(root_type));
+    }
+    let name = Mutf8Str::from_slice(&[]);
+    let BaseNbtCompound { tapes } = read_compound(data)?;
+    Ok(Nbt::Some(BaseNbt { name, tapes }))
 }
 /// Read a compound tag. This may have any number of items.
 pub fn read_compound<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtCompound<'a>, Error> {
     let mut tapes = Tapes::new();
-    NbtCompound::read(data, &mut tapes)?;
+    let mut stack = ParsingStack::new();
+
+    let mut data = ReaderFromCursor::new(data);
+
+    stack.push(ParsingStackElement::Compound {
+        index_of_compound_element: 0,
+    })?;
+    tapes.main.push(TapeElement {
+        kind: (
+            TapeTagKind::Compound,
+            TapeTagValue {
+                // this gets overwritten later
+                compound: (0.into(), 0.into()),
+            },
+        ),
+    });
+
+    read_with_stack(&mut data, &mut tapes, &mut stack)?;
+
     Ok(BaseNbtCompound { tapes })
 }
 /// Read an NBT tag, without reading its name. This may be any type of tag except for an end tag. If you need to be able to
 /// handle end tags, use [`read_optional_tag`].
 pub fn read_tag<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtTag<'a>, Error> {
     let mut tapes = Tapes::new();
-    NbtTag::read(data, &mut tapes)?;
+    let mut stack = ParsingStack::new();
+
+    let mut data = ReaderFromCursor::new(data);
+
+    let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+    if tag_type == END_ID {
+        return Err(Error::InvalidRootType(0));
+    }
+    compound::read_tag(&mut data, &mut tapes, &mut stack, tag_type)?;
+    read_with_stack(&mut data, &mut tapes, &mut stack)?;
+
     Ok(BaseNbtTag { tapes })
 }
 /// Read any NBT tag, without reading its name. This may be any type of tag, including an end tag.
@@ -61,12 +126,36 @@ pub fn read_tag<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtTag<'a>, Error
 /// Returns `Ok(None)` if there is no data.
 pub fn read_optional_tag<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Option<BaseNbtTag<'a>>, Error> {
     let mut tapes = Tapes::new();
-    let tag = NbtTag::read_optional(data, &mut tapes)?;
-    Ok(if tag {
-        Some(BaseNbtTag { tapes })
-    } else {
-        None
-    })
+    let mut stack = ParsingStack::new();
+
+    let mut data = ReaderFromCursor::new(data);
+
+    let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+    if tag_type == END_ID {
+        return Ok(None);
+    }
+    compound::read_tag(&mut data, &mut tapes, &mut stack, tag_type)?;
+    read_with_stack(&mut data, &mut tapes, &mut stack)?;
+
+    Ok(Some(BaseNbtTag { tapes }))
+}
+
+fn read_with_stack<'a>(
+    data: &mut Reader<'a>,
+    tapes: &mut Tapes<'a>,
+    stack: &mut ParsingStack,
+) -> Result<(), Error> {
+    while !stack.is_empty() {
+        match stack.peek_mut() {
+            ParsingStackElement::Compound { .. } => read_tag_in_compound(data, tapes, stack)?,
+            ParsingStackElement::ListOfLists { .. } => read_list_in_list(data, tapes, stack)?,
+            ParsingStackElement::ListOfCompounds { .. } => {
+                read_compound_in_list(data, tapes, stack)?
+            }
+        }
+    }
+
+    Ok(())
 }
 
 #[derive(Default)]
@@ -91,12 +180,13 @@ pub struct BaseNbt<'a> {
     tapes: Tapes<'a>,
 }
 impl<'a> BaseNbt<'a> {
-    pub fn compound<'tape>(&'a self) -> NbtCompound<'a, 'tape>
+    #[inline]
+    pub fn as_compound<'tape>(&'a self) -> NbtCompound<'a, 'tape>
     where
         'a: 'tape,
     {
         NbtCompound {
-            element: self.tapes.main.elements.as_ptr(),
+            element: self.tapes.main.as_ptr(),
             extra_tapes: &self.tapes.extra,
         }
     }
@@ -105,7 +195,52 @@ impl<'a> BaseNbt<'a> {
     pub fn name(&self) -> &'a Mutf8Str {
         self.name
     }
+
+    pub fn get<'tape>(&'a self, key: &str) -> Option<NbtTag<'a, 'tape>> {
+        self.as_compound().get(key)
+    }
+    /// Returns whether there is a tag with the given name.
+    pub fn contains<'tape>(&'a self, key: &str) -> bool {
+        self.as_compound().contains(key)
+    }
+    pub fn byte(&self, name: &str) -> Option<i8> {
+        self.as_compound().byte(name)
+    }
+    pub fn short(&self, name: &str) -> Option<i16> {
+        self.as_compound().short(name)
+    }
+    pub fn int(&self, name: &str) -> Option<i32> {
+        self.as_compound().int(name)
+    }
+    pub fn long(&self, name: &str) -> Option<i64> {
+        self.as_compound().long(name)
+    }
+    pub fn float(&self, name: &str) -> Option<f32> {
+        self.as_compound().float(name)
+    }
+    pub fn double(&self, name: &str) -> Option<f64> {
+        self.as_compound().double(name)
+    }
+    pub fn byte_array(&'a self, name: &str) -> Option<&'a [u8]> {
+        self.as_compound().byte_array(name)
+    }
+    pub fn string(&'a self, name: &str) -> Option<&'a Mutf8Str> {
+        self.as_compound().string(name)
+    }
+    pub fn list<'tape>(&'a self, name: &str) -> Option<NbtList<'a, 'tape>> {
+        self.as_compound().list(name)
+    }
+    pub fn compound<'tape>(&'a self, name: &str) -> Option<NbtCompound<'a, 'tape>> {
+        self.as_compound().compound(name)
+    }
+    pub fn int_array(&self, name: &str) -> Option<Vec<i32>> {
+        self.as_compound().int_array(name)
+    }
+    pub fn long_array(&self, name: &str) -> Option<Vec<i64>> {
+        self.as_compound().long_array(name)
+    }
 }
+
 impl<'a> Debug for BaseNbt<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BaseNbt").finish()
@@ -128,7 +263,7 @@ impl<'a> BaseNbtTag<'a> {
         'a: 'tape,
     {
         NbtCompound {
-            element: self.tapes.main.elements.as_ptr(),
+            element: self.tapes.main.as_ptr(),
             extra_tapes: &self.tapes.extra,
         }
     }
@@ -143,50 +278,13 @@ pub enum Nbt<'a> {
 }
 
 impl<'a> Nbt<'a> {
-    /// Reads NBT from the given data. Returns `Ok(Nbt::None)` if there is no data.
-    fn read(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
-        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-        if root_type == END_ID {
-            return Ok(Nbt::None);
-        }
-        if root_type != COMPOUND_ID {
-            return Err(Error::InvalidRootType(root_type));
-        }
-
-        let mut tapes = Tapes::new();
-
-        let name = read_string(data)?;
-        NbtCompound::read(data, &mut tapes)?;
-
-        Ok(Nbt::Some(BaseNbt { name, tapes }))
-    }
-
-    fn read_unnamed(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
-        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-        if root_type == END_ID {
-            return Ok(Nbt::None);
-        }
-        if root_type != COMPOUND_ID {
-            return Err(Error::InvalidRootType(root_type));
-        }
-        let mut tapes = Tapes::new();
-
-        NbtCompound::read(data, &mut tapes)?;
-
-        Ok(Nbt::Some(BaseNbt {
-            name: Mutf8Str::from_slice(&[]),
-            tapes,
-        }))
-    }
-
     pub fn write(&self, data: &mut Vec<u8>) {
-        todo!();
-        // match self {
-        //     Nbt::Some(nbt) => nbt.write(data),
-        //     Nbt::None => {
-        //         data.push(END_ID);
-        //     }
-        // }
+        match self {
+            Nbt::Some(nbt) => nbt.write(data),
+            Nbt::None => {
+                data.push(END_ID);
+            }
+        }
     }
 
     pub fn unwrap(self) -> BaseNbt<'a> {
@@ -210,19 +308,18 @@ impl<'a> Nbt<'a> {
 
 impl PartialEq for BaseNbt<'_> {
     fn eq(&self, other: &Self) -> bool {
-        todo!();
         // we don't need to compare the tapes since comparing `tag` will
         // still compare the values of the tags
-        // self.name == other.name && self.tag == other.tag
+        self.name == other.name && self.as_compound() == other.as_compound()
     }
 }
 
 impl<'a> BaseNbt<'a> {
     pub fn write(&self, data: &mut Vec<u8>) {
-        // data.push(COMPOUND_ID);
-        // write_string(data, self.name);
-        // self.tag.write(data);
-        // data.push(END_ID);
+        data.push(COMPOUND_ID);
+        write_string(data, self.name);
+        self.as_compound().write(data);
+        data.push(END_ID);
     }
 }
 
@@ -253,142 +350,7 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         }
     }
 
-    #[inline(always)]
-    fn read_with_type(
-        data: &mut Cursor<&'a [u8]>,
-        tapes: &'tape mut Tapes<'a>,
-        tag_type: u8,
-        depth: usize,
-    ) -> Result<(), Error> {
-        match tag_type {
-            BYTE_ID => {
-                let byte = data.read_i8().map_err(|_| Error::UnexpectedEof)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (TapeTagKind::Byte, TapeTagValue { byte }),
-                });
-                Ok(())
-            }
-            SHORT_ID => {
-                let short = data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (TapeTagKind::Short, TapeTagValue { short }),
-                });
-                Ok(())
-            }
-            INT_ID => {
-                let int = data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (TapeTagKind::Int, TapeTagValue { int }),
-                });
-                Ok(())
-            }
-            LONG_ID => {
-                let long = data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (TapeTagKind::Long, TapeTagValue { long: () }),
-                });
-                tapes.main.elements.push(TapeElement { long });
-                Ok(())
-            }
-            FLOAT_ID => {
-                let float = data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (TapeTagKind::Float, TapeTagValue { float }),
-                });
-                Ok(())
-            }
-            DOUBLE_ID => {
-                let double = data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (TapeTagKind::Double, TapeTagValue { double: () }),
-                });
-                tapes.main.elements.push(TapeElement { double });
-                Ok(())
-            }
-            BYTE_ARRAY_ID => {
-                let byte_array_pointer = data.get_ref().as_ptr() as u64 + data.position();
-                read_with_u32_length(data, 1)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (
-                        TapeTagKind::ByteArray,
-                        TapeTagValue {
-                            byte_array: byte_array_pointer.into(),
-                        },
-                    ),
-                });
-                Ok(())
-            }
-            STRING_ID => {
-                let string_pointer = data.get_ref().as_ptr() as u64 + data.position();
-
-                // assert that the top 8 bits of the pointer are 0 (because we rely on this)
-                debug_assert_eq!(string_pointer >> 56, 0);
-
-                read_string(data)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (
-                        TapeTagKind::String,
-                        TapeTagValue {
-                            string: string_pointer.into(),
-                        },
-                    ),
-                });
-                Ok(())
-            }
-            LIST_ID => NbtList::read(data, tapes, depth + 1),
-            COMPOUND_ID => NbtCompound::read_with_depth(data, tapes, depth + 1),
-            INT_ARRAY_ID => {
-                let int_array_pointer = data.get_ref().as_ptr() as u64 + data.position();
-                // let int_array = read_int_array(data)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (
-                        TapeTagKind::IntArray,
-                        TapeTagValue {
-                            int_array: int_array_pointer.into(),
-                        },
-                    ),
-                });
-                Ok(())
-            }
-            LONG_ARRAY_ID => {
-                let long_array_pointer = data.get_ref().as_ptr() as u64 + data.position();
-                read_long_array(data)?;
-                tapes.main.elements.push(TapeElement {
-                    kind: (
-                        TapeTagKind::LongArray,
-                        TapeTagValue {
-                            long_array: long_array_pointer.into(),
-                        },
-                    ),
-                });
-                Ok(())
-            }
-            _ => Err(Error::UnknownTagId(tag_type)),
-        }
-    }
-
-    fn read(data: &mut Cursor<&'a [u8]>, tapes: &'tape mut Tapes<'a>) -> Result<(), Error> {
-        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-        Self::read_with_type(data, tapes, tag_type, 0)
-    }
-
-    fn read_optional(
-        data: &mut Cursor<&'a [u8]>,
-        tapes: &'tape mut Tapes<'a>,
-    ) -> Result<bool, Error> {
-        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-        if tag_type == END_ID {
-            return Ok(false);
-        }
-        Self::read_with_type(data, tapes, tag_type, 0)?;
-        Ok(true)
-    }
-
     pub fn byte(&self) -> Option<i8> {
-        // match self {
-        //     NbtTag::Byte(byte) => Some(*byte),
-        //     _ => None,
-        // }
         let (kind, value) = self.element();
         if kind != TapeTagKind::Byte {
             return None;
@@ -396,10 +358,6 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         Some(unsafe { value.byte })
     }
     pub fn short(&self) -> Option<i16> {
-        // match self {
-        //     NbtTag::Short(short) => Some(*short),
-        //     _ => None,
-        // }
         let (kind, value) = self.element();
         if kind != TapeTagKind::Short {
             return None;
@@ -407,10 +365,6 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         Some(unsafe { value.short })
     }
     pub fn int(&self) -> Option<i32> {
-        // match self {
-        //     NbtTag::Int(int) => Some(*int),
-        //     _ => None,
-        // }
         let (kind, value) = unsafe { (*self.element).kind };
         if kind != TapeTagKind::Int {
             return None;
@@ -418,10 +372,6 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         Some(unsafe { value.int })
     }
     pub fn long(&self) -> Option<i64> {
-        // match self {
-        //     NbtTag::Long(long) => Some(*long),
-        //     _ => None,
-        // }
         let (kind, _) = self.element();
         if kind != TapeTagKind::Long {
             return None;
@@ -431,10 +381,6 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         Some(unsafe { (*value).long })
     }
     pub fn float(&self) -> Option<f32> {
-        // match self {
-        //     NbtTag::Float(float) => Some(*float),
-        //     _ => None,
-        // }
         let (kind, value) = self.element();
         if kind != TapeTagKind::Float {
             return None;
@@ -442,10 +388,6 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         Some(unsafe { value.float })
     }
     pub fn double(&self) -> Option<f64> {
-        // match self {
-        //     NbtTag::Double(double) => Some(*double),
-        //     _ => None,
-        // }
         let (kind, _) = self.element();
         if kind != TapeTagKind::Double {
             return None;
@@ -455,10 +397,6 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         Some(unsafe { (*value).double })
     }
     pub fn byte_array(&self) -> Option<&'a [u8]> {
-        // match self {
-        //     NbtTag::ByteArray(byte_array) => Some(byte_array),
-        //     _ => None,
-        // }
         let (kind, value) = self.element();
         if kind != TapeTagKind::ByteArray {
             return None;
@@ -469,10 +407,6 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         Some(unsafe { std::slice::from_raw_parts(data_ptr, length) })
     }
     pub fn string(&self) -> Option<&'a Mutf8Str> {
-        // match self {
-        //     NbtTag::String(string) => Some(string),
-        //     _ => None,
-        // }
         let (kind, value) = self.element();
         if kind != TapeTagKind::String {
             return None;
@@ -483,10 +417,6 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         Some(unsafe { Mutf8Str::from_slice(std::slice::from_raw_parts(data_ptr, length)) })
     }
     pub fn list(&self) -> Option<NbtList<'a, 'tape>> {
-        // match self {
-        //     NbtTag::List(list) => Some(list),
-        //     _ => None,
-        // }
         let (kind, _) = self.element();
         if !kind.is_list() {
             return None;
@@ -498,10 +428,6 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         })
     }
     pub fn compound(&self) -> Option<NbtCompound<'a, 'tape>> {
-        // match self {
-        //     NbtTag::Compound(compound) => Some(compound),
-        //     _ => None,
-        // }
         let (kind, _) = self.element();
         if kind != TapeTagKind::Compound {
             return None;
@@ -525,21 +451,52 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
     }
 
     pub fn to_owned(&self) -> crate::owned::NbtTag {
-        todo!()
-        // match self {
-        //     NbtTag::Byte(byte) => crate::owned::NbtTag::Byte(*byte),
-        //     NbtTag::Short(short) => crate::owned::NbtTag::Short(*short),
-        //     NbtTag::Int(int) => crate::owned::NbtTag::Int(*int),
-        //     NbtTag::Long(long) => crate::owned::NbtTag::Long(*long),
-        //     NbtTag::Float(float) => crate::owned::NbtTag::Float(*float),
-        //     NbtTag::Double(double) => crate::owned::NbtTag::Double(*double),
-        //     NbtTag::ByteArray(byte_array) => crate::owned::NbtTag::ByteArray(byte_array.to_vec()),
-        //     NbtTag::String(string) => crate::owned::NbtTag::String((*string).to_owned()),
-        //     NbtTag::List(list) => crate::owned::NbtTag::List(list.to_owned()),
-        //     NbtTag::Compound(compound) => crate::owned::NbtTag::Compound(compound.to_owned()),
-        //     NbtTag::IntArray(int_array) => crate::owned::NbtTag::IntArray(int_array.to_vec()),
-        //     NbtTag::LongArray(long_array) => crate::owned::NbtTag::LongArray(long_array.to_vec()),
-        // }
+        let (kind, _value) = self.element();
+
+        match kind {
+            TapeTagKind::Byte => crate::owned::NbtTag::Byte(self.byte().unwrap()),
+            TapeTagKind::Short => crate::owned::NbtTag::Short(self.short().unwrap()),
+            TapeTagKind::Int => crate::owned::NbtTag::Int(self.int().unwrap()),
+            TapeTagKind::Long => crate::owned::NbtTag::Long(self.long().unwrap()),
+            TapeTagKind::Float => crate::owned::NbtTag::Float(self.float().unwrap()),
+            TapeTagKind::Double => crate::owned::NbtTag::Double(self.double().unwrap()),
+            TapeTagKind::ByteArray => {
+                crate::owned::NbtTag::ByteArray(self.byte_array().unwrap().to_vec())
+            }
+            TapeTagKind::String => crate::owned::NbtTag::String(self.string().unwrap().to_owned()),
+            TapeTagKind::Compound => {
+                crate::owned::NbtTag::Compound(self.compound().unwrap().to_owned())
+            }
+            _ if kind.is_list() => crate::owned::NbtTag::List(self.list().unwrap().to_owned()),
+            TapeTagKind::IntArray => crate::owned::NbtTag::IntArray(self.int_array().unwrap()),
+            TapeTagKind::LongArray => crate::owned::NbtTag::LongArray(self.long_array().unwrap()),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl PartialEq for NbtTag<'_, '_> {
+    fn eq(&self, other: &Self) -> bool {
+        let (self_kind, _) = self.element();
+        let (other_kind, _) = other.element();
+        if self_kind != other_kind {
+            return false;
+        }
+        match self_kind {
+            TapeTagKind::Byte => self.byte().unwrap() == other.byte().unwrap(),
+            TapeTagKind::Short => self.short().unwrap() == other.short().unwrap(),
+            TapeTagKind::Int => self.int().unwrap() == other.int().unwrap(),
+            TapeTagKind::Long => self.long().unwrap() == other.long().unwrap(),
+            TapeTagKind::Float => self.float().unwrap() == other.float().unwrap(),
+            TapeTagKind::Double => self.double().unwrap() == other.double().unwrap(),
+            TapeTagKind::ByteArray => self.byte_array().unwrap() == other.byte_array().unwrap(),
+            TapeTagKind::String => self.string().unwrap() == other.string().unwrap(),
+            TapeTagKind::Compound => self.compound().unwrap() == other.compound().unwrap(),
+            TapeTagKind::IntArray => self.int_array().unwrap() == other.int_array().unwrap(),
+            TapeTagKind::LongArray => self.long_array().unwrap() == other.long_array().unwrap(),
+            t if t.is_list() => self.list().unwrap() == other.list().unwrap(),
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -547,21 +504,21 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
 mod tests {
     use std::io::Read;
 
-    use byteorder::WriteBytesExt;
+    use byteorder::{WriteBytesExt, BE};
     use flate2::read::GzDecoder;
 
     use super::*;
 
     #[test]
     fn hello_world() {
-        let nbt = Nbt::read(&mut Cursor::new(include_bytes!(
+        let nbt = super::read(&mut Cursor::new(include_bytes!(
             "../../tests/hello_world.nbt"
         )))
         .unwrap()
         .unwrap();
 
         assert_eq!(
-            nbt.compound().string("name"),
+            nbt.string("name"),
             Some(Mutf8Str::from_str("Bananrama").as_ref())
         );
         assert_eq!(nbt.name().to_str(), "hello world");
@@ -574,18 +531,12 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = Nbt::read(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
 
-        assert_eq!(nbt.compound().int("PersistentId"), Some(1946940766));
-        assert_eq!(
-            nbt.compound()
-                .list("Rotation")
-                .unwrap()
-                .floats()
-                .unwrap()
-                .len(),
-            2
-        );
+        assert_eq!(nbt.int("PersistentId"), Some(1946940766));
+        assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
     }
 
     #[test]
@@ -595,67 +546,49 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = Nbt::read(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
 
-        assert_eq!(
-            nbt.compound().float("foodExhaustionLevel").unwrap() as u32,
-            2
-        );
-        assert_eq!(
-            nbt.compound()
-                .list("Rotation")
-                .unwrap()
-                .floats()
-                .unwrap()
-                .len(),
-            2
-        );
+        assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
+        assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
     }
 
     #[test]
     fn read_hypixel() {
         let src = include_bytes!("../../tests/hypixel.nbt").to_vec();
-        let _nbt = Nbt::read(&mut Cursor::new(&src[..])).unwrap().unwrap();
+        let _nbt = super::read(&mut Cursor::new(&src[..])).unwrap().unwrap();
     }
 
     #[test]
     fn read_write_complex_player() {
-        return;
         let src = include_bytes!("../../tests/complex_player.dat").to_vec();
         let mut src_slice = src.as_slice();
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = Nbt::read(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
 
         let mut out = Vec::new();
         nbt.write(&mut out);
-        let nbt = Nbt::read(&mut Cursor::new(&out)).unwrap().unwrap();
 
-        assert_eq!(
-            nbt.compound().float("foodExhaustionLevel").unwrap() as u32,
-            2
-        );
-        assert_eq!(
-            nbt.compound()
-                .list("Rotation")
-                .unwrap()
-                .floats()
-                .unwrap()
-                .len(),
-            2
-        );
+        let nbt = super::read(&mut Cursor::new(&out)).unwrap().unwrap();
+
+        assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
+        assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
     }
 
     #[test]
     fn inttest_1023() {
-        let nbt = Nbt::read(&mut Cursor::new(include_bytes!(
+        let nbt = super::read(&mut Cursor::new(include_bytes!(
             "../../tests/inttest1023.nbt"
         )))
         .unwrap()
         .unwrap();
 
-        let ints = nbt.compound().list("").unwrap().ints().unwrap();
+        let ints = nbt.list("").unwrap().ints().unwrap();
 
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
@@ -677,8 +610,8 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = Nbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
-        let ints = nbt.compound().list("").unwrap().ints().unwrap();
+        let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        let ints = nbt.list("").unwrap().ints().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
         }
@@ -699,8 +632,8 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = Nbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
-        let ints = nbt.compound().list("").unwrap().ints().unwrap();
+        let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        let ints = nbt.list("").unwrap().ints().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
         }
@@ -721,8 +654,8 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = Nbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
-        let ints = nbt.compound().list("").unwrap().longs().unwrap();
+        let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        let ints = nbt.list("").unwrap().longs().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i64, item);
         }
@@ -738,7 +671,7 @@ mod tests {
         data.write_u16::<BE>(0).unwrap(); // first element name length
                                           // eof
 
-        let res = Nbt::read(&mut Cursor::new(&data));
+        let res = super::read(&mut Cursor::new(&data));
         assert_eq!(res, Err(Error::UnexpectedEof));
     }
 

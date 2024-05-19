@@ -1,7 +1,3 @@
-use std::io::Cursor;
-
-use byteorder::ReadBytesExt;
-
 use crate::{
     common::{
         read_i8_array, read_int_array, read_long_array, read_string, read_u8_array,
@@ -11,11 +7,12 @@ use crate::{
         LONG_ID, SHORT_ID, STRING_ID,
     },
     mutf8::Mutf8String,
+    reader::Reader,
     swap_endianness::swap_endianness,
     Error,
 };
 
-use super::{compound::NbtCompound, read_u32, MAX_DEPTH};
+use super::{compound::NbtCompound, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[repr(u8)]
@@ -37,14 +34,14 @@ pub enum NbtList {
     LongArray(Vec<Vec<i64>>) = LONG_ARRAY_ID,
 }
 impl NbtList {
-    pub(crate) fn read(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
+    pub(crate) fn read(data: &mut Reader<'_>, depth: usize) -> Result<Self, Error> {
         if depth > MAX_DEPTH {
             return Err(Error::MaxDepthExceeded);
         }
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         Ok(match tag_type {
             END_ID => {
-                data.set_position(data.position() + 4);
+                data.skip(4)?;
                 NbtList::Empty
             }
             BYTE_ID => NbtList::Byte(read_i8_array(data)?.to_owned()),
@@ -54,7 +51,7 @@ impl NbtList {
             FLOAT_ID => NbtList::Float(swap_endianness(read_with_u32_length(data, 4)?)),
             DOUBLE_ID => NbtList::Double(swap_endianness(read_with_u32_length(data, 8)?)),
             BYTE_ARRAY_ID => NbtList::ByteArray({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut arrays = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -63,7 +60,7 @@ impl NbtList {
                 arrays
             }),
             STRING_ID => NbtList::String({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut strings = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -72,7 +69,7 @@ impl NbtList {
                 strings
             }),
             LIST_ID => NbtList::List({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut lists = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -81,7 +78,7 @@ impl NbtList {
                 lists
             }),
             COMPOUND_ID => NbtList::Compound({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut compounds = Vec::with_capacity(length.min(128) as usize);
                 let mut capacity: usize = 8;
@@ -93,7 +90,7 @@ impl NbtList {
                 compounds
             }),
             INT_ARRAY_ID => NbtList::IntArray({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut arrays = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
@@ -102,7 +99,7 @@ impl NbtList {
                 arrays
             }),
             LONG_ARRAY_ID => NbtList::LongArray({
-                let length = read_u32(data)?;
+                let length = data.read_u32()?;
                 // arbitrary number to prevent big allocations
                 let mut arrays = Vec::with_capacity(length.min(128) as usize);
                 for _ in 0..length {
