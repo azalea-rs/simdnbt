@@ -200,7 +200,7 @@ impl<'a> BaseNbt<'a> {
         self.as_compound().get(key)
     }
     /// Returns whether there is a tag with the given name.
-    pub fn contains<'tape>(&'a self, key: &str) -> bool {
+    pub fn contains(&'a self, key: &str) -> bool {
         self.as_compound().contains(key)
     }
     pub fn byte(&self, name: &str) -> Option<i8> {
@@ -377,7 +377,7 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
             return None;
         }
         // the value is in the next element because longs are too big to fit in a single element
-        let value = unsafe { (self.element as *const TapeElement).add(1) };
+        let value = unsafe { self.element.add(1) };
         Some(unsafe { (*value).long })
     }
     pub fn float(&self) -> Option<f32> {
@@ -393,7 +393,7 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
             return None;
         }
         // the value is in the next element because doubles are too big to fit in a single element
-        let value = unsafe { (self.element as *const TapeElement).add(1) };
+        let value = unsafe { self.element.add(1) };
         Some(unsafe { (*value).double })
     }
     pub fn byte_array(&self) -> Option<&'a [u8]> {

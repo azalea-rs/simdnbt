@@ -33,7 +33,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         stack: &mut ParsingStack,
     ) -> Result<(), Error> {
         let tag_type = data.read_u8()?;
-        Ok(match tag_type {
+        match tag_type {
             END_ID => {
                 // the length is unused for this type of lists
                 data.skip(4)?;
@@ -222,7 +222,8 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                 }
             }
             _ => return Err(Error::UnknownTagId(tag_type)),
-        })
+        };
+        Ok(())
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
@@ -424,9 +425,8 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         let length = u32::from(unsafe { value.list_list.0 }) as usize;
 
         let max_tape_offset = u32::from(unsafe { value.list_list.1 }) as usize;
-        let tape_slice = unsafe {
-            std::slice::from_raw_parts((self.element as *const TapeElement).add(1), max_tape_offset)
-        };
+        let tape_slice =
+            unsafe { std::slice::from_raw_parts(self.element.add(1), max_tape_offset) };
 
         Some(ListList {
             iter: ListListIter {
@@ -448,9 +448,8 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         let length = u32::from(unsafe { value.compound_list.0 }) as usize;
 
         let max_tape_offset = u32::from(unsafe { value.compound_list.1 }) as usize;
-        let tape_slice = unsafe {
-            std::slice::from_raw_parts((self.element as *const TapeElement).add(1), max_tape_offset)
-        };
+        let tape_slice =
+            unsafe { std::slice::from_raw_parts(self.element.add(1), max_tape_offset) };
 
         Some(CompoundList {
             iter: CompoundListIter {
@@ -667,7 +666,7 @@ impl<'a: 'tape, 'tape> Iterator for ListListIter<'a, 'tape> {
         if self.current_tape_offset + 1 >= self.max_tape_offset {
             return None;
         }
-        let element = &self.tape[self.current_tape_offset as usize];
+        let element = &self.tape[self.current_tape_offset];
         let (kind, value) = unsafe { element.kind };
         debug_assert!(kind.is_list());
 
@@ -679,7 +678,7 @@ impl<'a: 'tape, 'tape> Iterator for ListListIter<'a, 'tape> {
         };
 
         self.current_tape_offset += offset;
-        return Some(nbt_list);
+        Some(nbt_list)
     }
 }
 impl Default for ListListIter<'_, '_> {
@@ -770,7 +769,7 @@ impl<'a: 'tape, 'tape> Iterator for CompoundListIter<'a, 'tape> {
             return None;
         }
 
-        let element = &self.tape[self.current_tape_offset as usize];
+        let element = &self.tape[self.current_tape_offset];
         let (kind, value) = unsafe { element.kind };
         debug_assert_eq!(kind, TapeTagKind::Compound);
 
@@ -782,7 +781,7 @@ impl<'a: 'tape, 'tape> Iterator for CompoundListIter<'a, 'tape> {
         };
 
         self.current_tape_offset += offset;
-        return Some(compound);
+        Some(compound)
     }
 }
 impl Default for CompoundListIter<'_, '_> {
