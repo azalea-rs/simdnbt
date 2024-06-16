@@ -613,6 +613,12 @@ impl<'a, 'tape> ListList<'a, 'tape> {
     pub fn get(&self, index: usize) -> Option<NbtList<'a, 'tape>> {
         self.iter.clone().nth(index)
     }
+    pub fn first(&self) -> Option<NbtList<'a, 'tape>> {
+        self.iter.clone().next()
+    }
+    pub fn last(&self) -> Option<NbtList<'a, 'tape>> {
+        self.iter.clone().last()
+    }
 }
 impl<'a: 'tape, 'tape> IntoIterator for ListList<'a, 'tape> {
     type Item = NbtList<'a, 'tape>;
@@ -714,6 +720,12 @@ impl<'a, 'tape> CompoundList<'a, 'tape> {
     /// this more than once you should probably just use the iterator.
     pub fn get(&self, index: usize) -> Option<NbtCompound<'a, 'tape>> {
         self.iter.clone().nth(index)
+    }
+    pub fn first(&self) -> Option<NbtCompound<'a, 'tape>> {
+        self.iter.clone().next()
+    }
+    pub fn last(&self) -> Option<NbtCompound<'a, 'tape>> {
+        self.iter.clone().last()
     }
 }
 impl<'a: 'tape, 'tape> IntoIterator for CompoundList<'a, 'tape> {

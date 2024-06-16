@@ -125,7 +125,7 @@ fn simdnbt_items_from_nbt(nbt: simdnbt::borrow::BaseNbt) -> Option<Vec<Option<It
                 .and_then(|skull_owner| skull_owner.compound("Properties"))
                 .and_then(|properties| properties.list("textures"))
                 .and_then(|textures| textures.compounds())
-                .and_then(|textures| textures.get(0))
+                .and_then(|textures| textures.first())
                 .and_then(|texture| texture.string("Value"))
                 // the real program does some base64+json decoding here but that's unnecessary for the benchmark
                 .map(|value| value.to_string()),
