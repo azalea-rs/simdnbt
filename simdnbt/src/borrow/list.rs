@@ -666,8 +666,8 @@ impl<'a: 'tape, 'tape> Iterator for ListListIter<'a, 'tape> {
         if self.current_tape_offset + 1 >= self.max_tape_offset {
             return None;
         }
-        let element = &self.tape[self.current_tape_offset];
-        let (kind, value) = unsafe { element.kind };
+        let element = unsafe { self.tape.as_ptr().add(self.current_tape_offset) };
+        let (kind, value) = unsafe { (*element).kind };
         debug_assert!(kind.is_list());
 
         let offset = u32::from(unsafe { value.list_list.1 }) as usize;
@@ -769,8 +769,8 @@ impl<'a: 'tape, 'tape> Iterator for CompoundListIter<'a, 'tape> {
             return None;
         }
 
-        let element = &self.tape[self.current_tape_offset];
-        let (kind, value) = unsafe { element.kind };
+        let element = unsafe { self.tape.as_ptr().add(self.current_tape_offset) };
+        let (kind, value) = unsafe { (*element).kind };
         debug_assert_eq!(kind, TapeTagKind::Compound);
 
         let offset = u32::from(unsafe { value.compound_list.1 }) as usize;

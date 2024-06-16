@@ -62,70 +62,41 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
 
             let (kind, _) = tag.element();
             match kind {
-                //         NbtTag::Byte(byte) => unsafe {
-                //             unchecked_push(data, *byte as u8);
-                //         },
                 TapeTagKind::Byte => unsafe {
                     unchecked_push(data, tag.byte().unwrap() as u8);
-                }, //         NbtTag::Short(short) => unsafe {
-                //             unchecked_extend(data, &short.to_be_bytes());
-                //         },
+                },
                 TapeTagKind::Short => unsafe {
                     unchecked_extend(data, &tag.short().unwrap().to_be_bytes());
-                }, //         NbtTag::Int(int) => unsafe {
-                //             unchecked_extend(data, &int.to_be_bytes());
-                //         },
+                },
                 TapeTagKind::Int => unsafe {
                     unchecked_extend(data, &tag.int().unwrap().to_be_bytes());
-                }, //         NbtTag::Long(long) => {
-                //             data.extend_from_slice(&long.to_be_bytes());
-                //         }
+                },
                 TapeTagKind::Long => {
                     data.extend_from_slice(&tag.long().unwrap().to_be_bytes());
-                } //         NbtTag::Float(float) => unsafe {
-                //             unchecked_extend(data, &float.to_be_bytes());
-                //         },
+                }
                 TapeTagKind::Float => unsafe {
                     unchecked_extend(data, &tag.float().unwrap().to_be_bytes());
-                }, //         NbtTag::Double(double) => {
-                //             data.extend_from_slice(&double.to_be_bytes());
-                //         }
+                },
                 TapeTagKind::Double => {
                     data.extend_from_slice(&tag.double().unwrap().to_be_bytes());
-                } //         NbtTag::ByteArray(byte_array) => {
-                //             unsafe {
-                //                 unchecked_extend(data, &byte_array.len().to_be_bytes());
-                //             }
-                //             data.extend_from_slice(byte_array);
-                //         }
+                }
                 TapeTagKind::ByteArray => {
                     let byte_array = tag.byte_array().unwrap();
                     unsafe {
                         unchecked_extend(data, &byte_array.len().to_be_bytes());
                     }
                     data.extend_from_slice(byte_array);
-                } //         NbtTag::String(string) => {
-                //             write_string(data, string);
-                //         }
+                }
                 TapeTagKind::String => {
                     let string = tag.string().unwrap();
                     write_string(data, string);
-                } //         NbtTag::List(list) => {
-                //             list.write(data);
-                //         }
+                }
                 _ if kind.is_list() => {
                     tag.list().unwrap().write(data);
-                } //         NbtTag::Compound(compound) => {
-                //             compound.write(data);
-                //         }
+                }
                 TapeTagKind::Compound => {
                     tag.compound().unwrap().write(data);
-                } //         NbtTag::IntArray(int_array) => {
-                //             unsafe {
-                //                 unchecked_extend(data, &int_array.len().to_be_bytes());
-                //             }
-                //             data.extend_from_slice(int_array.as_big_endian());
-                //         }
+                }
                 TapeTagKind::IntArray => {
                     let int_array = list::u32_prefixed_list_to_rawlist::<i32>(
                         TapeTagKind::IntArray,
@@ -136,12 +107,7 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
                         unchecked_extend(data, &int_array.len().to_be_bytes());
                     }
                     data.extend_from_slice(int_array.as_big_endian());
-                } //         NbtTag::LongArray(long_array) => {
-                //             unsafe {
-                //                 unchecked_extend(data, &long_array.len().to_be_bytes());
-                //             }
-                //             data.extend_from_slice(long_array.as_big_endian());
-                //         }
+                }
                 TapeTagKind::LongArray => {
                     let long_array = list::u32_prefixed_list_to_rawlist::<i64>(
                         TapeTagKind::LongArray,

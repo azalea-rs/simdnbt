@@ -83,7 +83,9 @@ impl TapeElement {
 }
 impl Debug for TapeElement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "TapeElement")
+        // just writes the u64
+        write!(f, "TapeElement({:#016x})", unsafe { self.name })?;
+        Ok(())
     }
 }
 
