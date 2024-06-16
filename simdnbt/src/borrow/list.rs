@@ -1,4 +1,4 @@
-use std::hint::unreachable_unchecked;
+use std::{hint::unreachable_unchecked, marker::PhantomData};
 
 use crate::{
     common::{
@@ -21,7 +21,7 @@ use super::{
 };
 
 /// A list of NBT tags of a single type.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct NbtList<'a: 'tape, 'tape> {
     pub(crate) element: *const TapeElement, // the initial list element
     pub(crate) extra_tapes: &'tape ExtraTapes<'a>,
@@ -423,18 +423,16 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         }
 
         let length = u32::from(unsafe { value.list_list.0 }) as usize;
-
         let max_tape_offset = u32::from(unsafe { value.list_list.1 }) as usize;
-        let tape_slice =
-            unsafe { std::slice::from_raw_parts(self.element.add(1), max_tape_offset) };
 
         Some(ListList {
             iter: ListListIter {
                 current_tape_offset: 0, // it's an iterator, it starts at 0
                 max_tape_offset,
                 length,
-                tape: tape_slice, // the first element is the listlist element so we don't include it
+                tape: unsafe { self.element.add(1) }, // the first element is the listlist element so we don't include it
                 extra_tapes: self.extra_tapes,
+                _phantom: PhantomData,
             },
         })
     }
@@ -644,8 +642,9 @@ pub struct ListListIter<'a, 'tape> {
     current_tape_offset: usize,
     max_tape_offset: usize,
     length: usize,
-    tape: &'tape [TapeElement],
+    tape: *const TapeElement,
     extra_tapes: *const ExtraTapes<'a>,
+    _phantom: PhantomData<&'tape ()>,
 }
 impl<'a: 'tape, 'tape> ListListIter<'a, 'tape> {
     /// Returns the number of tags directly in this list.
@@ -672,11 +671,17 @@ impl<'a: 'tape, 'tape> Iterator for ListListIter<'a, 'tape> {
         if self.current_tape_offset + 1 >= self.max_tape_offset {
             return None;
         }
-        let element = unsafe { self.tape.as_ptr().add(self.current_tape_offset) };
+
+        let element = unsafe { self.tape.add(self.current_tape_offset) };
+        // println!("{:?}", unsafe { *element });
         let (kind, value) = unsafe { (*element).kind };
         debug_assert!(kind.is_list());
 
-        let offset = u32::from(unsafe { value.list_list.1 }) as usize;
+        let offset = if matches!(kind, TapeTagKind::CompoundList | TapeTagKind::ListList) {
+            u32::from(unsafe { value.list_list.1 }) as usize
+        } else {
+            1
+        };
 
         let nbt_list = NbtList {
             element,
@@ -693,9 +698,10 @@ impl Default for ListListIter<'_, '_> {
             current_tape_offset: 0,
             max_tape_offset: 0,
             length: 0,
-            tape: &[],
+            tape: std::ptr::null(),
             // this won't ever get dereferenced because .next() will return immediately
             extra_tapes: std::ptr::null(),
+            _phantom: PhantomData,
         }
     }
 }
@@ -785,7 +791,7 @@ impl<'a: 'tape, 'tape> Iterator for CompoundListIter<'a, 'tape> {
         let (kind, value) = unsafe { (*element).kind };
         debug_assert_eq!(kind, TapeTagKind::Compound);
 
-        let offset = u32::from(unsafe { value.compound_list.1 }) as usize;
+        let offset = u32::from(unsafe { value.list_list.1 }) as usize;
 
         let compound = NbtCompound {
             element,

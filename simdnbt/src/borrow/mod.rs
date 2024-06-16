@@ -11,6 +11,7 @@ use std::{
 };
 
 use byteorder::ReadBytesExt;
+use tape::UnalignedU32;
 
 use crate::{
     common::{
@@ -401,8 +402,8 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         if kind != TapeTagKind::ByteArray {
             return None;
         }
-        let length_ptr = unsafe { u64::from(value.byte_array) as *const u32 };
-        let length = unsafe { *length_ptr as usize };
+        let length_ptr = unsafe { u64::from(value.byte_array) as *const UnalignedU32 };
+        let length = unsafe { u32::from(*length_ptr).swap_bytes() as usize };
         let data_ptr = unsafe { length_ptr.add(1) as *const u8 };
         Some(unsafe { std::slice::from_raw_parts(data_ptr, length) })
     }
@@ -693,5 +694,28 @@ mod tests {
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn get_byte_array() {
+        // found from fuzzing
+        let data = [10, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0];
+        let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        nbt.as_compound().to_owned();
+    }
+    #[test]
+    fn list_of_empty_lists() {
+        // found from fuzzing
+        // BaseNbt { name: m"", tag: NbtTag::NbtCompound { m"": NbtTag::List(List::List([List::Empty])) } }
+        let data = [10, 0, 0, 9, 0, 0, 9, 0, 0, 0, 1, 0, 9, 0, 0, 0, 0];
+        let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        nbt.as_compound().to_owned();
+    }
+    #[test]
+    fn list_of_byte_arrays() {
+        // BaseNbt { name: m"", tag: NbtCompound { values: [(m"", List(List([List::ByteArray([])])))] } }
+        let data = [10, 0, 0, 9, 0, 0, 9, 0, 0, 0, 1, 7, 0, 0, 0, 0, 0];
+        let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        nbt.as_compound().to_owned();
     }
 }

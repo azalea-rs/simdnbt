@@ -5,6 +5,7 @@ use crate::common::{
     LONG_ID, SHORT_ID, STRING_ID,
 };
 
+#[derive(Debug)]
 pub struct MainTape {
     elements: Vec<TapeElement>,
 }
@@ -29,11 +30,6 @@ impl MainTape {
         self.elements.as_ptr()
     }
 }
-impl Debug for MainTape {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "MainTape")
-    }
-}
 impl Default for MainTape {
     fn default() -> Self {
         Self {
@@ -42,6 +38,7 @@ impl Default for MainTape {
     }
 }
 
+#[derive(Clone, Copy)]
 #[repr(C)]
 pub union TapeElement {
     pub kind: (TapeTagKind, TapeTagValue),
