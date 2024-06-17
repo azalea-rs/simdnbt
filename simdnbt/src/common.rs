@@ -1,7 +1,8 @@
-use std::{io::Cursor, mem, slice};
+use std::{mem, slice};
 
 use crate::{
     raw_list::RawList,
+    reader::Reader,
     swap_endianness::{swap_endianness_as_u8, SwappableNumber},
     Error, Mutf8Str,
 };
@@ -23,83 +24,37 @@ pub const LONG_ARRAY_ID: u8 = 12;
 pub const MAX_DEPTH: usize = 512;
 
 #[inline(always)]
-pub fn read_u32(data: &mut Cursor<&[u8]>) -> Result<u32, Error> {
-    let remaining_slice = &data.get_ref()[data.position() as usize..data.get_ref().len()];
-    if remaining_slice.len() < 4 {
-        return Err(Error::UnexpectedEof);
-    }
-
-    data.set_position(data.position() + 4);
-
-    Ok(u32::from_be_bytes([
-        remaining_slice[0],
-        remaining_slice[1],
-        remaining_slice[2],
-        remaining_slice[3],
-    ]))
-}
-#[inline(always)]
-pub fn read_u16(data: &mut Cursor<&[u8]>) -> Result<u16, Error> {
-    let remaining_slice = &data.get_ref()[data.position() as usize..data.get_ref().len()];
-    if remaining_slice.len() < 2 {
-        return Err(Error::UnexpectedEof);
-    }
-
-    data.set_position(data.position() + 2);
-
-    Ok(u16::from_be_bytes([remaining_slice[0], remaining_slice[1]]))
-}
-
-#[inline(always)]
-pub fn read_with_u16_length<'a>(
-    data: &mut Cursor<&'a [u8]>,
-    width: usize,
-) -> Result<&'a [u8], Error> {
-    let length = read_u16(data)?;
+pub fn read_with_u16_length<'a>(data: &mut Reader<'a>, width: usize) -> Result<&'a [u8], Error> {
+    let length = data.read_u16()?;
     let length_in_bytes = length as usize * width;
-    // make sure we don't read more than the length
-    if data.get_ref().len() < data.position() as usize + length_in_bytes {
-        return Err(Error::UnexpectedEof);
-    }
-    let start_position = data.position() as usize;
-    data.set_position(data.position() + length_in_bytes as u64);
-    Ok(&data.get_ref()[start_position..start_position + length_in_bytes])
+    data.read_slice(length_in_bytes)
 }
 
 #[inline(never)]
-pub fn read_with_u32_length<'a>(
-    data: &mut Cursor<&'a [u8]>,
-    width: usize,
-) -> Result<&'a [u8], Error> {
-    let length = read_u32(data)?;
+pub fn read_with_u32_length<'a>(data: &mut Reader<'a>, width: usize) -> Result<&'a [u8], Error> {
+    let length = data.read_u32()?;
     let length_in_bytes = length as usize * width;
-    // make sure we don't read more than the length
-    if data.get_ref().len() < data.position() as usize + length_in_bytes {
-        return Err(Error::UnexpectedEof);
-    }
-    let start_position = data.position() as usize;
-    data.set_position(data.position() + length_in_bytes as u64);
-    Ok(&data.get_ref()[start_position..start_position + length_in_bytes])
+    data.read_slice(length_in_bytes)
 }
 
-pub fn read_string<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a Mutf8Str, Error> {
+pub fn read_string<'a>(data: &mut Reader<'a>) -> Result<&'a Mutf8Str, Error> {
     let data = read_with_u16_length(data, 1)?;
     Ok(Mutf8Str::from_slice(data))
 }
 
-pub fn read_u8_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a [u8], Error> {
+pub fn read_u8_array<'a>(data: &mut Reader<'a>) -> Result<&'a [u8], Error> {
     read_with_u32_length(data, 1)
 }
-pub fn read_i8_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<&'a [i8], Error> {
+pub fn read_i8_array<'a>(data: &mut Reader<'a>) -> Result<&'a [i8], Error> {
     Ok(slice_u8_into_i8(read_u8_array(data)?))
 }
 
-pub fn read_int_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<RawList<'a, i32>, Error> {
+pub fn read_int_array<'a>(data: &mut Reader<'a>) -> Result<RawList<'a, i32>, Error> {
     let array_bytes = read_with_u32_length(data, 4)?;
     Ok(RawList::new(array_bytes))
 }
 
-pub fn read_long_array<'a>(data: &mut Cursor<&'a [u8]>) -> Result<RawList<'a, i64>, Error> {
+pub fn read_long_array<'a>(data: &mut Reader<'a>) -> Result<RawList<'a, i64>, Error> {
     let array_bytes = read_with_u32_length(data, 8)?;
     Ok(RawList::new(array_bytes))
 }

@@ -135,13 +135,15 @@ impl fmt::Display for Mutf8Str {
 
 impl fmt::Debug for Mutf8Str {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Mutf8Str").field(&self.to_str()).finish()
+        f.write_str("m")?;
+        fmt::Debug::fmt(&self.to_str(), f)
     }
 }
 
 impl fmt::Debug for Mutf8String {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("Mutf8String").field(&self.to_str()).finish()
+        f.write_str("m")?;
+        fmt::Debug::fmt(&self.to_str(), f)
     }
 }
 
