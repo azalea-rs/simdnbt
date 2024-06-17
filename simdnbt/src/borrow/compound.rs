@@ -316,11 +316,10 @@ impl ParsingStack {
 
     #[inline]
     pub fn push(&mut self, state: ParsingStackElement) -> Result<(), Error> {
-        // self.stack[self.depth] = MaybeUninit::new(state);
         unsafe { self.stack.get_unchecked_mut(self.depth).write(state) };
         self.depth += 1;
 
-        if self.depth > MAX_DEPTH {
+        if self.depth >= MAX_DEPTH {
             Err(Error::MaxDepthExceeded)
         } else {
             Ok(())
