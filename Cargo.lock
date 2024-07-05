@@ -686,7 +686,7 @@ checksum = "829a5b2459a4971c4b97014b914e0424daff5f76e31411d1bc5bf4c2ed8010b6"
 
 [[package]]
 name = "simdnbt"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "azalea-nbt",
  "byteorder",
@@ -705,7 +705,7 @@ dependencies = [
 
 [[package]]
 name = "simdnbt-derive"
-version = "0.5.2"
+version = "0.6.0"
 dependencies = [
  "proc-macro2",
  "quote",
