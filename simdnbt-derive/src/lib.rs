@@ -168,7 +168,7 @@ pub fn from_nbt_tag_derive(input: proc_macro::TokenStream) -> proc_macro::TokenS
 
     let output = quote! {
         impl #generics simdnbt::FromNbtTag for #ident #generics #where_clause {
-            fn from_nbt_tag(tag: &simdnbt::borrow::NbtTag) -> Option<Self> {
+            fn from_nbt_tag(tag: simdnbt::borrow::NbtTag) -> Option<Self> {
                 match tag.string()?.to_str().as_ref() {
                     #(#matchers)*
                     _ => None,

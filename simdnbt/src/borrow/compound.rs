@@ -60,67 +60,7 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
                 unchecked_write_string(data, name);
             }
 
-            let (kind, _) = tag.element();
-            match kind {
-                TapeTagKind::Byte => unsafe {
-                    unchecked_push(data, tag.byte().unwrap() as u8);
-                },
-                TapeTagKind::Short => unsafe {
-                    unchecked_extend(data, &tag.short().unwrap().to_be_bytes());
-                },
-                TapeTagKind::Int => unsafe {
-                    unchecked_extend(data, &tag.int().unwrap().to_be_bytes());
-                },
-                TapeTagKind::Long => {
-                    data.extend_from_slice(&tag.long().unwrap().to_be_bytes());
-                }
-                TapeTagKind::Float => unsafe {
-                    unchecked_extend(data, &tag.float().unwrap().to_be_bytes());
-                },
-                TapeTagKind::Double => {
-                    data.extend_from_slice(&tag.double().unwrap().to_be_bytes());
-                }
-                TapeTagKind::ByteArray => {
-                    let byte_array = tag.byte_array().unwrap();
-                    unsafe {
-                        unchecked_extend(data, &byte_array.len().to_be_bytes());
-                    }
-                    data.extend_from_slice(byte_array);
-                }
-                TapeTagKind::String => {
-                    let string = tag.string().unwrap();
-                    write_string(data, string);
-                }
-                _ if kind.is_list() => {
-                    tag.list().unwrap().write(data);
-                }
-                TapeTagKind::Compound => {
-                    tag.compound().unwrap().write(data);
-                }
-                TapeTagKind::IntArray => {
-                    let int_array = list::u32_prefixed_list_to_rawlist::<i32>(
-                        TapeTagKind::IntArray,
-                        self.element,
-                    )
-                    .unwrap();
-                    unsafe {
-                        unchecked_extend(data, &int_array.len().to_be_bytes());
-                    }
-                    data.extend_from_slice(int_array.as_big_endian());
-                }
-                TapeTagKind::LongArray => {
-                    let long_array = list::u32_prefixed_list_to_rawlist::<i64>(
-                        TapeTagKind::LongArray,
-                        self.element,
-                    )
-                    .unwrap();
-                    unsafe {
-                        unchecked_extend(data, &long_array.len().to_be_bytes());
-                    }
-                    data.extend_from_slice(long_array.as_big_endian());
-                }
-                _ => unreachable!("Invalid tag kind {kind:?}"),
-            }
+            write_tag(tag, data);
         }
         data.push(END_ID);
     }
@@ -532,4 +472,62 @@ fn handle_compound_end(tapes: &mut Tapes, stack: &mut ParsingStack) {
             .compound
             .1 = (index_after_end_element as u32 - index_of_compound_element).into();
     };
+}
+
+pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
+    let (kind, value) = tag.element();
+    match kind {
+        TapeTagKind::Byte => unsafe {
+            unchecked_push(data, tag.byte().unwrap() as u8);
+        },
+        TapeTagKind::Short => unsafe {
+            unchecked_extend(data, &tag.short().unwrap().to_be_bytes());
+        },
+        TapeTagKind::Int => unsafe {
+            unchecked_extend(data, &tag.int().unwrap().to_be_bytes());
+        },
+        TapeTagKind::Long => {
+            data.extend_from_slice(&tag.long().unwrap().to_be_bytes());
+        }
+        TapeTagKind::Float => unsafe {
+            unchecked_extend(data, &tag.float().unwrap().to_be_bytes());
+        },
+        TapeTagKind::Double => {
+            data.extend_from_slice(&tag.double().unwrap().to_be_bytes());
+        }
+        TapeTagKind::ByteArray => {
+            let byte_array = tag.byte_array().unwrap();
+            unsafe {
+                unchecked_extend(data, &byte_array.len().to_be_bytes());
+            }
+            data.extend_from_slice(byte_array);
+        }
+        TapeTagKind::String => {
+            let string = tag.string().unwrap();
+            write_string(data, string);
+        }
+        _ if kind.is_list() => {
+            tag.list().unwrap().write(data);
+        }
+        TapeTagKind::Compound => {
+            tag.compound().unwrap().write(data);
+        }
+        TapeTagKind::IntArray => {
+            let int_array =
+                unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i32>(value).unwrap() };
+            unsafe {
+                unchecked_extend(data, &int_array.len().to_be_bytes());
+            }
+            data.extend_from_slice(int_array.as_big_endian());
+        }
+        TapeTagKind::LongArray => {
+            let long_array =
+                unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i64>(value).unwrap() };
+            unsafe {
+                unchecked_extend(data, &long_array.len().to_be_bytes());
+            }
+            data.extend_from_slice(long_array.as_big_endian());
+        }
+        _ => unreachable!("Invalid tag kind {kind:?}"),
+    }
 }

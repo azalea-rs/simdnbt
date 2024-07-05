@@ -350,6 +350,12 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         }
     }
 
+    /// Returns whether the list is specifically a list with the `empty` tag type. This will return
+    /// false if the list is any other type (even it has a length of zero).
+    pub fn empty(&self) -> bool {
+        self.element().0 == TapeTagKind::EmptyList
+    }
+
     pub fn bytes(&self) -> Option<&[i8]> {
         let (kind, value) = self.element();
         if kind != TapeTagKind::ByteList {
@@ -827,6 +833,16 @@ where
         return None;
     }
 
+    unsafe { u32_prefixed_list_to_rawlist_unchecked(value) }
+}
+
+#[inline]
+pub(crate) unsafe fn u32_prefixed_list_to_rawlist_unchecked<'a, T>(
+    value: TapeTagValue,
+) -> Option<RawList<'a, T>>
+where
+    T: Copy + SwappableNumber,
+{
     // length is always a u32
     let length_ptr = u64::from(unsafe { value.int_list }) as usize as *const UnalignedU32;
     let length = unsafe { u32::from(*length_ptr).swap_bytes() as usize };

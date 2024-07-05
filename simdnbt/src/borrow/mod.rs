@@ -253,23 +253,38 @@ impl<'a> Debug for BaseNbt<'a> {
 pub struct BaseNbtCompound<'a> {
     tapes: Tapes<'a>,
 }
+impl<'a, 'tape> From<&'a BaseNbtCompound<'a>> for NbtCompound<'a, 'tape> {
+    fn from(compound: &'a BaseNbtCompound<'a>) -> Self
+    where
+        'a: 'tape,
+    {
+        NbtCompound {
+            element: compound.tapes.main.as_ptr(),
+            extra_tapes: &compound.tapes.extra,
+        }
+    }
+}
 
 /// A nameless NBT tag.
 pub struct BaseNbtTag<'a> {
     tapes: Tapes<'a>,
 }
 impl<'a> BaseNbtTag<'a> {
-    pub fn compound<'tape>(&'a self) -> NbtCompound<'a, 'tape>
+    pub fn as_tag<'tape>(&'a self) -> NbtTag<'a, 'tape>
     where
         'a: 'tape,
     {
-        NbtCompound {
+        NbtTag {
             element: self.tapes.main.as_ptr(),
             extra_tapes: &self.tapes.extra,
         }
     }
 }
-
+impl<'a, 'tape> From<&'a BaseNbtTag<'a>> for NbtTag<'a, 'tape> {
+    fn from(tag: &'a BaseNbtTag<'a>) -> Self {
+        tag.as_tag()
+    }
+}
 /// Either a complete NBT container, or nothing.
 #[derive(Debug, PartialEq, Default)]
 pub enum Nbt<'a> {
@@ -677,7 +692,7 @@ mod tests {
     }
 
     #[test]
-    fn read_complexplayer_with_given_alloc() {
+    fn read_complex_player_as_tag() {
         let src = include_bytes!("../../tests/complex_player.dat").to_vec();
         let mut src_slice = src.as_slice();
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
@@ -690,7 +705,7 @@ mod tests {
         decoded_src_as_tag.push(END_ID);
 
         let nbt = super::read_tag(&mut Cursor::new(&decoded_src_as_tag)).unwrap();
-        let nbt = nbt.compound().compound("").unwrap();
+        let nbt = nbt.as_tag().compound().unwrap().compound("").unwrap();
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
