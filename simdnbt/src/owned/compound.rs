@@ -1,13 +1,9 @@
-use std::{
-    io::Cursor,
-    mem::{self, MaybeUninit},
-};
-
-use byteorder::ReadBytesExt;
+use std::mem::{self, MaybeUninit};
 
 use crate::{
     common::{read_string, unchecked_push, unchecked_write_string, END_ID, MAX_DEPTH},
     mutf8::Mutf8String,
+    reader::Reader,
     Error, Mutf8Str, ToNbtTag,
 };
 
@@ -28,12 +24,12 @@ impl NbtCompound {
         Self { values }
     }
 
-    pub(crate) fn read(data: &mut Cursor<&[u8]>) -> Result<Self, Error> {
+    pub(crate) fn read(data: &mut Reader<'_>) -> Result<Self, Error> {
         Self::read_with_depth(data, 0)
     }
 
     pub(crate) fn read_with_depth_and_capacity(
-        data: &mut Cursor<&[u8]>,
+        data: &mut Reader<'_>,
         depth: usize,
         capacity: usize,
     ) -> Result<Self, Error> {
@@ -73,7 +69,7 @@ impl NbtCompound {
         Ok(Self { values })
     }
 
-    pub(crate) fn read_with_depth(data: &mut Cursor<&[u8]>, depth: usize) -> Result<Self, Error> {
+    pub(crate) fn read_with_depth(data: &mut Reader<'_>, depth: usize) -> Result<Self, Error> {
         Self::read_with_depth_and_capacity(data, depth, 8)
     }
 

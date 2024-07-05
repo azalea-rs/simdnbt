@@ -6,16 +6,15 @@ mod list;
 
 use std::{io::Cursor, ops::Deref};
 
-use byteorder::{ReadBytesExt, BE};
-
 use crate::{
     common::{
-        read_int_array, read_long_array, read_string, read_u32, read_with_u32_length,
+        read_int_array, read_long_array, read_string, read_with_u32_length,
         slice_into_u8_big_endian, unchecked_extend, unchecked_push, write_string, BYTE_ARRAY_ID,
         BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
         LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     mutf8::Mutf8String,
+    reader::{Reader, ReaderFromCursor},
     Error, Mutf8Str,
 };
 
@@ -25,7 +24,8 @@ pub use self::{compound::NbtCompound, list::NbtList};
 ///
 /// Returns `Ok(Nbt::None)` if there is no data.
 pub fn read(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
-    Nbt::read(data)
+    let mut reader = ReaderFromCursor::new(data);
+    Nbt::read(&mut reader)
 }
 /// Read a root NBT compound, but without reading the name. This is used in Minecraft when reading
 /// NBT over the network.
@@ -33,22 +33,26 @@ pub fn read(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
 /// This is similar to [`read_tag`], but returns an [`Nbt`] instead (guaranteeing it'll be either
 /// empty or a compound).
 pub fn read_unnamed(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
-    Nbt::read_unnamed(data)
+    let mut reader = ReaderFromCursor::new(data);
+    Nbt::read_unnamed(&mut reader)
 }
 /// Read a compound tag. This may have any number of items.
 pub fn read_compound(data: &mut Cursor<&[u8]>) -> Result<NbtCompound, Error> {
-    NbtCompound::read(data)
+    let mut reader = ReaderFromCursor::new(data);
+    NbtCompound::read(&mut reader)
 }
 /// Read an NBT tag, without reading its name. This may be any type of tag except for an end tag. If you need to be able to
 /// handle end tags, use [`read_optional_tag`].
 pub fn read_tag(data: &mut Cursor<&[u8]>) -> Result<NbtTag, Error> {
-    NbtTag::read(data)
+    let mut reader = ReaderFromCursor::new(data);
+    NbtTag::read(&mut reader)
 }
 /// Read any NBT tag, without reading its name. This may be any type of tag, including an end tag.
 ///
 /// Returns `Ok(None)` if there is no data.
 pub fn read_optional_tag(data: &mut Cursor<&[u8]>) -> Result<Option<NbtTag>, Error> {
-    Ok(NbtTag::read_optional(data)?)
+    let mut reader = ReaderFromCursor::new(data);
+    NbtTag::read_optional(&mut reader)
 }
 
 /// A complete NBT container. This contains a name and a compound tag.
@@ -71,7 +75,7 @@ impl Nbt {
     }
 
     /// Reads NBT from the given data. Returns `Ok(Nbt::None)` if there is no data.
-    fn read(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
+    fn read(data: &mut Reader<'_>) -> Result<Nbt, Error> {
         let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(Nbt::None);
@@ -85,7 +89,7 @@ impl Nbt {
         Ok(Nbt::Some(BaseNbt { name, tag }))
     }
 
-    fn read_unnamed(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
+    fn read_unnamed(data: &mut Reader<'_>) -> Result<Nbt, Error> {
         let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
             return Ok(Nbt::None);
@@ -258,25 +262,25 @@ impl NbtTag {
     }
 
     #[inline(always)]
-    fn read_with_type(data: &mut Cursor<&[u8]>, tag_type: u8, depth: usize) -> Result<Self, Error> {
+    fn read_with_type(data: &mut Reader<'_>, tag_type: u8, depth: usize) -> Result<Self, Error> {
         match tag_type {
             BYTE_ID => Ok(NbtTag::Byte(
                 data.read_i8().map_err(|_| Error::UnexpectedEof)?,
             )),
             SHORT_ID => Ok(NbtTag::Short(
-                data.read_i16::<BE>().map_err(|_| Error::UnexpectedEof)?,
+                data.read_i16().map_err(|_| Error::UnexpectedEof)?,
             )),
             INT_ID => Ok(NbtTag::Int(
-                data.read_i32::<BE>().map_err(|_| Error::UnexpectedEof)?,
+                data.read_i32().map_err(|_| Error::UnexpectedEof)?,
             )),
             LONG_ID => Ok(NbtTag::Long(
-                data.read_i64::<BE>().map_err(|_| Error::UnexpectedEof)?,
+                data.read_i64().map_err(|_| Error::UnexpectedEof)?,
             )),
             FLOAT_ID => Ok(NbtTag::Float(
-                data.read_f32::<BE>().map_err(|_| Error::UnexpectedEof)?,
+                data.read_f32().map_err(|_| Error::UnexpectedEof)?,
             )),
             DOUBLE_ID => Ok(NbtTag::Double(
-                data.read_f64::<BE>().map_err(|_| Error::UnexpectedEof)?,
+                data.read_f64().map_err(|_| Error::UnexpectedEof)?,
             )),
             BYTE_ARRAY_ID => Ok(NbtTag::ByteArray(read_with_u32_length(data, 1)?.to_owned())),
             STRING_ID => Ok(NbtTag::String(read_string(data)?.to_owned())),
@@ -291,12 +295,12 @@ impl NbtTag {
         }
     }
 
-    pub fn read(data: &mut Cursor<&[u8]>) -> Result<Self, Error> {
+    fn read(data: &mut Reader<'_>) -> Result<Self, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         Self::read_with_type(data, tag_type, 0)
     }
 
-    pub fn read_optional(data: &mut Cursor<&[u8]>) -> Result<Option<Self>, Error> {
+    fn read_optional(data: &mut Reader<'_>) -> Result<Option<Self>, Error> {
         let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if tag_type == END_ID {
             return Ok(None);
@@ -621,14 +625,14 @@ impl From<Nbt> for NbtTag {
 mod tests {
     use std::io::Read;
 
-    use byteorder::WriteBytesExt;
+    use byteorder::{WriteBytesExt, BE};
     use flate2::read::GzDecoder;
 
     use super::*;
 
     #[test]
     fn hello_world() {
-        let nbt = Nbt::read(&mut Cursor::new(include_bytes!(
+        let nbt = super::read(&mut Cursor::new(include_bytes!(
             "../../tests/hello_world.nbt"
         )))
         .unwrap()
@@ -648,7 +652,9 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = Nbt::read(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
 
         assert_eq!(nbt.int("PersistentId"), Some(1946940766));
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
@@ -661,7 +667,9 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = Nbt::read(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
@@ -674,11 +682,13 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        let nbt = Nbt::read(&mut Cursor::new(&decoded_src)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
 
         let mut out = Vec::new();
         nbt.write(&mut out);
-        let nbt = Nbt::read(&mut Cursor::new(&out)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&out)).unwrap().unwrap();
 
         assert_eq!(nbt.float("foodExhaustionLevel").unwrap() as u32, 2);
         assert_eq!(nbt.list("Rotation").unwrap().floats().unwrap().len(), 2);
@@ -686,7 +696,7 @@ mod tests {
 
     #[test]
     fn inttest_1023() {
-        let nbt = Nbt::read(&mut Cursor::new(include_bytes!(
+        let nbt = super::read(&mut Cursor::new(include_bytes!(
             "../../tests/inttest1023.nbt"
         )))
         .unwrap()
@@ -714,7 +724,7 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = Nbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
         let ints = nbt.list("").unwrap().ints().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
@@ -736,7 +746,7 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = Nbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
         let ints = nbt.list("").unwrap().ints().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i32, item);
@@ -758,7 +768,7 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        let nbt = Nbt::read(&mut Cursor::new(&data)).unwrap().unwrap();
+        let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
         let ints = nbt.list("").unwrap().longs().unwrap();
         for (i, &item) in ints.iter().enumerate() {
             assert_eq!(i as i64, item);

@@ -26,7 +26,7 @@ fn example(item_bytes: &[u8]) {
     let skyblock_id: Cow<str> = nbt
         .list("i")
         .and_then(|i| i.compounds())
-        .and_then(|i| i.get(0))
+        .and_then(|i| i.first())
         .and_then(|i| i.compound("tag"))
         .and_then(|tag| tag.compound("ExtraAttributes"))
         .and_then(|ea| ea.string("id"))
