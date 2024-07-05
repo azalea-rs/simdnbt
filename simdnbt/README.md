@@ -76,7 +76,7 @@ Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crat
 
 | Library                                                                     | Throughput   |
 | --------------------------------------------------------------------------- | ------------ |
-| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 1.9725 GiB/s |
+| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 3.9493 GiB/s |
 | [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)   | 825.59 MiB/s |
 | [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                    | 606.68 MiB/s |
 | [graphite_binary](https://docs.rs/graphite_binary/latest/graphite_binary/)  | 363.94 MiB/s |
@@ -89,9 +89,9 @@ And for writing `complex_player.dat`:
 
 | Library         | Throughput   |
 | --------------- | ------------ |
-| simdnbt::borrow | 2.6116 GiB/s |
 | simdnbt::owned  | 2.5033 GiB/s |
 | azalea_nbt      | 2.4152 GiB/s |
+| simdnbt::borrow | 2.1317 GiB/s |
 | graphite_binary | 1.8804 GiB/s |
 
 The tables above were made from the [compare benchmark](https://github.com/azalea-rs/simdnbt/tree/master/simdnbt/benches) in this repo.

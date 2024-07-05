@@ -33,14 +33,14 @@ fn bench_file(filename: &str, c: &mut Criterion) {
     });
 
     let nbt = simdnbt::borrow::read(&mut input_stream).unwrap().unwrap();
-    group.bench_function("Get", |b| {
-        b.iter(|| {
-            let level = nbt.compound("abilities").unwrap();
-            for (k, _) in level.iter() {
-                black_box(level.get(black_box(&k.to_str())));
-            }
-        })
-    });
+    // group.bench_function("Get", |b| {
+    //     b.iter(|| {
+    //         let level = nbt.compound("abilities").unwrap();
+    //         for (k, _) in level.iter() {
+    //             black_box(level.get(black_box(&k.to_str())));
+    //         }
+    //     })
+    // });
     group.finish();
 }
 
