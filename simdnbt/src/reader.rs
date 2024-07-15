@@ -55,7 +55,10 @@ impl<'a> Reader<'a> {
 
     #[inline]
     pub fn read_u16(&mut self) -> Result<u16, Error> {
-        self.read_type::<u16>().map(u16::swap_bytes)
+        let value = self.read_type::<u16>();
+        #[cfg(target_endian = "little")]
+        let value = value.map(u16::swap_bytes);
+        value
     }
     #[inline]
     pub fn read_i16(&mut self) -> Result<i16, Error> {
@@ -64,7 +67,10 @@ impl<'a> Reader<'a> {
 
     #[inline]
     pub fn read_u32(&mut self) -> Result<u32, Error> {
-        self.read_type::<u32>().map(u32::swap_bytes)
+        let value = self.read_type::<u32>();
+        #[cfg(target_endian = "little")]
+        let value = value.map(u32::swap_bytes);
+        value
     }
     #[inline]
     pub fn read_i32(&mut self) -> Result<i32, Error> {
@@ -73,7 +79,10 @@ impl<'a> Reader<'a> {
 
     #[inline]
     pub fn read_u64(&mut self) -> Result<u64, Error> {
-        self.read_type::<u64>().map(u64::swap_bytes)
+        let value = self.read_type::<u64>();
+        #[cfg(target_endian = "little")]
+        let value = value.map(u64::swap_bytes);
+        value
     }
     #[inline]
     pub fn read_i64(&mut self) -> Result<i64, Error> {
