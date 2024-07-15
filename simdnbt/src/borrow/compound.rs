@@ -236,8 +236,8 @@ impl<'a: 'tape, 'tape> Iterator for CompoundIter<'a, 'tape> {
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum ParsingStackElement {
     Compound { index_of_compound_element: u32 },
-    ListOfLists { index_of_list_element: u32 },
     ListOfCompounds { index_of_list_element: u32 },
+    ListOfLists { index_of_list_element: u32 },
 }
 
 pub struct ParsingStack {
