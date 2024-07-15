@@ -6,10 +6,10 @@ use crate::{
         COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID,
         LONG_ID, SHORT_ID, STRING_ID,
     },
+    error::NonRootError,
     mutf8::Mutf8String,
     reader::Reader,
     swap_endianness::swap_endianness,
-    Error,
 };
 
 use super::{compound::NbtCompound, MAX_DEPTH};
@@ -34,11 +34,11 @@ pub enum NbtList {
     LongArray(Vec<Vec<i64>>) = LONG_ARRAY_ID,
 }
 impl NbtList {
-    pub(crate) fn read(data: &mut Reader<'_>, depth: usize) -> Result<Self, Error> {
+    pub(crate) fn read(data: &mut Reader<'_>, depth: usize) -> Result<Self, NonRootError> {
         if depth > MAX_DEPTH {
-            return Err(Error::MaxDepthExceeded);
+            return Err(NonRootError::max_depth_exceeded());
         }
-        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        let tag_type = data.read_u8().map_err(|_| NonRootError::unexpected_eof())?;
         Ok(match tag_type {
             END_ID => {
                 data.skip(4)?;
@@ -107,7 +107,7 @@ impl NbtList {
                 }
                 arrays
             }),
-            _ => return Err(Error::UnknownTagId(tag_type)),
+            _ => return Err(NonRootError::unknown_tag_id(tag_type)),
         })
     }
 

@@ -13,6 +13,7 @@ use crate::{
         BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
         LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
+    error::NonRootError,
     mutf8::Mutf8String,
     reader::{Reader, ReaderFromCursor},
     Error, Mutf8Str,
@@ -37,20 +38,20 @@ pub fn read_unnamed(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
     Nbt::read_unnamed(&mut reader)
 }
 /// Read a compound tag. This may have any number of items.
-pub fn read_compound(data: &mut Cursor<&[u8]>) -> Result<NbtCompound, Error> {
+pub fn read_compound(data: &mut Cursor<&[u8]>) -> Result<NbtCompound, NonRootError> {
     let mut reader = ReaderFromCursor::new(data);
     NbtCompound::read(&mut reader)
 }
 /// Read an NBT tag, without reading its name. This may be any type of tag except for an end tag. If you need to be able to
 /// handle end tags, use [`read_optional_tag`].
-pub fn read_tag(data: &mut Cursor<&[u8]>) -> Result<NbtTag, Error> {
+pub fn read_tag(data: &mut Cursor<&[u8]>) -> Result<NbtTag, NonRootError> {
     let mut reader = ReaderFromCursor::new(data);
     NbtTag::read(&mut reader)
 }
 /// Read any NBT tag, without reading its name. This may be any type of tag, including an end tag.
 ///
 /// Returns `Ok(None)` if there is no data.
-pub fn read_optional_tag(data: &mut Cursor<&[u8]>) -> Result<Option<NbtTag>, Error> {
+pub fn read_optional_tag(data: &mut Cursor<&[u8]>) -> Result<Option<NbtTag>, NonRootError> {
     let mut reader = ReaderFromCursor::new(data);
     NbtTag::read_optional(&mut reader)
 }
@@ -262,25 +263,34 @@ impl NbtTag {
     }
 
     #[inline(always)]
-    fn read_with_type(data: &mut Reader<'_>, tag_type: u8, depth: usize) -> Result<Self, Error> {
+    fn read_with_type(
+        data: &mut Reader<'_>,
+        tag_type: u8,
+        depth: usize,
+    ) -> Result<Self, NonRootError> {
         match tag_type {
             BYTE_ID => Ok(NbtTag::Byte(
-                data.read_i8().map_err(|_| Error::UnexpectedEof)?,
+                data.read_i8().map_err(|_| NonRootError::unexpected_eof())?,
             )),
             SHORT_ID => Ok(NbtTag::Short(
-                data.read_i16().map_err(|_| Error::UnexpectedEof)?,
+                data.read_i16()
+                    .map_err(|_| NonRootError::unexpected_eof())?,
             )),
             INT_ID => Ok(NbtTag::Int(
-                data.read_i32().map_err(|_| Error::UnexpectedEof)?,
+                data.read_i32()
+                    .map_err(|_| NonRootError::unexpected_eof())?,
             )),
             LONG_ID => Ok(NbtTag::Long(
-                data.read_i64().map_err(|_| Error::UnexpectedEof)?,
+                data.read_i64()
+                    .map_err(|_| NonRootError::unexpected_eof())?,
             )),
             FLOAT_ID => Ok(NbtTag::Float(
-                data.read_f32().map_err(|_| Error::UnexpectedEof)?,
+                data.read_f32()
+                    .map_err(|_| NonRootError::unexpected_eof())?,
             )),
             DOUBLE_ID => Ok(NbtTag::Double(
-                data.read_f64().map_err(|_| Error::UnexpectedEof)?,
+                data.read_f64()
+                    .map_err(|_| NonRootError::unexpected_eof())?,
             )),
             BYTE_ARRAY_ID => Ok(NbtTag::ByteArray(read_with_u32_length(data, 1)?.to_owned())),
             STRING_ID => Ok(NbtTag::String(read_string(data)?.to_owned())),
@@ -291,17 +301,17 @@ impl NbtTag {
             )?)),
             INT_ARRAY_ID => Ok(NbtTag::IntArray(read_int_array(data)?.to_vec())),
             LONG_ARRAY_ID => Ok(NbtTag::LongArray(read_long_array(data)?.to_vec())),
-            _ => Err(Error::UnknownTagId(tag_type)),
+            _ => Err(NonRootError::unknown_tag_id(tag_type)),
         }
     }
 
-    fn read(data: &mut Reader<'_>) -> Result<Self, Error> {
-        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+    fn read(data: &mut Reader<'_>) -> Result<Self, NonRootError> {
+        let tag_type = data.read_u8().map_err(|_| NonRootError::unexpected_eof())?;
         Self::read_with_type(data, tag_type, 0)
     }
 
-    fn read_optional(data: &mut Reader<'_>) -> Result<Option<Self>, Error> {
-        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+    fn read_optional(data: &mut Reader<'_>) -> Result<Option<Self>, NonRootError> {
+        let tag_type = data.read_u8().map_err(|_| NonRootError::unexpected_eof())?;
         if tag_type == END_ID {
             return Ok(None);
         }
