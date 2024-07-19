@@ -61,12 +61,12 @@ The most significant and simple optimization you can do is switching to an alloc
 Simdnbt currently makes use of SIMD instructions for two things:
 
 -   swapping the endianness of int arrays
--   checking if a string is plain ascii for faster mutf8 to utf8 conversion
+-   checking if a string is plain ascii for faster MUTF-8 to UTF-8 conversion
 
 Simdnbt ~~cheats~~ takes some shortcuts to be this fast:
 
 1. it requires a reference to the original data (to avoid cloning)
-2. it doesn't validate/decode the mutf-8 strings at decode-time
+2. it doesn't validate/decode the MUTF-8 strings at decode-time
 
 ## Benchmarks
 
