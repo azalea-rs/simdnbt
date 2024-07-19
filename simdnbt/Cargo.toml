@@ -11,7 +11,7 @@ repository = "https://github.com/azalea-rs/simdnbt"
 [dependencies]
 byteorder = "1.5.0"
 flate2 = "^1.0.30"
-residua-mutf8 = "2.0.0"
+simd_cesu8 = "1.0.1"
 simdnbt-derive = { version = "0.6.0", path = "../simdnbt-derive", optional = true }
 thiserror = "1.0.61"
 valence_nbt = { version = "0.8.0", features = ["binary"] }

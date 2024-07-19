@@ -7,12 +7,14 @@ use std::{
     simd::prelude::*,
 };
 
-/// A M-UTF8 string slice. This is how strings are represented internally in NBT.
+use simd_cesu8::mutf8;
+
+/// A MUTF-8 string slice. This is how strings are represented internally in NBT.
 #[derive(Eq, PartialEq)]
 pub struct Mutf8Str {
     pub(crate) slice: [u8],
 }
-/// An owned M-UTF8 string.
+/// An owned MUTF-8 string.
 #[derive(Eq, PartialEq, Clone, Default)]
 pub struct Mutf8String {
     pub(crate) vec: Vec<u8>,
@@ -29,8 +31,8 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         let mask = u8x16::splat(0b10000000);
         let zero = u8x16::splat(0);
         let simd = u8x16::from_array(*chunk);
-        let and = simd & mask;
-        if and != zero {
+        let masked = simd & mask;
+        if masked != zero {
             is_plain_ascii = false;
         }
     }
@@ -40,8 +42,8 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         let mask = u8x8::splat(0b10000000);
         let zero = u8x8::splat(0);
         let simd = u8x8::from_array(*chunk);
-        let and = simd & mask;
-        if and != zero {
+        let masked = simd & mask;
+        if masked != zero {
             is_plain_ascii = false;
         }
     }
@@ -51,8 +53,8 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         let mask = u8x4::splat(0b10000000);
         let zero = u8x4::splat(0);
         let simd = u8x4::from_array(*chunk);
-        let and = simd & mask;
-        if and != zero {
+        let masked = simd & mask;
+        if masked != zero {
             is_plain_ascii = false;
         }
     }
@@ -66,8 +68,8 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
         let mask = u8x32::splat(0b10000000);
         let zero = u8x32::splat(0);
         let simd = u8x32::from_array(chunk);
-        let and = simd & mask;
-        if and != zero {
+        let masked = simd & mask;
+        if masked != zero {
             is_plain_ascii = false;
         }
     }
@@ -76,17 +78,6 @@ fn is_plain_ascii(slice: &[u8]) -> bool {
 }
 
 impl Mutf8Str {
-    #[inline]
-    pub fn to_string_lossy(&self) -> Cow<str> {
-        String::from_utf8_lossy(&self.slice)
-    }
-
-    #[inline]
-    pub fn from_slice(slice: &[u8]) -> &Mutf8Str {
-        // SAFETY: &[u8] and &Mutf8Str are the same layout.
-        unsafe { mem::transmute::<&[u8], &Mutf8Str>(slice) }
-    }
-
     // we can't implement FromStr on Cow<Mutf8Str>
     #[allow(clippy::should_implement_trait)]
     #[inline]
@@ -97,19 +88,35 @@ impl Mutf8Str {
         }
     }
 
+    /// Try to convert this MUTF-8 string into a UTF-8 string. If the data isn't
+    /// valid MUTF-8, it'll return an empty string without erroring.
     #[inline]
     pub fn to_str(&self) -> Cow<str> {
-        // fast check to skip if none of the bytes have the top bit set
+        // fast check to skip if none of the bytes have the top bit set.
+        // note that this allows some valid utf8 but invalid mutf8 through as
+        // null bytes aren't allowed in mutf8.
         if is_plain_ascii(&self.slice) {
-            // SAFETY: &[u8] and &str are the same layout.
+            // SAFETY: Plain ASCII is always valid UTF-8.
             unsafe { Cow::Borrowed(std::str::from_utf8_unchecked(&self.slice)) }
         } else {
-            match mutf8::decode(&self.slice) {
-                Ok(Cow::Borrowed(b)) => Cow::Borrowed(b),
-                Ok(Cow::Owned(o)) => Cow::Owned(o),
-                Err(_) => Cow::Borrowed(""),
-            }
+            // we use the non-strict variant as it's apparently significantly
+            // faster and our is_plain_ascii check makes it non-strict already
+            // anyways.
+            mutf8::decode(&self.slice).unwrap_or_default()
         }
+    }
+
+    #[inline]
+    pub fn to_string_lossy(&self) -> Cow<str> {
+        mutf8::decode_lossy(&self.slice)
+    }
+
+    /// Convert a slice of bytes into a Mutf8Str. This is safe because it's only
+    /// checked to be valid MUTF-8 while being converted to UTF-8.
+    #[inline]
+    pub fn from_slice(slice: &[u8]) -> &Mutf8Str {
+        // SAFETY: &[u8] and &Mutf8Str are the same layout.
+        unsafe { mem::transmute::<&[u8], &Mutf8Str>(slice) }
     }
 
     #[inline]
@@ -174,33 +181,26 @@ impl Mutf8String {
         Mutf8Str::from_slice(self.vec.as_slice())
     }
 
+    /// Try to convert this MUTF-8 string into a UTF-8 string. If the data isn't
+    /// valid MUTF-8, it'll return an empty string without erroring.
     #[inline]
     pub fn into_string(self) -> String {
         if is_plain_ascii(&self.vec) {
             // SAFETY: &[u8] and &str are the same layout.
             unsafe { String::from_utf8_unchecked(self.vec) }
         } else {
-            match mutf8::decode(&self.vec) {
-                Ok(Cow::Borrowed(b)) => b.to_owned(),
-                Ok(Cow::Owned(o)) => o,
-                Err(_) => String::new(),
-            }
+            mutf8::decode(&self.vec).unwrap_or_default().to_string()
         }
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.vec.len()
-    }
-
-    #[inline]
-    pub fn from_vec(vec: Vec<u8>) -> Mutf8String {
-        Self { vec }
     }
 
     #[inline]
     pub fn from_string(s: String) -> Mutf8String {
         Self::from_vec(mutf8::encode(&s).into_owned())
+    }
+
+    #[inline]
+    pub fn from_vec(vec: Vec<u8>) -> Mutf8String {
+        Self { vec }
     }
 }
 impl Deref for Mutf8String {
