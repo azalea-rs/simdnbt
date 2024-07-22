@@ -304,7 +304,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             }
             TapeTagKind::CompoundList => {
                 let compounds = self.compounds().unwrap();
-                write_u32(data, compounds.len() as u32);
+                write_u32(data, compounds.clone().len() as u32);
                 for compound in compounds {
                     compound.write(data);
                 }
@@ -436,7 +436,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             iter: ListListIter {
                 current_tape_offset: 0, // it's an iterator, it starts at 0
                 max_tape_offset,
-                length,
+                approx_length: length,
                 tape: unsafe { self.element.add(1) }, // the first element is the listlist element so we don't include it
                 extra_tapes: self.extra_tapes,
                 _phantom: PhantomData,
@@ -460,7 +460,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             iter: CompoundListIter {
                 current_tape_offset: 0,
                 max_tape_offset,
-                length,
+                approx_length: length,
                 tape: tape_slice,
                 extra_tapes: self.extra_tapes,
             },
@@ -605,13 +605,15 @@ pub struct ListList<'a, 'tape> {
 impl<'a, 'tape> ListList<'a, 'tape> {
     /// Returns the number of tags directly in this list.
     ///
-    /// Note that due to an optimization, this saturates at 2^24. Use [`Self::exact_len`] if you
-    /// need the length to always be accurate at extremes.
-    pub fn len(&self) -> usize {
+    /// Note that due to an internal optimization, this function runs at `O(n)`
+    /// if the list has at least 2^24 items. Use [`Self::approx_len`] if you
+    /// want to avoid that.
+    pub fn len(self) -> usize {
         self.iter.len()
     }
-    pub fn exact_len(self) -> usize {
-        self.iter.exact_len()
+    /// A version of [`Self::len`] that saturates at 2^24.
+    pub fn approx_len(&self) -> usize {
+        self.iter.approx_len()
     }
     /// Get the element at the given index. This is O(n) where n is index, so if you'll be calling
     /// this more than once you should probably just use the iterator.
@@ -635,12 +637,16 @@ impl<'a: 'tape, 'tape> IntoIterator for ListList<'a, 'tape> {
 }
 impl PartialEq for ListList<'_, '_> {
     fn eq(&self, other: &Self) -> bool {
-        self.iter.clone().exact_len() == other.iter.clone().exact_len()
-            && self
-                .iter
-                .clone()
-                .zip(other.iter.clone())
-                .all(|(a, b)| a == b)
+        if self.iter.clone().approx_len() != other.iter.clone().approx_len() {
+            return false;
+        }
+        if self.iter.clone().len() != other.iter.clone().len() {
+            return false;
+        }
+        self.iter
+            .clone()
+            .zip(other.iter.clone())
+            .all(|(a, b)| a == b)
     }
 }
 /// An iterator over a list of lists.
@@ -648,7 +654,7 @@ impl PartialEq for ListList<'_, '_> {
 pub struct ListListIter<'a, 'tape> {
     current_tape_offset: usize,
     max_tape_offset: usize,
-    length: usize,
+    approx_length: usize,
     tape: *const TapeElement,
     extra_tapes: *const ExtraTapes<'a>,
     _phantom: PhantomData<&'tape ()>,
@@ -656,19 +662,21 @@ pub struct ListListIter<'a, 'tape> {
 impl<'a: 'tape, 'tape> ListListIter<'a, 'tape> {
     /// Returns the number of tags directly in this list.
     ///
-    /// Note that due to an optimization, this saturates at 2^24. Use [`Self::exact_len`] if you
-    /// need the length to always be accurate at extremes.
-    pub fn len(&self) -> usize {
-        self.length
-    }
-
-    pub fn exact_len(self) -> usize {
-        let len = self.len();
+    /// Note that due to an internal optimization, this function runs at `O(n)`
+    /// if the list has at least 2^24 items. Use [`Self::approx_len`] if you
+    /// want to avoid that.
+    pub fn len(self) -> usize {
+        let len = self.approx_len();
         if len < 2usize.pow(24) {
             len
         } else {
             self.count()
         }
+    }
+
+    /// A version of [`Self::len`] that saturates at 2^24.
+    pub fn approx_len(&self) -> usize {
+        self.approx_length
     }
 }
 impl<'a: 'tape, 'tape> Iterator for ListListIter<'a, 'tape> {
@@ -704,7 +712,7 @@ impl Default for ListListIter<'_, '_> {
         ListListIter {
             current_tape_offset: 0,
             max_tape_offset: 0,
-            length: 0,
+            approx_length: 0,
             tape: std::ptr::null(),
             // this won't ever get dereferenced because .next() will return immediately
             extra_tapes: std::ptr::null(),
@@ -721,16 +729,19 @@ pub struct CompoundList<'a, 'tape> {
 impl<'a, 'tape> CompoundList<'a, 'tape> {
     /// Returns the number of tags directly in this list.
     ///
-    /// Note that due to an optimization, this saturates at 2^24. Use [`Self::exact_len`] if you
-    /// need the length to always be accurate at extremes.
-    pub fn len(&self) -> usize {
+    /// Note that due to an internal optimization, this function runs at `O(n)`
+    /// if the list has at least 2^24 items. Use [`Self::approx_len`] if you
+    /// want to avoid that.
+    pub fn len(self) -> usize {
         self.iter.len()
     }
-    pub fn exact_len(self) -> usize {
-        self.iter.exact_len()
+    /// A version of [`Self::len`] that saturates at 2^24.
+    pub fn approx_len(&self) -> usize {
+        self.iter.approx_len()
     }
-    /// Get the element at the given index. This is O(n) where n is index, so if you'll be calling
-    /// this more than once you should probably just use the iterator.
+    /// Get the element at the given index. This is `O(n)` where n is index, so
+    /// if you'll be calling this more than once you should probably just use
+    /// the iterator.
     pub fn get(&self, index: usize) -> Option<NbtCompound<'a, 'tape>> {
         self.iter.clone().nth(index)
     }
@@ -751,12 +762,16 @@ impl<'a: 'tape, 'tape> IntoIterator for CompoundList<'a, 'tape> {
 }
 impl PartialEq for CompoundList<'_, '_> {
     fn eq(&self, other: &Self) -> bool {
-        self.iter.clone().exact_len() == other.iter.clone().exact_len()
-            && self
-                .iter
-                .clone()
-                .zip(other.iter.clone())
-                .all(|(a, b)| a == b)
+        if self.iter.clone().approx_len() != other.iter.clone().approx_len() {
+            return false;
+        }
+        if self.iter.clone().len() != other.iter.clone().len() {
+            return false;
+        }
+        self.iter
+            .clone()
+            .zip(other.iter.clone())
+            .all(|(a, b)| a == b)
     }
 }
 
@@ -764,26 +779,28 @@ impl PartialEq for CompoundList<'_, '_> {
 pub struct CompoundListIter<'a, 'tape> {
     current_tape_offset: usize,
     max_tape_offset: usize,
-    length: usize,
+    approx_length: usize,
     tape: &'tape [TapeElement],
     extra_tapes: *const ExtraTapes<'a>,
 }
 impl<'a: 'tape, 'tape> CompoundListIter<'a, 'tape> {
     /// Returns the number of tags directly in this list.
     ///
-    /// Note that due to an optimization, this saturates at 2^24. Use [`Self::exact_len`] if you
-    /// need the length to always be accurate at extremes.
-    pub fn len(&self) -> usize {
-        self.length
-    }
-
-    pub fn exact_len(self) -> usize {
-        let len = self.len();
+    /// Note that due to an internal optimization, this function runs at `O(n)`
+    /// if the list has at least 2^24 items. Use [`Self::approx_len`] if you
+    /// want to avoid that.
+    pub fn len(self) -> usize {
+        let len = self.approx_len();
         if len < 2usize.pow(24) {
             len
         } else {
             self.count()
         }
+    }
+
+    /// A version of [`Self::len`] that saturates at 2^24.
+    pub fn approx_len(&self) -> usize {
+        self.approx_length
     }
 }
 impl<'a: 'tape, 'tape> Iterator for CompoundListIter<'a, 'tape> {
@@ -814,7 +831,7 @@ impl Default for CompoundListIter<'_, '_> {
         CompoundListIter {
             current_tape_offset: 0,
             max_tape_offset: 0,
-            length: 0,
+            approx_length: 0,
             tape: &[],
             // this won't ever get dereferenced because .next() will return immediately
             extra_tapes: std::ptr::null(),

@@ -150,18 +150,11 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
 
     /// Returns the number of tags directly in this compound.
     ///
-    /// Note that due to an optimization, this saturates at 2^24. This means if you have a
-    /// compound with more than 2^24 items, then this function will just return 2^24 instead of the
-    /// correct length. If you absolutely need the correct length, you can always just iterate over
-    /// the compound and get the length that way.
+    /// Note that due to an internal optimization, this function runs at `O(n)`
+    /// if the compound has at least 2^24 items. Use [`Self::approx_len`] if you
+    /// want to avoid that.
     pub fn len(&self) -> usize {
-        let (kind, value) = self.element();
-        debug_assert_eq!(kind, TapeTagKind::Compound);
-        unsafe { u32::from(value.list_list.0) as usize }
-    }
-
-    pub fn exact_len(self) -> usize {
-        let len = self.len();
+        let len = self.approx_len();
         if len < 2usize.pow(24) {
             len
         } else {
@@ -169,8 +162,15 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
         }
     }
 
+    /// A version of [`Self::len`] that saturates at 2^24.
+    pub fn approx_len(self) -> usize {
+        let (kind, value) = self.element();
+        debug_assert_eq!(kind, TapeTagKind::Compound);
+        unsafe { u32::from(value.list_list.0) as usize }
+    }
+
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.approx_len() == 0
     }
     #[allow(clippy::type_complexity)]
     pub fn keys(
