@@ -54,7 +54,7 @@ nbt.write(&mut buffer);
 
 Use the borrow variant of `Nbt` if possible, and avoid allocating unnecessarily (for example, keep strings as `Cow<str>` if you can).
 
-The most significant and simple optimization you can do is switching to an allocator like [mimalloc](https://docs.rs/mimalloc/latest/mimalloc/) (it's ~20% faster on my machine). Setting `RUSTFLAGS='-C target-cpu=native'` when running your code may also help a little bit.
+If you're using the owned variant of simdnbt, switching to a faster allocator like [mimalloc](https://docs.rs/mimalloc/latest/mimalloc/) may help a decent amount (it's ~20% faster on my machine). Setting `RUSTFLAGS='-C target-cpu=native'` when running your code may also help a little bit.
 
 ## Implementation details
 
@@ -68,9 +68,11 @@ Simdnbt ~~cheats~~ takes some shortcuts to be this fast:
 1. it requires a reference to the original data (to avoid cloning)
 2. it doesn't validate/decode the MUTF-8 strings at decode-time
 
+Several ideas are borrowed from simdjson, notably the usage of a [tape](https://github.com/simdjson/simdjson/blob/master/doc/tape.md).
+
 ## Benchmarks
 
-Simdnbt is likely the fastest NBT decoder currently in existence.
+Simdnbt is the fastest NBT parser in Rust.
 
 Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crates for decoding [`complex_player.dat`](https://github.com/azalea-rs/simdnbt/blob/master/simdnbt/tests/complex_player.dat):
 
