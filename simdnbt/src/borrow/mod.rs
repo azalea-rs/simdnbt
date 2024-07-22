@@ -147,12 +147,13 @@ fn read_with_stack<'a>(
     stack: &mut ParsingStack,
 ) -> Result<(), Error> {
     while !stack.is_empty() {
-        match stack.peek_mut() {
+        let top = stack.peek_mut();
+        match top {
             ParsingStackElement::Compound { .. } => read_tag_in_compound(data, tapes, stack)?,
-            ParsingStackElement::ListOfLists { .. } => read_list_in_list(data, tapes, stack)?,
             ParsingStackElement::ListOfCompounds { .. } => {
                 read_compound_in_list(data, tapes, stack)?
             }
+            ParsingStackElement::ListOfLists { .. } => read_list_in_list(data, tapes, stack)?,
         }
     }
 

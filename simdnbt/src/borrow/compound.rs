@@ -7,8 +7,9 @@ use crate::{
         DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID,
         MAX_DEPTH, SHORT_ID, STRING_ID,
     },
+    error::NonRootError,
     reader::Reader,
-    Error, Mutf8Str,
+    Mutf8Str,
 };
 
 use super::{
@@ -30,7 +31,7 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
         _data: &mut Reader<'a>,
         tapes: &'tape mut Tapes<'a>,
         stack: &mut ParsingStack,
-    ) -> Result<(), Error> {
+    ) -> Result<(), NonRootError> {
         let index_of_compound_element = tapes.main.len();
 
         stack.push(ParsingStackElement::Compound {
@@ -235,8 +236,8 @@ impl<'a: 'tape, 'tape> Iterator for CompoundIter<'a, 'tape> {
 #[derive(Debug, Copy, Clone)]
 pub(crate) enum ParsingStackElement {
     Compound { index_of_compound_element: u32 },
-    ListOfLists { index_of_list_element: u32 },
     ListOfCompounds { index_of_list_element: u32 },
+    ListOfLists { index_of_list_element: u32 },
 }
 
 pub struct ParsingStack {
@@ -255,12 +256,12 @@ impl ParsingStack {
     }
 
     #[inline]
-    pub fn push(&mut self, state: ParsingStackElement) -> Result<(), Error> {
+    pub fn push(&mut self, state: ParsingStackElement) -> Result<(), NonRootError> {
         unsafe { self.stack.get_unchecked_mut(self.depth).write(state) };
         self.depth += 1;
 
         if self.depth >= MAX_DEPTH {
-            Err(Error::MaxDepthExceeded)
+            Err(NonRootError::max_depth_exceeded())
         } else {
             Ok(())
         }
@@ -327,7 +328,7 @@ pub(crate) fn read_tag<'a>(
     tapes: &mut Tapes<'a>,
     stack: &mut ParsingStack,
     tag_type: u8,
-) -> Result<(), Error> {
+) -> Result<(), NonRootError> {
     match tag_type {
         COMPOUND_ID => return NbtCompound::read(data, tapes, stack),
         LIST_ID => return NbtList::read(data, tapes, stack),
@@ -426,7 +427,7 @@ pub(crate) fn read_tag<'a>(
                 ),
             });
         }
-        _ => return Err(Error::UnknownTagId(tag_type)),
+        _ => return Err(NonRootError::unknown_tag_id(tag_type)),
     };
     Ok(())
 }
@@ -436,7 +437,7 @@ pub(crate) fn read_tag_in_compound<'a>(
     data: &mut Reader<'a>,
     tapes: &mut Tapes<'a>,
     stack: &mut ParsingStack,
-) -> Result<(), Error> {
+) -> Result<(), NonRootError> {
     let tag_type = data.read_u8()?;
     if tag_type == END_ID {
         handle_compound_end(tapes, stack);

@@ -7,10 +7,11 @@ use crate::{
         BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
         LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
     },
+    error::NonRootError,
     raw_list::RawList,
     reader::Reader,
     swap_endianness::SwappableNumber,
-    Error, Mutf8Str,
+    Mutf8Str,
 };
 
 use super::{
@@ -31,7 +32,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         data: &mut Reader<'a>,
         tapes: &mut Tapes<'a>,
         stack: &mut ParsingStack,
-    ) -> Result<(), Error> {
+    ) -> Result<(), NonRootError> {
         let tag_type = data.read_u8()?;
         match tag_type {
             END_ID => {
@@ -221,7 +222,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                     tapes.extra.elements.push(ExtraTapeElement { long_array });
                 }
             }
-            _ => return Err(Error::UnknownTagId(tag_type)),
+            _ => return Err(NonRootError::unknown_tag_id(tag_type)),
         };
         Ok(())
     }
@@ -867,7 +868,7 @@ pub fn read_list_in_list<'a>(
     data: &mut Reader<'a>,
     tapes: &mut Tapes<'a>,
     stack: &mut ParsingStack,
-) -> Result<(), Error> {
+) -> Result<(), NonRootError> {
     let ParsingStackElement::ListOfLists {
         index_of_list_element,
     } = stack.peek()
@@ -903,7 +904,7 @@ pub(crate) fn read_compound_in_list<'a>(
     data: &mut Reader<'a>,
     tapes: &mut Tapes<'a>,
     stack: &mut ParsingStack,
-) -> Result<(), Error> {
+) -> Result<(), NonRootError> {
     let ParsingStackElement::ListOfCompounds {
         index_of_list_element,
     } = stack.peek()

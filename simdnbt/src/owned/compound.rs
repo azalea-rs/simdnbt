@@ -2,9 +2,10 @@ use std::mem::{self, MaybeUninit};
 
 use crate::{
     common::{read_string, unchecked_push, unchecked_write_string, END_ID, MAX_DEPTH},
+    error::NonRootError,
     mutf8::Mutf8String,
     reader::Reader,
-    Error, Mutf8Str, ToNbtTag,
+    Mutf8Str, ToNbtTag,
 };
 
 use super::{list::NbtList, NbtTag};
@@ -24,7 +25,7 @@ impl NbtCompound {
         Self { values }
     }
 
-    pub(crate) fn read(data: &mut Reader<'_>) -> Result<Self, Error> {
+    pub(crate) fn read(data: &mut Reader<'_>) -> Result<Self, NonRootError> {
         Self::read_with_depth(data, 0)
     }
 
@@ -32,9 +33,9 @@ impl NbtCompound {
         data: &mut Reader<'_>,
         depth: usize,
         capacity: usize,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, NonRootError> {
         if depth > MAX_DEPTH {
-            return Err(Error::MaxDepthExceeded);
+            return Err(NonRootError::max_depth_exceeded());
         }
 
         let mut tags_buffer = unsafe {
@@ -44,7 +45,7 @@ impl NbtCompound {
 
         let mut values = Vec::with_capacity(capacity);
         loop {
-            let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+            let tag_type = data.read_u8().map_err(|_| NonRootError::unexpected_eof())?;
             if tag_type == END_ID {
                 break;
             }
@@ -69,7 +70,10 @@ impl NbtCompound {
         Ok(Self { values })
     }
 
-    pub(crate) fn read_with_depth(data: &mut Reader<'_>, depth: usize) -> Result<Self, Error> {
+    pub(crate) fn read_with_depth(
+        data: &mut Reader<'_>,
+        depth: usize,
+    ) -> Result<Self, NonRootError> {
         Self::read_with_depth_and_capacity(data, depth, 8)
     }
 

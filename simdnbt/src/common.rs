@@ -1,10 +1,11 @@
 use std::{mem, slice};
 
 use crate::{
+    error::UnexpectedEofError,
     raw_list::RawList,
     reader::Reader,
     swap_endianness::{swap_endianness_as_u8, SwappableNumber},
-    Error, Mutf8Str,
+    Mutf8Str,
 };
 
 pub const END_ID: u8 = 0;
@@ -24,37 +25,43 @@ pub const LONG_ARRAY_ID: u8 = 12;
 pub const MAX_DEPTH: usize = 512;
 
 #[inline(always)]
-pub fn read_with_u16_length<'a>(data: &mut Reader<'a>, width: usize) -> Result<&'a [u8], Error> {
+pub fn read_with_u16_length<'a>(
+    data: &mut Reader<'a>,
+    width: usize,
+) -> Result<&'a [u8], UnexpectedEofError> {
     let length = data.read_u16()?;
     let length_in_bytes = length as usize * width;
     data.read_slice(length_in_bytes)
 }
 
 #[inline(never)]
-pub fn read_with_u32_length<'a>(data: &mut Reader<'a>, width: usize) -> Result<&'a [u8], Error> {
+pub fn read_with_u32_length<'a>(
+    data: &mut Reader<'a>,
+    width: usize,
+) -> Result<&'a [u8], UnexpectedEofError> {
     let length = data.read_u32()?;
     let length_in_bytes = length as usize * width;
     data.read_slice(length_in_bytes)
 }
 
-pub fn read_string<'a>(data: &mut Reader<'a>) -> Result<&'a Mutf8Str, Error> {
+pub fn read_string<'a>(data: &mut Reader<'a>) -> Result<&'a Mutf8Str, UnexpectedEofError> {
     let data = read_with_u16_length(data, 1)?;
     Ok(Mutf8Str::from_slice(data))
 }
 
-pub fn read_u8_array<'a>(data: &mut Reader<'a>) -> Result<&'a [u8], Error> {
+pub fn read_u8_array<'a>(data: &mut Reader<'a>) -> Result<&'a [u8], UnexpectedEofError> {
     read_with_u32_length(data, 1)
 }
-pub fn read_i8_array<'a>(data: &mut Reader<'a>) -> Result<&'a [i8], Error> {
+pub fn read_i8_array<'a>(data: &mut Reader<'a>) -> Result<&'a [i8], UnexpectedEofError> {
     Ok(slice_u8_into_i8(read_u8_array(data)?))
 }
 
-pub fn read_int_array<'a>(data: &mut Reader<'a>) -> Result<RawList<'a, i32>, Error> {
+pub fn read_int_array<'a>(data: &mut Reader<'a>) -> Result<RawList<'a, i32>, UnexpectedEofError> {
     let array_bytes = read_with_u32_length(data, 4)?;
     Ok(RawList::new(array_bytes))
 }
 
-pub fn read_long_array<'a>(data: &mut Reader<'a>) -> Result<RawList<'a, i64>, Error> {
+pub fn read_long_array<'a>(data: &mut Reader<'a>) -> Result<RawList<'a, i64>, UnexpectedEofError> {
     let array_bytes = read_with_u32_length(data, 8)?;
     Ok(RawList::new(array_bytes))
 }
