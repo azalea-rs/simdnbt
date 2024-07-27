@@ -1,4 +1,7 @@
-use std::fmt::{self, Debug};
+use std::{
+    fmt::{self, Debug},
+    mem,
+};
 
 use crate::common::{
     BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LONG_ARRAY_ID,
@@ -39,41 +42,77 @@ impl Default for MainTape {
 }
 
 #[derive(Clone, Copy)]
-#[repr(C)]
-pub union TapeElement {
-    pub kind: (TapeTagKind, TapeTagValue),
+pub struct TapeElement(u64);
 
-    pub long: i64,
-    pub double: f64,
+impl TapeElement {
+    pub fn kind(self) -> TapeTagKind {
+        let kind_id = (self.0 >> 56) as u8;
+        unsafe { mem::transmute::<u8, TapeTagKind>(kind_id) }
+    }
+    pub fn u8(self) -> u8 {
+        self.0 as u8
+    }
+    pub fn u16(self) -> u16 {
+        self.0 as u16
+    }
+    pub fn u32(self) -> u32 {
+        self.0 as u32
+    }
+    pub fn u64(self) -> u64 {
+        self.0
+    }
 
-    pub name: u64, // pointer to the original data
+    pub fn approx_len_and_offset(self) -> (u32, u32) {
+        ((self.0 >> 32) as u32 & 0xff_ffff, self.0 as u32)
+    }
+    pub fn ptr<T>(self) -> *const T {
+        (self.0 & 0xff_ffff_ffff_ffff) as *const T
+    }
+
+    pub fn new_with_approx_len_and_offset(kind: TapeTagKind, approx_len: u32, offset: u32) -> Self {
+        debug_assert!(approx_len < 2u32.pow(24));
+        Self((kind as u64) << 56 | (approx_len as u64) << 32 | (offset as u64))
+    }
+    pub fn set_offset(&mut self, offset: u32) {
+        *self = Self::new_with_approx_len_and_offset(
+            self.kind(),
+            self.approx_len_and_offset().0,
+            offset,
+        )
+    }
+
+    pub fn new_with_u8(kind: TapeTagKind, u8: u8) -> Self {
+        Self((kind as u64) << 56 | u8 as u64)
+    }
+    pub fn new_with_u16(kind: TapeTagKind, u16: u16) -> Self {
+        Self((kind as u64) << 56 | u16 as u64)
+    }
+    pub fn new_with_u32(kind: TapeTagKind, u32: u32) -> Self {
+        Self((kind as u64) << 56 | u32 as u64)
+    }
+    pub fn new_with_ptr<T>(kind: TapeTagKind, ptr: *const T) -> Self {
+        Self((kind as u64) << 56 | ptr as u64)
+    }
+    /// Create a new TapeElement with the given kind and everything else set to 0.
+    pub fn new_with_0(kind: TapeTagKind) -> Self {
+        Self((kind as u64) << 56)
+    }
+    pub fn new(u64: u64) -> Self {
+        Self(u64)
+    }
 }
+
 impl TapeElement {
     /// Returns how much we should increment the tape index to get to the next tag.
     ///
     /// # Safety
     /// The element must be a tag and not something else like a continuation of a long or double.
     pub unsafe fn skip_offset(&self) -> usize {
-        match self.kind {
-            (TapeTagKind::Long | TapeTagKind::Double, _) => 2,
-            (
-                TapeTagKind::Compound,
-                TapeTagValue {
-                    compound: (_, offset),
-                },
-            ) => u32::from(offset) as usize,
-            (
-                TapeTagKind::ListList,
-                TapeTagValue {
-                    list_list: (_, offset),
-                },
-            ) => u32::from(offset) as usize,
-            (
-                TapeTagKind::CompoundList,
-                TapeTagValue {
-                    compound_list: (_, offset),
-                },
-            ) => u32::from(offset) as usize,
+        match self.kind() {
+            TapeTagKind::Long | TapeTagKind::Double => 2,
+            TapeTagKind::Compound | TapeTagKind::ListList | TapeTagKind::CompoundList => {
+                self.approx_len_and_offset().1 as usize
+            }
             _ => 1,
         }
     }
@@ -81,40 +120,9 @@ impl TapeElement {
 impl Debug for TapeElement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // just writes the u64
-        write!(f, "TapeElement({:#016x})", unsafe { self.name })?;
+        write!(f, "TapeElement({:#016x})", self.0)?;
         Ok(())
     }
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub union TapeTagValue {
-    pub byte: i8,
-    pub short: i16,
-    pub int: i32,
-    pub long: (), // value is in next tape element
-    pub float: f32,
-    pub double: (),                    // value is in next tape element
-    pub byte_array: u56,               // pointer to the original data
-    pub string: u56,                   // pointer to the original data
-    pub compound: (u24, UnalignedU32), // length estimate + tape index offset to the end of the compound
-    pub int_array: u56,                // pointer to the original data
-    pub long_array: u56,               // pointer to the original data
-
-    // lists
-    pub empty_list: (),
-    pub byte_list: u56,                       // pointer to the original data
-    pub short_list: u56,                      // pointer to the original data
-    pub int_list: u56,                        // pointer to the original data
-    pub long_list: u56,                       // pointer to the original data
-    pub float_list: u56,                      // pointer to the original data
-    pub double_list: u56,                     // pointer to the original data
-    pub byte_array_list: (u24, UnalignedU32), // padding + index to ExtraTapes which has a fat pointer that points to the original data
-    pub string_list: (u24, UnalignedU32),     // padding + index to ExtraTapes
-    pub list_list: (u24, UnalignedU32), // length estimate + tape index offset to the end of the list
-    pub compound_list: (u24, UnalignedU32), // length estimate + tape index offset to the end of the list
-    pub int_array_list: (u24, UnalignedU32), // padding + index to ExtraTapes
-    pub long_array_list: (u24, UnalignedU32), // padding + index to ExtraTapes
 }
 
 #[derive(Debug, Copy, Clone)]

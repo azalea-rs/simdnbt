@@ -17,7 +17,7 @@ use crate::{
 use super::{
     compound::{ParsingStack, ParsingStackElement},
     extra_tapes::{ExtraTapeElement, ExtraTapes},
-    tape::{TapeElement, TapeTagKind, TapeTagValue, UnalignedU32},
+    tape::{TapeElement, TapeTagKind, UnalignedU32},
     NbtCompound, Tapes,
 };
 
@@ -38,92 +38,64 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             END_ID => {
                 // the length is unused for this type of lists
                 data.skip(4)?;
-                tapes.main.push(TapeElement {
-                    kind: (TapeTagKind::EmptyList, TapeTagValue { empty_list: () }),
-                });
+                tapes
+                    .main
+                    .push(TapeElement::new_with_0(TapeTagKind::EmptyList));
             }
             BYTE_ID => {
-                let byte_list_pointer = data.cur as u64;
+                let byte_list_ptr = data.cur;
                 let _ = read_i8_array(data)?;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::ByteList,
-                        TapeTagValue {
-                            byte_list: byte_list_pointer.into(),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_ptr(
+                    TapeTagKind::ByteList,
+                    byte_list_ptr,
+                ));
             }
             SHORT_ID => {
-                let short_list_pointer = data.cur as u64;
+                let short_list_ptr = data.cur;
                 read_with_u32_length(data, 2)?;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::ShortList,
-                        TapeTagValue {
-                            short_list: short_list_pointer.into(),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_ptr(
+                    TapeTagKind::ShortList,
+                    short_list_ptr,
+                ));
             }
             INT_ID => {
-                let int_list_pointer = data.cur as u64;
+                let int_list_ptr = data.cur;
                 read_with_u32_length(data, 4)?;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::IntList,
-                        TapeTagValue {
-                            int_list: int_list_pointer.into(),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_ptr(
+                    TapeTagKind::IntList,
+                    int_list_ptr,
+                ));
             }
             LONG_ID => {
-                let long_list_pointer = data.cur as u64;
+                let long_list_ptr = data.cur;
                 read_with_u32_length(data, 8)?;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::LongList,
-                        TapeTagValue {
-                            long_list: long_list_pointer.into(),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_ptr(
+                    TapeTagKind::LongList,
+                    long_list_ptr,
+                ));
             }
             FLOAT_ID => {
-                let float_list_pointer = data.cur as u64;
+                let float_list_ptr = data.cur;
                 read_with_u32_length(data, 4)?;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::FloatList,
-                        TapeTagValue {
-                            float_list: float_list_pointer.into(),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_ptr(
+                    TapeTagKind::FloatList,
+                    float_list_ptr,
+                ));
             }
             DOUBLE_ID => {
-                let double_list_pointer = data.cur as u64;
+                let double_list_ptr = data.cur;
                 read_with_u32_length(data, 8)?;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::DoubleList,
-                        TapeTagValue {
-                            double_list: double_list_pointer.into(),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_ptr(
+                    TapeTagKind::DoubleList,
+                    double_list_ptr,
+                ));
             }
             BYTE_ARRAY_ID => {
                 let index_of_element = tapes.extra.elements.len() as u32;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::ByteArrayList,
-                        TapeTagValue {
-                            byte_array_list: (0.into(), index_of_element.into()),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_u32(
+                    TapeTagKind::ByteArrayList,
+                    index_of_element,
+                ));
 
                 let length = data.read_u32()?;
                 tapes.extra.elements.push(ExtraTapeElement { length });
@@ -134,14 +106,10 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             }
             STRING_ID => {
                 let index_of_element = tapes.extra.elements.len() as u32;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::StringList,
-                        TapeTagValue {
-                            string_list: (0.into(), index_of_element.into()),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_u32(
+                    TapeTagKind::StringList,
+                    index_of_element,
+                ));
 
                 let length = data.read_u32()?;
                 tapes.extra.elements.push(ExtraTapeElement { length });
@@ -159,15 +127,12 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                     index_of_list_element: index_of_list_element as u32,
                 })?;
                 stack.set_list_length(length);
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::ListList,
-                        TapeTagValue {
-                            // can't know the offset until after
-                            list_list: (length.into(), 0.into()),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_approx_len_and_offset(
+                    TapeTagKind::ListList,
+                    length,
+                    // can't know the offset until after
+                    0,
+                ));
             }
             COMPOUND_ID => {
                 let length = data.read_u32()?;
@@ -178,26 +143,19 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                     index_of_list_element: index_of_list_element as u32,
                 })?;
                 stack.set_list_length(length);
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::CompoundList,
-                        TapeTagValue {
-                            // this gets overwritten after the list is fully read
-                            compound_list: (length.into(), 0.into()),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_approx_len_and_offset(
+                    TapeTagKind::CompoundList,
+                    length,
+                    // this gets overwritten after the list is fully read
+                    0,
+                ));
             }
             INT_ARRAY_ID => {
                 let index_of_element = tapes.extra.elements.len() as u32;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::IntArrayList,
-                        TapeTagValue {
-                            int_array_list: (0.into(), index_of_element.into()),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_u32(
+                    TapeTagKind::IntArrayList,
+                    index_of_element,
+                ));
                 let length = data.read_u32()?;
                 tapes.extra.elements.push(ExtraTapeElement { length });
                 for _ in 0..length {
@@ -207,14 +165,10 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             }
             LONG_ARRAY_ID => {
                 let index_of_element = tapes.extra.elements.len() as u32;
-                tapes.main.push(TapeElement {
-                    kind: (
-                        TapeTagKind::LongArrayList,
-                        TapeTagValue {
-                            long_array_list: (0.into(), index_of_element.into()),
-                        },
-                    ),
-                });
+                tapes.main.push(TapeElement::new_with_u32(
+                    TapeTagKind::LongArrayList,
+                    index_of_element.into(),
+                ));
                 let length = data.read_u32()?;
                 tapes.extra.elements.push(ExtraTapeElement { length });
                 for _ in 0..length {
@@ -228,11 +182,11 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
-        let (kind, _) = self.element();
+        let el = self.element();
 
         data.push(self.id());
 
-        match kind {
+        match el.kind() {
             TapeTagKind::EmptyList => {
                 data.extend(&0u32.to_be_bytes());
             }
@@ -326,14 +280,14 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
     }
 
     /// Get the tape element kind and value for this list.
-    fn element(&self) -> (TapeTagKind, TapeTagValue) {
-        unsafe { (*self.element).kind }
+    fn element(&self) -> TapeElement {
+        unsafe { *self.element }
     }
 
     /// Get the numerical ID of the tag type.
     #[inline]
     pub fn id(&self) -> u8 {
-        match self.element().0 {
+        match self.element().kind() {
             TapeTagKind::EmptyList => END_ID,
             TapeTagKind::ByteList => BYTE_ID,
             TapeTagKind::ShortList => SHORT_ID,
@@ -354,15 +308,15 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
     /// Returns whether the list is specifically a list with the `empty` tag type. This will return
     /// false if the list is any other type (even it has a length of zero).
     pub fn empty(&self) -> bool {
-        self.element().0 == TapeTagKind::EmptyList
+        self.element().kind() == TapeTagKind::EmptyList
     }
 
     pub fn bytes(&self) -> Option<&[i8]> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::ByteList {
+        let el = self.element();
+        if el.kind() != TapeTagKind::ByteList {
             return None;
         }
-        let length_ptr = u64::from(unsafe { value.byte_list }) as usize as *const UnalignedU32;
+        let length_ptr = el.ptr::<UnalignedU32>();
         let length = unsafe { u32::from(*length_ptr).swap_bytes() as usize };
         let byte_array =
             unsafe { std::slice::from_raw_parts(length_ptr.add(1) as *const i8, length) };
@@ -384,11 +338,11 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         u32_prefixed_list_to_vec(TapeTagKind::DoubleList, self.element)
     }
     pub fn byte_arrays(&self) -> Option<&'a [&'a [u8]]> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::ByteArrayList {
+        let el = self.element();
+        if el.kind() != TapeTagKind::ByteArrayList {
             return None;
         }
-        let index_to_extra_tapes = u32::from(unsafe { value.byte_array_list.1 }) as usize;
+        let index_to_extra_tapes = el.u32() as usize;
         let length_ref = &self.extra_tapes.elements[index_to_extra_tapes];
         let length = unsafe { length_ref.length as usize };
         let slice = unsafe {
@@ -404,11 +358,11 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         Some(slice)
     }
     pub fn strings(&self) -> Option<&'a [&'a Mutf8Str]> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::StringList {
+        let el = self.element();
+        if el.kind() != TapeTagKind::StringList {
             return None;
         }
-        let index_to_extra_tapes = u32::from(unsafe { value.string_list.1 }) as usize;
+        let index_to_extra_tapes = el.u32() as usize;
         let length_ref = &self.extra_tapes.elements[index_to_extra_tapes];
         let length = unsafe { length_ref.length as usize };
         let slice = unsafe {
@@ -424,19 +378,18 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         Some(slice)
     }
     pub fn lists(&self) -> Option<ListList<'a, 'tape>> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::ListList {
+        let el = self.element();
+        if el.kind() != TapeTagKind::ListList {
             return None;
         }
 
-        let length = u32::from(unsafe { value.list_list.0 }) as usize;
-        let max_tape_offset = u32::from(unsafe { value.list_list.1 }) as usize;
+        let (approx_length, max_tape_offset) = el.approx_len_and_offset();
 
         Some(ListList {
             iter: ListListIter {
                 current_tape_offset: 0, // it's an iterator, it starts at 0
-                max_tape_offset,
-                approx_length: length,
+                max_tape_offset: max_tape_offset as usize,
+                approx_length,
                 tape: unsafe { self.element.add(1) }, // the first element is the listlist element so we don't include it
                 extra_tapes: self.extra_tapes,
                 _phantom: PhantomData,
@@ -445,14 +398,14 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
     }
 
     pub fn compounds(&self) -> Option<CompoundList<'a, 'tape>> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::CompoundList {
+        let el = self.element();
+        if el.kind() != TapeTagKind::CompoundList {
             return None;
         }
 
-        let length = u32::from(unsafe { value.compound_list.0 }) as usize;
+        let (approx_length, max_tape_offset) = el.approx_len_and_offset();
+        let max_tape_offset = max_tape_offset as usize;
 
-        let max_tape_offset = u32::from(unsafe { value.compound_list.1 }) as usize;
         let tape_slice =
             unsafe { std::slice::from_raw_parts(self.element.add(1), max_tape_offset) };
 
@@ -460,18 +413,18 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             iter: CompoundListIter {
                 current_tape_offset: 0,
                 max_tape_offset,
-                approx_length: length,
+                approx_length,
                 tape: tape_slice,
                 extra_tapes: self.extra_tapes,
             },
         })
     }
     pub fn int_arrays(&self) -> Option<&[RawList<i32>]> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::IntArrayList {
+        let el = self.element();
+        if el.kind() != TapeTagKind::IntArrayList {
             return None;
         }
-        let index_to_extra_tapes = u32::from(unsafe { value.int_array_list.1 }) as usize;
+        let index_to_extra_tapes = el.u32() as usize;
         let length_ref = &self.extra_tapes.elements[index_to_extra_tapes];
         let length = unsafe { length_ref.length as usize };
         let slice = unsafe {
@@ -487,11 +440,11 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         Some(slice)
     }
     pub fn long_arrays(&self) -> Option<&[RawList<i64>]> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::LongArrayList {
+        let el = self.element();
+        if el.kind() != TapeTagKind::LongArrayList {
             return None;
         }
-        let index_to_extra_tapes = u32::from(unsafe { value.long_array_list.1 }) as usize;
+        let index_to_extra_tapes = el.u32() as usize;
         let length_ref = &self.extra_tapes.elements[index_to_extra_tapes];
         let length = unsafe { length_ref.length as usize };
         let slice = unsafe {
@@ -508,9 +461,9 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
     }
 
     pub fn to_owned(&self) -> crate::owned::NbtList {
-        let (kind, _value) = self.element();
+        let el = self.element();
 
-        match kind {
+        match el.kind() {
             TapeTagKind::EmptyList => crate::owned::NbtList::Empty,
             TapeTagKind::ByteList => crate::owned::NbtList::Byte(self.bytes().unwrap().to_vec()),
             TapeTagKind::ShortList => crate::owned::NbtList::Short(self.shorts().unwrap().to_vec()),
@@ -569,12 +522,12 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
 
 impl PartialEq for NbtList<'_, '_> {
     fn eq(&self, other: &Self) -> bool {
-        let (self_kind, _) = self.element();
-        let (other_kind, _) = other.element();
-        if self_kind != other_kind {
+        let self_el = self.element();
+        let other_el = other.element();
+        if self_el.kind() != other_el.kind() {
             return false;
         }
-        match self_kind {
+        match self_el.kind() {
             TapeTagKind::EmptyList => true,
             TapeTagKind::ByteList => self.bytes().unwrap() == other.bytes().unwrap(),
             TapeTagKind::ShortList => self.shorts().unwrap() == other.shorts().unwrap(),
@@ -612,7 +565,7 @@ impl<'a, 'tape> ListList<'a, 'tape> {
         self.iter.len()
     }
     /// A version of [`Self::len`] that saturates at 2^24.
-    pub fn approx_len(&self) -> usize {
+    pub fn approx_len(&self) -> u32 {
         self.iter.approx_len()
     }
     /// Get the element at the given index. This is O(n) where n is index, so if you'll be calling
@@ -654,7 +607,7 @@ impl PartialEq for ListList<'_, '_> {
 pub struct ListListIter<'a, 'tape> {
     current_tape_offset: usize,
     max_tape_offset: usize,
-    approx_length: usize,
+    approx_length: u32,
     tape: *const TapeElement,
     extra_tapes: *const ExtraTapes<'a>,
     _phantom: PhantomData<&'tape ()>,
@@ -667,15 +620,15 @@ impl<'a: 'tape, 'tape> ListListIter<'a, 'tape> {
     /// want to avoid that.
     pub fn len(self) -> usize {
         let len = self.approx_len();
-        if len < 2usize.pow(24) {
-            len
+        if len < 2u32.pow(24) {
+            len as usize
         } else {
             self.count()
         }
     }
 
     /// A version of [`Self::len`] that saturates at 2^24.
-    pub fn approx_len(&self) -> usize {
+    pub fn approx_len(&self) -> u32 {
         self.approx_length
     }
 }
@@ -687,19 +640,18 @@ impl<'a: 'tape, 'tape> Iterator for ListListIter<'a, 'tape> {
             return None;
         }
 
-        let element = unsafe { self.tape.add(self.current_tape_offset) };
-        // println!("{:?}", unsafe { *element });
-        let (kind, value) = unsafe { (*element).kind };
-        debug_assert!(kind.is_list());
+        let el_ptr = unsafe { self.tape.add(self.current_tape_offset) };
+        let el = unsafe { *el_ptr };
+        debug_assert!(el.kind().is_list());
 
-        let offset = if matches!(kind, TapeTagKind::CompoundList | TapeTagKind::ListList) {
-            u32::from(unsafe { value.list_list.1 }) as usize
+        let offset = if matches!(el.kind(), TapeTagKind::CompoundList | TapeTagKind::ListList) {
+            el.u32() as usize
         } else {
             1
         };
 
         let nbt_list = NbtList {
-            element,
+            element: el_ptr,
             extra_tapes: unsafe { &*self.extra_tapes },
         };
 
@@ -736,7 +688,7 @@ impl<'a, 'tape> CompoundList<'a, 'tape> {
         self.iter.len()
     }
     /// A version of [`Self::len`] that saturates at 2^24.
-    pub fn approx_len(&self) -> usize {
+    pub fn approx_len(&self) -> u32 {
         self.iter.approx_len()
     }
     /// Get the element at the given index. This is `O(n)` where n is index, so
@@ -779,7 +731,7 @@ impl PartialEq for CompoundList<'_, '_> {
 pub struct CompoundListIter<'a, 'tape> {
     current_tape_offset: usize,
     max_tape_offset: usize,
-    approx_length: usize,
+    approx_length: u32,
     tape: &'tape [TapeElement],
     extra_tapes: *const ExtraTapes<'a>,
 }
@@ -791,15 +743,15 @@ impl<'a: 'tape, 'tape> CompoundListIter<'a, 'tape> {
     /// want to avoid that.
     pub fn len(self) -> usize {
         let len = self.approx_len();
-        if len < 2usize.pow(24) {
-            len
+        if len < 2u32.pow(24) {
+            len as usize
         } else {
             self.count()
         }
     }
 
     /// A version of [`Self::len`] that saturates at 2^24.
-    pub fn approx_len(&self) -> usize {
+    pub fn approx_len(&self) -> u32 {
         self.approx_length
     }
 }
@@ -811,14 +763,14 @@ impl<'a: 'tape, 'tape> Iterator for CompoundListIter<'a, 'tape> {
             return None;
         }
 
-        let element = unsafe { self.tape.as_ptr().add(self.current_tape_offset) };
-        let (kind, value) = unsafe { (*element).kind };
-        debug_assert_eq!(kind, TapeTagKind::Compound);
+        let el_ptr = unsafe { self.tape.as_ptr().add(self.current_tape_offset) };
+        let el = unsafe { *el_ptr };
+        debug_assert_eq!(el.kind(), TapeTagKind::Compound);
 
-        let offset = u32::from(unsafe { value.list_list.1 }) as usize;
+        let offset = el.u32() as usize;
 
         let compound = NbtCompound {
-            element,
+            element: el_ptr,
             extra_tapes: unsafe { &*self.extra_tapes },
         };
 
@@ -841,32 +793,30 @@ impl Default for CompoundListIter<'_, '_> {
 
 pub(crate) fn u32_prefixed_list_to_rawlist<'a, T>(
     expected_kind: TapeTagKind,
-    element: *const TapeElement,
+    el_ptr: *const TapeElement,
 ) -> Option<RawList<'a, T>>
 where
     T: Copy + SwappableNumber,
 {
-    let (kind, value) = unsafe { (*element).kind };
-    if kind != expected_kind {
+    let el = unsafe { *el_ptr };
+    if el.kind() != expected_kind {
         return None;
     }
 
-    unsafe { u32_prefixed_list_to_rawlist_unchecked(value) }
+    unsafe { u32_prefixed_list_to_rawlist_unchecked(el.ptr()) }
 }
 
 #[inline]
 pub(crate) unsafe fn u32_prefixed_list_to_rawlist_unchecked<'a, T>(
-    value: TapeTagValue,
+    ptr: *const UnalignedU32,
 ) -> Option<RawList<'a, T>>
 where
     T: Copy + SwappableNumber,
 {
     // length is always a u32
-    let length_ptr = u64::from(unsafe { value.int_list }) as usize as *const UnalignedU32;
-    let length = unsafe { u32::from(*length_ptr).swap_bytes() as usize };
+    let length = unsafe { u32::from(*ptr).swap_bytes() as usize };
     let length_in_bytes = length * std::mem::size_of::<T>();
-    let array_be =
-        unsafe { std::slice::from_raw_parts(length_ptr.add(1) as *const u8, length_in_bytes) };
+    let array_be = unsafe { std::slice::from_raw_parts(ptr.add(1) as *const u8, length_in_bytes) };
     Some(RawList::new(array_be))
 }
 
@@ -903,10 +853,7 @@ pub fn read_list_in_list<'a>(
             tapes
                 .main
                 .get_unchecked_mut(index_of_list_element as usize)
-                .kind
-                .1
-                .list_list
-                .1 = (index_after_end_element as u32 - index_of_list_element).into();
+                .set_offset(index_after_end_element as u32 - index_of_list_element);
         };
         return Ok(());
     }
@@ -939,10 +886,7 @@ pub(crate) fn read_compound_in_list<'a>(
             tapes
                 .main
                 .get_unchecked_mut(index_of_list_element as usize)
-                .kind
-                .1
-                .compound_list
-                .1 = (index_after_end_element as u32 - index_of_list_element).into();
+                .set_offset(index_after_end_element as u32 - index_of_list_element);
         };
         return Ok(());
     }

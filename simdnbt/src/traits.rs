@@ -39,7 +39,7 @@ pub trait ToNbtTag: Sized {
 
 impl<K: Display + FromStr + Eq + Hash, V: FromNbtTag> Deserialize for HashMap<K, V> {
     fn from_compound(compound: crate::borrow::NbtCompound) -> Result<Self, DeserializeError> {
-        let mut hashmap = HashMap::with_capacity(compound.approx_len());
+        let mut hashmap = HashMap::with_capacity(compound.approx_len() as usize);
 
         for (k, v) in compound.iter() {
             let k_str = k.to_str();
@@ -277,7 +277,7 @@ impl<T: Deserialize> FromNbtTag for Vec<Option<T>> {
     fn from_nbt_tag(tag: crate::borrow::NbtTag) -> Option<Self> {
         let list = tag.list()?;
         let list = list.compounds()?;
-        let mut vec = Vec::with_capacity(list.approx_len());
+        let mut vec = Vec::with_capacity(list.approx_len() as usize);
         for tag in list {
             if tag.is_empty() {
                 vec.push(None);
@@ -306,7 +306,7 @@ impl<T: Deserialize> FromNbtTag for Vec<T> {
     fn from_nbt_tag(tag: crate::borrow::NbtTag) -> Option<Self> {
         let list = tag.list()?;
         let list = list.compounds()?;
-        let mut vec = Vec::with_capacity(list.approx_len());
+        let mut vec = Vec::with_capacity(list.approx_len() as usize);
         for tag in list {
             vec.push(T::from_compound(tag).ok()?);
         }

@@ -11,7 +11,7 @@ use std::{
 };
 
 use byteorder::ReadBytesExt;
-use tape::UnalignedU32;
+use tape::{UnalignedU16, UnalignedU32};
 
 use crate::{
     common::{
@@ -27,7 +27,7 @@ use self::{
     compound::{read_tag_in_compound, ParsingStack, ParsingStackElement},
     extra_tapes::ExtraTapes,
     list::{read_compound_in_list, read_list_in_list},
-    tape::{MainTape, TapeElement, TapeTagKind, TapeTagValue, UnalignedU16},
+    tape::{MainTape, TapeElement, TapeTagKind},
 };
 
 /// Read a normal root NBT compound. This is either empty or has a name and compound tag.
@@ -50,15 +50,12 @@ pub fn read<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
     stack.push(ParsingStackElement::Compound {
         index_of_compound_element: 0,
     })?;
-    tapes.main.push(TapeElement {
-        kind: (
-            TapeTagKind::Compound,
-            TapeTagValue {
-                // this gets overwritten later
-                compound: (0.into(), 0.into()),
-            },
-        ),
-    });
+    tapes.main.push(TapeElement::new_with_approx_len_and_offset(
+        TapeTagKind::Compound,
+        // these get overwritten later
+        0,
+        0,
+    ));
 
     read_with_stack(&mut data, &mut tapes, &mut stack)?;
 
@@ -91,15 +88,12 @@ pub fn read_compound<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtCompound<
     stack.push(ParsingStackElement::Compound {
         index_of_compound_element: 0,
     })?;
-    tapes.main.push(TapeElement {
-        kind: (
-            TapeTagKind::Compound,
-            TapeTagValue {
-                // this gets overwritten later
-                compound: (0.into(), 0.into()),
-            },
-        ),
-    });
+    tapes.main.push(TapeElement::new_with_approx_len_and_offset(
+        TapeTagKind::Compound,
+        // these get overwritten later
+        0,
+        0,
+    ));
 
     read_with_stack(&mut data, &mut tapes, &mut stack)?;
 
@@ -350,7 +344,7 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
     /// Get the numerical ID of the tag type.
     #[inline]
     pub fn id(&self) -> u8 {
-        match self.element().0 {
+        match self.element().kind() {
             TapeTagKind::Byte => BYTE_ID,
             TapeTagKind::Short => SHORT_ID,
             TapeTagKind::Int => INT_ID,
@@ -368,74 +362,62 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
     }
 
     pub fn byte(&self) -> Option<i8> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::Byte {
-            return None;
-        }
-        Some(unsafe { value.byte })
+        let el = self.element();
+        ensure_kind(el, TapeTagKind::Byte)?;
+        Some(el.u8() as i8)
     }
     pub fn short(&self) -> Option<i16> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::Short {
-            return None;
-        }
-        Some(unsafe { value.short })
+        let el = self.element();
+        ensure_kind(el, TapeTagKind::Short)?;
+        Some(el.u16() as i16)
     }
     pub fn int(&self) -> Option<i32> {
-        let (kind, value) = unsafe { (*self.element).kind };
-        if kind != TapeTagKind::Int {
-            return None;
-        }
-        Some(unsafe { value.int })
+        let el = self.element();
+        ensure_kind(el, TapeTagKind::Int)?;
+        Some(el.u32() as i32)
     }
     pub fn long(&self) -> Option<i64> {
-        let (kind, _) = self.element();
-        if kind != TapeTagKind::Long {
-            return None;
-        }
+        let el = self.element();
+        ensure_kind(el, TapeTagKind::Long)?;
         // the value is in the next element because longs are too big to fit in a single element
-        let value = unsafe { self.element.add(1) };
-        Some(unsafe { (*value).long })
+        let value_el = unsafe { *self.element.add(1) };
+        Some(value_el.u64() as i64)
     }
     pub fn float(&self) -> Option<f32> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::Float {
-            return None;
-        }
-        Some(unsafe { value.float })
+        let el = self.element();
+        ensure_kind(el, TapeTagKind::Float)?;
+        Some(el.u32() as f32)
     }
     pub fn double(&self) -> Option<f64> {
-        let (kind, _) = self.element();
-        if kind != TapeTagKind::Double {
-            return None;
-        }
+        let el = self.element();
+        ensure_kind(el, TapeTagKind::Double)?;
         // the value is in the next element because doubles are too big to fit in a single element
-        let value = unsafe { self.element.add(1) };
-        Some(unsafe { (*value).double })
+        let value_el = unsafe { *self.element.add(1) };
+        Some(value_el.u64() as f64)
     }
     pub fn byte_array(&self) -> Option<&'a [u8]> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::ByteArray {
-            return None;
-        }
-        let length_ptr = unsafe { u64::from(value.byte_array) as *const UnalignedU32 };
-        let length = unsafe { u32::from(*length_ptr).swap_bytes() as usize };
+        let el = self.element();
+        ensure_kind(el, TapeTagKind::ByteArray)?;
+        let length_ptr = el.ptr::<UnalignedU32>();
+        let length = u32::from(unsafe { *length_ptr });
+        #[cfg(target_endian = "little")]
+        let length = length.swap_bytes();
         let data_ptr = unsafe { length_ptr.add(1) as *const u8 };
-        Some(unsafe { std::slice::from_raw_parts(data_ptr, length) })
+        Some(unsafe { std::slice::from_raw_parts(data_ptr, length as usize) })
     }
     pub fn string(&self) -> Option<&'a Mutf8Str> {
-        let (kind, value) = self.element();
-        if kind != TapeTagKind::String {
-            return None;
-        }
-        let length_ptr = unsafe { u64::from(value.string) as usize as *const UnalignedU16 };
-        let length = unsafe { u16::from(*length_ptr).swap_bytes() as usize };
+        let el = self.element();
+        ensure_kind(el, TapeTagKind::String)?;
+        let length_ptr = el.ptr::<UnalignedU16>();
+        let length = u16::from(unsafe { *length_ptr });
+        #[cfg(target_endian = "little")]
+        let length = length.swap_bytes();
         let data_ptr = unsafe { length_ptr.add(1) as *const u8 };
-        Some(unsafe { Mutf8Str::from_slice(std::slice::from_raw_parts(data_ptr, length)) })
+        Some(unsafe { Mutf8Str::from_slice(std::slice::from_raw_parts(data_ptr, length as usize)) })
     }
     pub fn list(&self) -> Option<NbtList<'a, 'tape>> {
-        let (kind, _) = self.element();
-        if !kind.is_list() {
+        let el = self.element();
+        if !el.kind().is_list() {
             return None;
         }
 
@@ -445,10 +427,8 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         })
     }
     pub fn compound(&self) -> Option<NbtCompound<'a, 'tape>> {
-        let (kind, _) = self.element();
-        if kind != TapeTagKind::Compound {
-            return None;
-        }
+        let el = self.element();
+        ensure_kind(el, TapeTagKind::Compound)?;
 
         Some(NbtCompound {
             element: self.element,
@@ -462,15 +442,15 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
         list::u32_prefixed_list_to_vec(TapeTagKind::LongArray, self.element)
     }
 
-    /// Get the tape element kind and value for this tag.
-    fn element(&self) -> (TapeTagKind, TapeTagValue) {
-        unsafe { (*self.element).kind }
+    /// Get the tape element for this tag.
+    fn element(&self) -> TapeElement {
+        unsafe { *self.element }
     }
 
     pub fn to_owned(&self) -> crate::owned::NbtTag {
-        let (kind, _value) = self.element();
+        let el = self.element();
 
-        match kind {
+        match el.kind() {
             TapeTagKind::Byte => crate::owned::NbtTag::Byte(self.byte().unwrap()),
             TapeTagKind::Short => crate::owned::NbtTag::Short(self.short().unwrap()),
             TapeTagKind::Int => crate::owned::NbtTag::Int(self.int().unwrap()),
@@ -484,7 +464,7 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
             TapeTagKind::Compound => {
                 crate::owned::NbtTag::Compound(self.compound().unwrap().to_owned())
             }
-            _ if kind.is_list() => crate::owned::NbtTag::List(self.list().unwrap().to_owned()),
+            kind if kind.is_list() => crate::owned::NbtTag::List(self.list().unwrap().to_owned()),
             TapeTagKind::IntArray => crate::owned::NbtTag::IntArray(self.int_array().unwrap()),
             TapeTagKind::LongArray => crate::owned::NbtTag::LongArray(self.long_array().unwrap()),
             _ => unreachable!(),
@@ -492,14 +472,22 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
     }
 }
 
+fn ensure_kind(el: TapeElement, other: TapeTagKind) -> Option<()> {
+    if el.kind() != other {
+        return None;
+    } else {
+        Some(())
+    }
+}
+
 impl PartialEq for NbtTag<'_, '_> {
     fn eq(&self, other: &Self) -> bool {
-        let (self_kind, _) = self.element();
-        let (other_kind, _) = other.element();
-        if self_kind != other_kind {
+        let self_el = self.element();
+        let other_el = other.element();
+        if self_el.kind() != other_el.kind() {
             return false;
         }
-        match self_kind {
+        match self_el.kind() {
             TapeTagKind::Byte => self.byte().unwrap() == other.byte().unwrap(),
             TapeTagKind::Short => self.short().unwrap() == other.short().unwrap(),
             TapeTagKind::Int => self.int().unwrap() == other.int().unwrap(),

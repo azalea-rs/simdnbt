@@ -15,7 +15,7 @@ use crate::{
 use super::{
     extra_tapes::ExtraTapes,
     list::{self, NbtList},
-    tape::{TapeElement, TapeTagKind, TapeTagValue, UnalignedU16},
+    tape::{TapeElement, TapeTagKind, UnalignedU16},
     NbtTag, Tapes,
 };
 
@@ -37,15 +37,12 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
         stack.push(ParsingStackElement::Compound {
             index_of_compound_element: index_of_compound_element as u32,
         })?;
-        tapes.main.push(TapeElement {
-            kind: (
-                TapeTagKind::Compound,
-                TapeTagValue {
-                    // this gets overwritten later
-                    compound: (0.into(), 0.into()),
-                },
-            ),
-        });
+        tapes.main.push(TapeElement::new_with_approx_len_and_offset(
+            TapeTagKind::Compound,
+            // these get overwritten later
+            0,
+            0,
+        ));
 
         Ok(())
     }
@@ -128,15 +125,15 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
     }
 
     /// Get the tape element kind and value for this compound.
-    fn element(&self) -> (TapeTagKind, TapeTagValue) {
-        unsafe { (*self.element).kind }
+    fn element(&self) -> TapeElement {
+        unsafe { *self.element }
     }
 
     pub fn iter(&self) -> CompoundIter<'a, 'tape> {
-        let (kind, value) = self.element();
-        debug_assert_eq!(kind, TapeTagKind::Compound);
+        let el = self.element();
+        debug_assert_eq!(el.kind(), TapeTagKind::Compound);
 
-        let max_tape_offset = u32::from(unsafe { value.list_list.1 }) as usize;
+        let max_tape_offset = el.approx_len_and_offset().1 as usize;
         let tape_slice =
             unsafe { std::slice::from_raw_parts(self.element.add(1), max_tape_offset) };
 
@@ -155,18 +152,18 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
     /// want to avoid that.
     pub fn len(&self) -> usize {
         let len = self.approx_len();
-        if len < 2usize.pow(24) {
-            len
+        if len < 2u32.pow(24) {
+            len as usize
         } else {
             self.iter().count()
         }
     }
 
     /// A version of [`Self::len`] that saturates at 2^24.
-    pub fn approx_len(self) -> usize {
-        let (kind, value) = self.element();
-        debug_assert_eq!(kind, TapeTagKind::Compound);
-        unsafe { u32::from(value.list_list.0) as usize }
+    pub fn approx_len(self) -> u32 {
+        let el = self.element();
+        debug_assert_eq!(el.kind(), TapeTagKind::Compound);
+        el.approx_len_and_offset().0
     }
 
     pub fn is_empty(&self) -> bool {
@@ -212,11 +209,10 @@ impl<'a: 'tape, 'tape> Iterator for CompoundIter<'a, 'tape> {
             return None;
         }
 
-        let name_length_ptr = unsafe { self.tape[self.current_tape_offset].name };
-        let name_length_ptr = name_length_ptr as *const UnalignedU16;
+        let name_length_ptr = self.tape[self.current_tape_offset].u64() as *const UnalignedU16;
         let name_length = u16::from(unsafe { *name_length_ptr }).swap_bytes();
-        let name_pointer = unsafe { name_length_ptr.add(1) as *const u8 };
-        let name_slice = unsafe { std::slice::from_raw_parts(name_pointer, name_length as usize) };
+        let name_ptr = unsafe { name_length_ptr.add(1) as *const u8 };
+        let name_slice = unsafe { std::slice::from_raw_parts(name_ptr, name_length as usize) };
         let name = Mutf8Str::from_slice(name_slice);
 
         self.current_tape_offset += 1;
@@ -338,94 +334,75 @@ pub(crate) fn read_tag<'a>(
     match tag_type {
         BYTE_ID => {
             let byte = data.read_i8()?;
-            tapes.main.push(TapeElement {
-                kind: (TapeTagKind::Byte, TapeTagValue { byte }),
-            });
+            tapes
+                .main
+                .push(TapeElement::new_with_u8(TapeTagKind::Byte, byte as u8));
         }
         SHORT_ID => {
             let short = data.read_i16()?;
-            tapes.main.push(TapeElement {
-                kind: (TapeTagKind::Short, TapeTagValue { short }),
-            });
+            tapes
+                .main
+                .push(TapeElement::new_with_u16(TapeTagKind::Short, short as u16));
         }
         INT_ID => {
             let int = data.read_i32()?;
-            tapes.main.push(TapeElement {
-                kind: (TapeTagKind::Int, TapeTagValue { int }),
-            });
+            tapes
+                .main
+                .push(TapeElement::new_with_u32(TapeTagKind::Int, int as u32));
         }
         LONG_ID => {
             let long = data.read_i64()?;
-            tapes.main.push(TapeElement {
-                kind: (TapeTagKind::Long, TapeTagValue { long: () }),
-            });
-            tapes.main.push(TapeElement { long });
+            tapes.main.push(TapeElement::new_with_0(TapeTagKind::Long));
+            tapes.main.push(TapeElement::new(long as u64));
         }
         FLOAT_ID => {
             let float = data.read_f32()?;
-            tapes.main.push(TapeElement {
-                kind: (TapeTagKind::Float, TapeTagValue { float }),
-            });
+            tapes
+                .main
+                .push(TapeElement::new_with_u32(TapeTagKind::Float, float as u32));
         }
         DOUBLE_ID => {
             let double = data.read_f64()?;
-            tapes.main.push(TapeElement {
-                kind: (TapeTagKind::Double, TapeTagValue { double: () }),
-            });
-            tapes.main.push(TapeElement { double });
+            tapes
+                .main
+                .push(TapeElement::new_with_0(TapeTagKind::Double));
+            tapes.main.push(TapeElement::new(double as u64));
         }
         BYTE_ARRAY_ID => {
-            let byte_array_pointer = data.cur as u64;
+            let byte_array_ptr = data.cur;
             read_with_u32_length(data, 1)?;
-            tapes.main.push(TapeElement {
-                kind: (
-                    TapeTagKind::ByteArray,
-                    TapeTagValue {
-                        byte_array: byte_array_pointer.into(),
-                    },
-                ),
-            });
+            tapes.main.push(TapeElement::new_with_ptr(
+                TapeTagKind::ByteArray,
+                byte_array_ptr,
+            ));
         }
         STRING_ID => {
-            let string_pointer = data.cur as u64;
+            let string_ptr = data.cur;
 
             // assert that the top 8 bits of the pointer are 0 (because we rely on this)
-            debug_assert_eq!(string_pointer >> 56, 0);
+            debug_assert_eq!(string_ptr as u64 >> 56, 0);
 
             read_string(data)?;
 
-            tapes.main.push(TapeElement {
-                kind: (
-                    TapeTagKind::String,
-                    TapeTagValue {
-                        string: string_pointer.into(),
-                    },
-                ),
-            });
+            tapes
+                .main
+                .push(TapeElement::new_with_ptr(TapeTagKind::String, string_ptr));
         }
         INT_ARRAY_ID => {
-            let int_array_pointer = data.cur as u64;
+            let int_array_ptr = data.cur;
             read_int_array(data)?;
-            tapes.main.push(TapeElement {
-                kind: (
-                    TapeTagKind::IntArray,
-                    TapeTagValue {
-                        int_array: int_array_pointer.into(),
-                    },
-                ),
-            });
+            tapes.main.push(TapeElement::new_with_ptr(
+                TapeTagKind::IntArray,
+                int_array_ptr,
+            ));
         }
         LONG_ARRAY_ID => {
-            let long_array_pointer = data.cur as u64;
+            let long_array_ptr = data.cur;
             read_long_array(data)?;
-            tapes.main.push(TapeElement {
-                kind: (
-                    TapeTagKind::LongArray,
-                    TapeTagValue {
-                        long_array: long_array_pointer.into(),
-                    },
-                ),
-            });
+            tapes.main.push(TapeElement::new_with_ptr(
+                TapeTagKind::LongArray,
+                long_array_ptr,
+            ));
         }
         _ => return Err(NonRootError::unknown_tag_id(tag_type)),
     };
@@ -444,12 +421,10 @@ pub(crate) fn read_tag_in_compound<'a>(
         return Ok(());
     }
 
-    let tag_name_pointer = data.cur as u64;
-    debug_assert_eq!(tag_name_pointer >> 56, 0);
+    let tag_name_ptr = data.cur;
+    debug_assert_eq!(tag_name_ptr as u64 >> 56, 0);
     read_string(data)?;
-    tapes.main.push(TapeElement {
-        name: tag_name_pointer,
-    });
+    tapes.main.push(TapeElement::new(tag_name_ptr as u64));
 
     read_tag(data, tapes, stack, tag_type)
 }
@@ -468,16 +443,13 @@ fn handle_compound_end(tapes: &mut Tapes, stack: &mut ParsingStack) {
         tapes
             .main
             .get_unchecked_mut(index_of_compound_element as usize)
-            .kind
-            .1
-            .compound
-            .1 = (index_after_end_element as u32 - index_of_compound_element).into();
+            .set_offset(index_after_end_element as u32 - index_of_compound_element);
     };
 }
 
 pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
-    let (kind, value) = tag.element();
-    match kind {
+    let el = tag.element();
+    match el.kind() {
         TapeTagKind::Byte => unsafe {
             unchecked_push(data, tag.byte().unwrap() as u8);
         },
@@ -507,7 +479,7 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
             let string = tag.string().unwrap();
             write_string(data, string);
         }
-        _ if kind.is_list() => {
+        kind if kind.is_list() => {
             tag.list().unwrap().write(data);
         }
         TapeTagKind::Compound => {
@@ -515,7 +487,7 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
         }
         TapeTagKind::IntArray => {
             let int_array =
-                unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i32>(value).unwrap() };
+                unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i32>(el.ptr()).unwrap() };
             unsafe {
                 unchecked_extend(data, &int_array.len().to_be_bytes());
             }
@@ -523,12 +495,12 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
         }
         TapeTagKind::LongArray => {
             let long_array =
-                unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i64>(value).unwrap() };
+                unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i64>(el.ptr()).unwrap() };
             unsafe {
                 unchecked_extend(data, &long_array.len().to_be_bytes());
             }
             data.extend_from_slice(long_array.as_big_endian());
         }
-        _ => unreachable!("Invalid tag kind {kind:?}"),
+        kind => unreachable!("Invalid tag kind {kind:?}"),
     }
 }
