@@ -347,7 +347,7 @@ impl NbtTag {
             }
             NbtTag::ByteArray(byte_array) => {
                 unsafe {
-                    unchecked_extend(data, &byte_array.len().to_be_bytes());
+                    unchecked_extend(data, &(byte_array.len() as u32).to_be_bytes());
                 }
                 data.extend_from_slice(byte_array);
             }
@@ -362,13 +362,13 @@ impl NbtTag {
             }
             NbtTag::IntArray(int_array) => {
                 unsafe {
-                    unchecked_extend(data, &int_array.len().to_be_bytes());
+                    unchecked_extend(data, &(int_array.len() as u32).to_be_bytes());
                 }
                 data.extend_from_slice(&slice_into_u8_big_endian(int_array));
             }
             NbtTag::LongArray(long_array) => {
                 unsafe {
-                    unchecked_extend(data, &long_array.len().to_be_bytes());
+                    unchecked_extend(data, &(long_array.len() as u32).to_be_bytes());
                 }
                 data.extend_from_slice(&slice_into_u8_big_endian(long_array));
             }
