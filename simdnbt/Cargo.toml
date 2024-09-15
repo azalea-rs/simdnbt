@@ -1,6 +1,6 @@
 [package]
 name = "simdnbt"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2021"
 description = "an unnecessarily fast nbt decoder"
 license = "MIT"
