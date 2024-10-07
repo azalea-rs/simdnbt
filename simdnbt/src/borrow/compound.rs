@@ -357,16 +357,17 @@ pub(crate) fn read_tag<'a>(
         }
         FLOAT_ID => {
             let float = data.read_f32()?;
-            tapes
-                .main
-                .push(TapeElement::new_with_u32(TapeTagKind::Float, float as u32));
+            tapes.main.push(TapeElement::new_with_u32(
+                TapeTagKind::Float,
+                float.to_bits(),
+            ));
         }
         DOUBLE_ID => {
             let double = data.read_f64()?;
             tapes
                 .main
                 .push(TapeElement::new_with_0(TapeTagKind::Double));
-            tapes.main.push(TapeElement::new(double as u64));
+            tapes.main.push(TapeElement::new(double.to_bits()));
         }
         BYTE_ARRAY_ID => {
             let byte_array_ptr = data.cur;

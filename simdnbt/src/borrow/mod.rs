@@ -386,14 +386,14 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
     pub fn float(&self) -> Option<f32> {
         let el = self.element();
         ensure_kind(el, TapeTagKind::Float)?;
-        Some(el.u32() as f32)
+        Some(f32::from_bits(el.u32()))
     }
     pub fn double(&self) -> Option<f64> {
         let el = self.element();
         ensure_kind(el, TapeTagKind::Double)?;
         // the value is in the next element because doubles are too big to fit in a single element
         let value_el = unsafe { *self.element.add(1) };
-        Some(value_el.u64() as f64)
+        Some(f64::from_bits(value_el.u64()))
     }
     pub fn byte_array(&self) -> Option<&'a [u8]> {
         let el = self.element();
