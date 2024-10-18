@@ -317,9 +317,11 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             return None;
         }
         let length_ptr = el.ptr::<UnalignedU32>();
-        let length = unsafe { u32::from(*length_ptr).swap_bytes() as usize };
+        let length = unsafe { u32::from(*length_ptr) };
+        #[cfg(target_endian = "little")]
+        let length = length.swap_bytes();
         let byte_array =
-            unsafe { std::slice::from_raw_parts(length_ptr.add(1) as *const i8, length) };
+            unsafe { std::slice::from_raw_parts(length_ptr.add(1) as *const i8, length as usize) };
         Some(byte_array)
     }
     pub fn shorts(&self) -> Option<Vec<i16>> {
@@ -830,8 +832,10 @@ where
     T: Copy + SwappableNumber,
 {
     // length is always a u32
-    let length = unsafe { u32::from(*ptr).swap_bytes() as usize };
-    let length_in_bytes = length * std::mem::size_of::<T>();
+    let length = unsafe { u32::from(*ptr) };
+    #[cfg(target_endian = "little")]
+    let length = length.swap_bytes();
+    let length_in_bytes = length as usize * std::mem::size_of::<T>();
     let array_be = unsafe { std::slice::from_raw_parts(ptr.add(1) as *const u8, length_in_bytes) };
     Some(RawList::new(array_be))
 }

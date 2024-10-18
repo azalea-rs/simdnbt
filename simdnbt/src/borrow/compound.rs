@@ -211,7 +211,9 @@ impl<'a: 'tape, 'tape> Iterator for NbtCompoundIter<'a, 'tape> {
         }
 
         let name_length_ptr = self.tape[self.current_tape_offset].u64() as *const UnalignedU16;
-        let name_length = u16::from(unsafe { *name_length_ptr }).swap_bytes();
+        let name_length = u16::from(unsafe { *name_length_ptr });
+        #[cfg(target_endian = "little")]
+        let name_length = name_length.swap_bytes();
         let name_ptr = unsafe { name_length_ptr.add(1) as *const u8 };
         let name_slice = unsafe { std::slice::from_raw_parts(name_ptr, name_length as usize) };
         let name = Mutf8Str::from_slice(name_slice);

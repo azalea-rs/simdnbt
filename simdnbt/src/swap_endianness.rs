@@ -1,5 +1,9 @@
 use std::{mem, simd::prelude::*};
 
+// TODO: relying on auto-vectorization for swapping bits is significantly faster
+// than this code, we should figure out a way to make that work dynamically and
+// then delete all this.
+
 mod private {
     pub trait Sealed {}
 
@@ -310,6 +314,9 @@ pub fn swap_endianness<T: SwappableNumber>(data: &[u8]) -> Vec<T> {
 }
 
 #[cfg(test)]
+// swap_endianness_as_u8 only does anything on LE systems, so otherwise it'll
+// error
+#[cfg(target_endian = "little")]
 mod tests {
     use super::*;
 

@@ -212,7 +212,7 @@ impl BaseNbt {
         self.tag.write(data);
     }
 
-    pub fn into_inner(self) -> NbtCompound {
+    pub fn as_compound(self) -> NbtCompound {
         self.tag
     }
 }
@@ -784,5 +784,22 @@ mod tests {
             assert_eq!(i as i64, item);
         }
         assert_eq!(ints.len(), 1023);
+    }
+
+    #[test]
+    fn equals_can_fail() {
+        let src = include_bytes!("../../tests/complex_player.dat").to_vec();
+        let mut src_slice = src.as_slice();
+        let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
+        let mut decoded_src = Vec::new();
+        decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
+        let nbt = super::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap()
+            .as_compound();
+        let mut modified_nbt = nbt.clone();
+        modified_nbt.insert("foodExhaustionLevel", 2.0f32);
+
+        assert_ne!(nbt, modified_nbt);
     }
 }
