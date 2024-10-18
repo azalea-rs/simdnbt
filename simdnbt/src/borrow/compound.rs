@@ -147,27 +147,28 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
 
     /// Returns the number of tags directly in this compound.
     ///
-    /// Note that due to an internal optimization, this function runs at `O(n)`
-    /// if the compound has at least 2^24 items. Use [`Self::approx_len`] if you
-    /// want to avoid that.
+    /// Note that this function runs at `O(n)` due to not storing the length
+    /// directly.
     pub fn len(&self) -> usize {
-        let len = self.approx_len();
-        if len < 2u32.pow(24) {
-            len as usize
-        } else {
-            self.iter().count()
-        }
+        self.iter().count()
+
+        // let len = self.approx_len();
+        // if len < 2u32.pow(24) {
+        //     len as usize
+        // } else {
+        //     self.iter().count()
+        // }
     }
 
-    /// A version of [`Self::len`] that saturates at 2^24.
-    pub fn approx_len(self) -> u32 {
-        let el = self.element();
-        debug_assert_eq!(el.kind(), TapeTagKind::Compound);
-        el.approx_len_and_offset().0
-    }
+    // /// A version of [`Self::len`] that saturates at 2^24.
+    // pub fn approx_len(self) -> u32 {
+    //     let el = self.element();
+    //     debug_assert_eq!(el.kind(), TapeTagKind::Compound);
+    //     el.approx_len_and_offset().0
+    // }
 
     pub fn is_empty(&self) -> bool {
-        self.approx_len() == 0
+        self.iter().next().is_none()
     }
     #[allow(clippy::type_complexity)]
     pub fn keys(
@@ -444,6 +445,8 @@ fn handle_compound_end(tapes: &mut Tapes, stack: &mut ParsingStack) {
         tapes
             .main
             .get_unchecked_mut(index_of_compound_element as usize)
+            // we don't set the approx_len because determining it for compounds
+            // is too expensive
             .set_offset(index_after_end_element as u32 - index_of_compound_element);
     };
 }

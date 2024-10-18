@@ -722,4 +722,18 @@ mod tests {
         let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
         nbt.as_compound().to_owned();
     }
+
+    #[test]
+    fn compound_len() {
+        let src = include_bytes!("../../tests/complex_player.dat").to_vec();
+        let mut src_slice = src.as_slice();
+        let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
+        let mut decoded_src = Vec::new();
+        decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
+        let nbt = super::read(&mut Cursor::new(&decoded_src))
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(nbt.as_compound().len(), nbt.as_compound().iter().count());
+    }
 }

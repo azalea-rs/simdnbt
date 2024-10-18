@@ -39,7 +39,7 @@ pub trait ToNbtTag: Sized {
 
 impl<K: Display + FromStr + Eq + Hash, V: FromNbtTag> Deserialize for HashMap<K, V> {
     fn from_compound(compound: crate::borrow::NbtCompound) -> Result<Self, DeserializeError> {
-        let mut hashmap = HashMap::with_capacity(compound.approx_len() as usize);
+        let mut hashmap = HashMap::new();
 
         for (k, v) in compound.iter() {
             let k_str = k.to_str();
