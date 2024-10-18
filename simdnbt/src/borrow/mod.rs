@@ -22,12 +22,15 @@ use crate::{
     Error, Mutf8Str,
 };
 
-pub use self::{compound::NbtCompound, list::NbtList};
 use self::{
     compound::{read_tag_in_compound, ParsingStack, ParsingStackElement},
     extra_tapes::ExtraTapes,
     list::{read_compound_in_list, read_list_in_list},
     tape::{MainTape, TapeElement, TapeTagKind},
+};
+pub use self::{
+    compound::{NbtCompound, NbtCompoundIter},
+    list::{NbtCompoundList, NbtCompoundListIter, NbtList, NbtListList, NbtListListIter},
 };
 
 /// Read a normal root NBT compound. This is either empty or has a name and compound tag.
@@ -474,7 +477,7 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
 
 fn ensure_kind(el: TapeElement, other: TapeTagKind) -> Option<()> {
     if el.kind() != other {
-        return None;
+        None
     } else {
         Some(())
     }

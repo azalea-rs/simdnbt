@@ -167,7 +167,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                 let index_of_element = tapes.extra.elements.len() as u32;
                 tapes.main.push(TapeElement::new_with_u32(
                     TapeTagKind::LongArrayList,
-                    index_of_element.into(),
+                    index_of_element,
                 ));
                 let length = data.read_u32()?;
                 tapes.extra.elements.push(ExtraTapeElement { length });
@@ -377,7 +377,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         };
         Some(slice)
     }
-    pub fn lists(&self) -> Option<ListList<'a, 'tape>> {
+    pub fn lists(&self) -> Option<NbtListList<'a, 'tape>> {
         let el = self.element();
         if el.kind() != TapeTagKind::ListList {
             return None;
@@ -385,8 +385,8 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
 
         let (approx_length, max_tape_offset) = el.approx_len_and_offset();
 
-        Some(ListList {
-            iter: ListListIter {
+        Some(NbtListList {
+            iter: NbtListListIter {
                 current_tape_offset: 0, // it's an iterator, it starts at 0
                 max_tape_offset: max_tape_offset as usize,
                 approx_length,
@@ -397,7 +397,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         })
     }
 
-    pub fn compounds(&self) -> Option<CompoundList<'a, 'tape>> {
+    pub fn compounds(&self) -> Option<NbtCompoundList<'a, 'tape>> {
         let el = self.element();
         if el.kind() != TapeTagKind::CompoundList {
             return None;
@@ -409,8 +409,8 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         let tape_slice =
             unsafe { std::slice::from_raw_parts(self.element.add(1), max_tape_offset) };
 
-        Some(CompoundList {
-            iter: CompoundListIter {
+        Some(NbtCompoundList {
+            iter: NbtCompoundListIter {
                 current_tape_offset: 0,
                 max_tape_offset,
                 approx_length,
@@ -550,12 +550,12 @@ impl PartialEq for NbtList<'_, '_> {
     }
 }
 
-/// A wrapper over [`ListListIter`] that acts more like a Vec.
+/// A wrapper over [`NbtListListIter`] that acts more like a Vec.
 #[derive(Clone, Default)]
-pub struct ListList<'a, 'tape> {
-    iter: ListListIter<'a, 'tape>,
+pub struct NbtListList<'a, 'tape> {
+    iter: NbtListListIter<'a, 'tape>,
 }
-impl<'a, 'tape> ListList<'a, 'tape> {
+impl<'a, 'tape> NbtListList<'a, 'tape> {
     /// Returns the number of tags directly in this list.
     ///
     /// Note that due to an internal optimization, this function runs at `O(n)`
@@ -579,16 +579,20 @@ impl<'a, 'tape> ListList<'a, 'tape> {
     pub fn last(&self) -> Option<NbtList<'a, 'tape>> {
         self.iter.clone().last()
     }
+
+    pub fn is_empty(self) -> bool {
+        self.approx_len() == 0
+    }
 }
-impl<'a: 'tape, 'tape> IntoIterator for ListList<'a, 'tape> {
+impl<'a: 'tape, 'tape> IntoIterator for NbtListList<'a, 'tape> {
     type Item = NbtList<'a, 'tape>;
-    type IntoIter = ListListIter<'a, 'tape>;
+    type IntoIter = NbtListListIter<'a, 'tape>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter
     }
 }
-impl PartialEq for ListList<'_, '_> {
+impl PartialEq for NbtListList<'_, '_> {
     fn eq(&self, other: &Self) -> bool {
         if self.iter.clone().approx_len() != other.iter.clone().approx_len() {
             return false;
@@ -604,7 +608,7 @@ impl PartialEq for ListList<'_, '_> {
 }
 /// An iterator over a list of lists.
 #[derive(Clone)]
-pub struct ListListIter<'a, 'tape> {
+pub struct NbtListListIter<'a, 'tape> {
     current_tape_offset: usize,
     max_tape_offset: usize,
     approx_length: u32,
@@ -612,7 +616,7 @@ pub struct ListListIter<'a, 'tape> {
     extra_tapes: *const ExtraTapes<'a>,
     _phantom: PhantomData<&'tape ()>,
 }
-impl<'a: 'tape, 'tape> ListListIter<'a, 'tape> {
+impl<'a: 'tape, 'tape> NbtListListIter<'a, 'tape> {
     /// Returns the number of tags directly in this list.
     ///
     /// Note that due to an internal optimization, this function runs at `O(n)`
@@ -631,8 +635,12 @@ impl<'a: 'tape, 'tape> ListListIter<'a, 'tape> {
     pub fn approx_len(&self) -> u32 {
         self.approx_length
     }
+
+    pub fn is_empty(self) -> bool {
+        self.approx_len() == 0
+    }
 }
-impl<'a: 'tape, 'tape> Iterator for ListListIter<'a, 'tape> {
+impl<'a: 'tape, 'tape> Iterator for NbtListListIter<'a, 'tape> {
     type Item = NbtList<'a, 'tape>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -659,9 +667,9 @@ impl<'a: 'tape, 'tape> Iterator for ListListIter<'a, 'tape> {
         Some(nbt_list)
     }
 }
-impl Default for ListListIter<'_, '_> {
+impl Default for NbtListListIter<'_, '_> {
     fn default() -> Self {
-        ListListIter {
+        NbtListListIter {
             current_tape_offset: 0,
             max_tape_offset: 0,
             approx_length: 0,
@@ -673,12 +681,12 @@ impl Default for ListListIter<'_, '_> {
     }
 }
 
-/// A wrapper over [`CompoundListIter`] that acts more like a Vec.
+/// A wrapper over [`NbtCompoundListIter`] that acts more like a Vec.
 #[derive(Clone, Default)]
-pub struct CompoundList<'a, 'tape> {
-    iter: CompoundListIter<'a, 'tape>,
+pub struct NbtCompoundList<'a, 'tape> {
+    iter: NbtCompoundListIter<'a, 'tape>,
 }
-impl<'a, 'tape> CompoundList<'a, 'tape> {
+impl<'a, 'tape> NbtCompoundList<'a, 'tape> {
     /// Returns the number of tags directly in this list.
     ///
     /// Note that due to an internal optimization, this function runs at `O(n)`
@@ -703,16 +711,20 @@ impl<'a, 'tape> CompoundList<'a, 'tape> {
     pub fn last(&self) -> Option<NbtCompound<'a, 'tape>> {
         self.iter.clone().last()
     }
+
+    pub fn is_empty(self) -> bool {
+        self.approx_len() == 0
+    }
 }
-impl<'a: 'tape, 'tape> IntoIterator for CompoundList<'a, 'tape> {
+impl<'a: 'tape, 'tape> IntoIterator for NbtCompoundList<'a, 'tape> {
     type Item = NbtCompound<'a, 'tape>;
-    type IntoIter = CompoundListIter<'a, 'tape>;
+    type IntoIter = NbtCompoundListIter<'a, 'tape>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter
     }
 }
-impl PartialEq for CompoundList<'_, '_> {
+impl PartialEq for NbtCompoundList<'_, '_> {
     fn eq(&self, other: &Self) -> bool {
         if self.iter.clone().approx_len() != other.iter.clone().approx_len() {
             return false;
@@ -728,14 +740,14 @@ impl PartialEq for CompoundList<'_, '_> {
 }
 
 #[derive(Clone)]
-pub struct CompoundListIter<'a, 'tape> {
+pub struct NbtCompoundListIter<'a, 'tape> {
     current_tape_offset: usize,
     max_tape_offset: usize,
     approx_length: u32,
     tape: &'tape [TapeElement],
     extra_tapes: *const ExtraTapes<'a>,
 }
-impl<'a: 'tape, 'tape> CompoundListIter<'a, 'tape> {
+impl<'a: 'tape, 'tape> NbtCompoundListIter<'a, 'tape> {
     /// Returns the number of tags directly in this list.
     ///
     /// Note that due to an internal optimization, this function runs at `O(n)`
@@ -754,8 +766,12 @@ impl<'a: 'tape, 'tape> CompoundListIter<'a, 'tape> {
     pub fn approx_len(&self) -> u32 {
         self.approx_length
     }
+
+    pub fn is_empty(self) -> bool {
+        self.approx_len() == 0
+    }
 }
-impl<'a: 'tape, 'tape> Iterator for CompoundListIter<'a, 'tape> {
+impl<'a: 'tape, 'tape> Iterator for NbtCompoundListIter<'a, 'tape> {
     type Item = NbtCompound<'a, 'tape>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -778,9 +794,9 @@ impl<'a: 'tape, 'tape> Iterator for CompoundListIter<'a, 'tape> {
         Some(compound)
     }
 }
-impl Default for CompoundListIter<'_, '_> {
+impl Default for NbtCompoundListIter<'_, '_> {
     fn default() -> Self {
-        CompoundListIter {
+        NbtCompoundListIter {
             current_tape_offset: 0,
             max_tape_offset: 0,
             approx_length: 0,

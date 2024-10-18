@@ -129,7 +129,7 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
         unsafe { *self.element }
     }
 
-    pub fn iter(&self) -> CompoundIter<'a, 'tape> {
+    pub fn iter(&self) -> NbtCompoundIter<'a, 'tape> {
         let el = self.element();
         debug_assert_eq!(el.kind(), TapeTagKind::Compound);
 
@@ -137,7 +137,7 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
         let tape_slice =
             unsafe { std::slice::from_raw_parts(self.element.add(1), max_tape_offset) };
 
-        CompoundIter {
+        NbtCompoundIter {
             current_tape_offset: 0,
             max_tape_offset,
             tape: tape_slice,
@@ -174,7 +174,7 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
     pub fn keys(
         &self,
     ) -> std::iter::Map<
-        CompoundIter<'a, 'tape>,
+        NbtCompoundIter<'a, 'tape>,
         fn((&'a Mutf8Str, NbtTag<'a, 'tape>)) -> &'a Mutf8Str,
     > {
         self.iter().map(|(k, _)| k)
@@ -196,13 +196,13 @@ impl PartialEq for NbtCompound<'_, '_> {
     }
 }
 
-pub struct CompoundIter<'a: 'tape, 'tape> {
+pub struct NbtCompoundIter<'a: 'tape, 'tape> {
     current_tape_offset: usize,
     max_tape_offset: usize,
     tape: &'tape [TapeElement],
     extra_tapes: &'tape ExtraTapes<'a>,
 }
-impl<'a: 'tape, 'tape> Iterator for CompoundIter<'a, 'tape> {
+impl<'a: 'tape, 'tape> Iterator for NbtCompoundIter<'a, 'tape> {
     type Item = (&'a Mutf8Str, NbtTag<'a, 'tape>);
 
     fn next(&mut self) -> Option<Self::Item> {
