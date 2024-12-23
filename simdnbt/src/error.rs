@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use thiserror::Error;
 
 use crate::common::MAX_DEPTH;
@@ -38,6 +40,7 @@ impl From<NonRootError> for Error {
         }
     }
 }
+
 impl NonRootError {
     #[inline]
     pub fn unexpected_eof() -> Self {
@@ -60,6 +63,16 @@ impl From<UnexpectedEofError> for NonRootError {
     #[inline]
     fn from(_: UnexpectedEofError) -> Self {
         NonRootError::unexpected_eof()
+    }
+}
+impl Debug for NonRootError {
+    #[inline]
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.value {
+            0 => write!(f, "UnexpectedEofError"),
+            1 => write!(f, "MaxDepthExceededError"),
+            _ => write!(f, "UnknownTagId({})", self.value.wrapping_add(1)),
+        }
     }
 }
 
