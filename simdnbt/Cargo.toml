@@ -14,7 +14,6 @@ flate2 = "^1.0.35"
 simd_cesu8 = "1.0.1"
 simdnbt-derive = { version = "0.6.0", path = "../simdnbt-derive", optional = true }
 thiserror = "2.0.11"
-valence_nbt = { version = "0.8.0", features = ["binary"] }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
