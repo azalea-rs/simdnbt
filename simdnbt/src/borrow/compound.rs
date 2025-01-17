@@ -334,51 +334,39 @@ pub(crate) fn read_tag<'a>(
         _ => {}
     }
 
-    match tag_type {
+    let pushing_element = match tag_type {
         BYTE_ID => {
             let byte = data.read_i8()?;
-            tapes
-                .main
-                .push(TapeElement::new_with_u8(TapeTagKind::Byte, byte as u8));
+            TapeElement::new_with_u8(TapeTagKind::Byte, byte as u8)
         }
         SHORT_ID => {
             let short = data.read_i16()?;
-            tapes
-                .main
-                .push(TapeElement::new_with_u16(TapeTagKind::Short, short as u16));
+            TapeElement::new_with_u16(TapeTagKind::Short, short as u16)
         }
         INT_ID => {
             let int = data.read_i32()?;
-            tapes
-                .main
-                .push(TapeElement::new_with_u32(TapeTagKind::Int, int as u32));
+            TapeElement::new_with_u32(TapeTagKind::Int, int as u32)
         }
         LONG_ID => {
             let long = data.read_i64()?;
             tapes.main.push(TapeElement::new_with_0(TapeTagKind::Long));
-            tapes.main.push(TapeElement::new(long as u64));
+            TapeElement::new(long as u64)
         }
         FLOAT_ID => {
             let float = data.read_f32()?;
-            tapes.main.push(TapeElement::new_with_u32(
-                TapeTagKind::Float,
-                float.to_bits(),
-            ));
+            TapeElement::new_with_u32(TapeTagKind::Float, float.to_bits())
         }
         DOUBLE_ID => {
             let double = data.read_f64()?;
             tapes
                 .main
                 .push(TapeElement::new_with_0(TapeTagKind::Double));
-            tapes.main.push(TapeElement::new(double.to_bits()));
+            TapeElement::new(double.to_bits())
         }
         BYTE_ARRAY_ID => {
             let byte_array_ptr = data.cur;
             read_with_u32_length(data, 1)?;
-            tapes.main.push(TapeElement::new_with_ptr(
-                TapeTagKind::ByteArray,
-                byte_array_ptr,
-            ));
+            TapeElement::new_with_ptr(TapeTagKind::ByteArray, byte_array_ptr)
         }
         STRING_ID => {
             let string_ptr = data.cur;
@@ -388,28 +376,21 @@ pub(crate) fn read_tag<'a>(
 
             read_string(data)?;
 
-            tapes
-                .main
-                .push(TapeElement::new_with_ptr(TapeTagKind::String, string_ptr));
+            TapeElement::new_with_ptr(TapeTagKind::String, string_ptr)
         }
         INT_ARRAY_ID => {
             let int_array_ptr = data.cur;
             read_int_array(data)?;
-            tapes.main.push(TapeElement::new_with_ptr(
-                TapeTagKind::IntArray,
-                int_array_ptr,
-            ));
+            TapeElement::new_with_ptr(TapeTagKind::IntArray, int_array_ptr)
         }
         LONG_ARRAY_ID => {
             let long_array_ptr = data.cur;
             read_long_array(data)?;
-            tapes.main.push(TapeElement::new_with_ptr(
-                TapeTagKind::LongArray,
-                long_array_ptr,
-            ));
+            TapeElement::new_with_ptr(TapeTagKind::LongArray, long_array_ptr)
         }
         _ => return Err(NonRootError::unknown_tag_id(tag_type)),
     };
+    tapes.main.push(pushing_element);
     Ok(())
 }
 
