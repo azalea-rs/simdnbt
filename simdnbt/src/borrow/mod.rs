@@ -162,7 +162,7 @@ pub(crate) struct Tapes<'a> {
     main: MainTape,
     extra: ExtraTapes<'a>,
 }
-impl<'a> Tapes<'a> {
+impl Tapes<'_> {
     fn new() -> Self {
         Self::default()
     }
@@ -240,7 +240,7 @@ impl<'a> BaseNbt<'a> {
     }
 }
 
-impl<'a> Debug for BaseNbt<'a> {
+impl Debug for BaseNbt<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("BaseNbt").finish()
     }
@@ -278,7 +278,7 @@ impl<'a> BaseNbtTag<'a> {
         }
     }
 }
-impl<'a, 'tape> From<&'a BaseNbtTag<'a>> for NbtTag<'a, 'tape> {
+impl<'a> From<&'a BaseNbtTag<'a>> for NbtTag<'a, '_> {
     fn from(tag: &'a BaseNbtTag<'a>) -> Self {
         tag.as_tag()
     }
@@ -328,7 +328,7 @@ impl PartialEq for BaseNbt<'_> {
     }
 }
 
-impl<'a> BaseNbt<'a> {
+impl BaseNbt<'_> {
     pub fn write(&self, data: &mut Vec<u8>) {
         data.push(COMPOUND_ID);
         write_string(data, self.name);

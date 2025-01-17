@@ -38,12 +38,12 @@ mod tests {
     }
 
     fn test_decodes_equally(src: &[u8]) {
-        let nbt_borrow = crate::borrow::read(&mut Cursor::new(&src))
+        let nbt_borrow = crate::borrow::read(&mut Cursor::new(src))
             .unwrap()
             .unwrap()
             .as_compound()
             .to_owned();
-        let nbt_owned = crate::owned::read(&mut Cursor::new(&src))
+        let nbt_owned = crate::owned::read(&mut Cursor::new(src))
             .unwrap()
             .unwrap()
             .as_compound();

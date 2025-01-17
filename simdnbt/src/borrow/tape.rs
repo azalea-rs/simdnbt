@@ -71,7 +71,7 @@ impl TapeElement {
 
     pub fn new_with_approx_len_and_offset(kind: TapeTagKind, approx_len: u32, offset: u32) -> Self {
         debug_assert!(approx_len < 2u32.pow(24));
-        Self((kind as u64) << 56 | (approx_len as u64) << 32 | (offset as u64))
+        Self(((kind as u64) << 56) | ((approx_len as u64) << 32) | (offset as u64))
     }
     pub fn set_offset(&mut self, offset: u32) {
         *self = Self::new_with_approx_len_and_offset(
@@ -82,16 +82,16 @@ impl TapeElement {
     }
 
     pub fn new_with_u8(kind: TapeTagKind, u8: u8) -> Self {
-        Self((kind as u64) << 56 | u8 as u64)
+        Self(((kind as u64) << 56) | u8 as u64)
     }
     pub fn new_with_u16(kind: TapeTagKind, u16: u16) -> Self {
-        Self((kind as u64) << 56 | u16 as u64)
+        Self(((kind as u64) << 56) | u16 as u64)
     }
     pub fn new_with_u32(kind: TapeTagKind, u32: u32) -> Self {
-        Self((kind as u64) << 56 | u32 as u64)
+        Self(((kind as u64) << 56) | u32 as u64)
     }
     pub fn new_with_ptr<T>(kind: TapeTagKind, ptr: *const T) -> Self {
-        Self((kind as u64) << 56 | ptr as u64)
+        Self(((kind as u64) << 56) | ptr as u64)
     }
     /// Create a new TapeElement with the given kind and everything else set to 0.
     pub fn new_with_0(kind: TapeTagKind) -> Self {
@@ -125,7 +125,7 @@ impl Debug for TapeElement {
 }
 
 #[derive(Debug, Copy, Clone)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
 pub struct u56 {
     a: u8,
@@ -152,7 +152,7 @@ impl From<u56> for u64 {
 }
 
 #[derive(Debug, Copy, Clone)]
-#[repr(packed)]
+#[repr(C, packed)]
 #[allow(non_camel_case_types)]
 pub struct u24 {
     a: u8,
@@ -176,7 +176,7 @@ impl From<u24> for u32 {
 }
 
 #[derive(Debug, Copy, Clone)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct UnalignedU64(pub u64);
 impl From<u64> for UnalignedU64 {
     #[inline]
@@ -192,7 +192,7 @@ impl From<UnalignedU64> for u64 {
 }
 
 #[derive(Debug, Copy, Clone)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct UnalignedU32(pub u32);
 impl From<u32> for UnalignedU32 {
     #[inline]
@@ -208,7 +208,7 @@ impl From<UnalignedU32> for u32 {
 }
 
 #[derive(Debug, Copy, Clone)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct UnalignedU16(pub u16);
 impl From<u16> for UnalignedU16 {
     #[inline]

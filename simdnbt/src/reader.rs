@@ -150,7 +150,7 @@ impl<'a> Deref for ReaderFromCursor<'a, '_> {
         &self.reader
     }
 }
-impl<'a> DerefMut for ReaderFromCursor<'a, '_> {
+impl DerefMut for ReaderFromCursor<'_, '_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.reader
     }
