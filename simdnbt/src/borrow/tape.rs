@@ -109,7 +109,6 @@ impl TapeElement {
     /// The element must be a tag and not something else like a continuation of a long or double.
     pub unsafe fn skip_offset(&self) -> usize {
         match self.kind() {
-            TapeTagKind::Long | TapeTagKind::Double => 2,
             TapeTagKind::Compound | TapeTagKind::ListList | TapeTagKind::CompoundList => {
                 self.approx_len_and_offset().1 as usize
             }
@@ -173,6 +172,22 @@ impl From<u24> for u32 {
         let a = value.a as u32;
         let b = value.b as u32;
         (a << 16) | b
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+#[repr(packed)]
+pub struct UnalignedU64(pub u64);
+impl From<u64> for UnalignedU64 {
+    #[inline]
+    fn from(value: u64) -> Self {
+        Self(value)
+    }
+}
+impl From<UnalignedU64> for u64 {
+    #[inline]
+    fn from(value: UnalignedU64) -> Self {
+        value.0
     }
 }
 

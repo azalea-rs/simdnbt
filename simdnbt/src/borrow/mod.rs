@@ -11,7 +11,7 @@ use std::{
 };
 
 use byteorder::ReadBytesExt;
-use tape::{UnalignedU16, UnalignedU32};
+use tape::{UnalignedU16, UnalignedU32, UnalignedU64};
 
 use crate::{
     common::{
@@ -382,9 +382,10 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
     pub fn long(&self) -> Option<i64> {
         let el = self.element();
         ensure_kind(el, TapeTagKind::Long)?;
-        // the value is in the next element because longs are too big to fit in a single element
-        let value_el = unsafe { *self.element.add(1) };
-        Some(value_el.u64() as i64)
+        // longs are 64 bits so since we can't fit the kind and value in a
+        // single element, we store a pointer to them instead
+        let long_ptr = el.ptr::<UnalignedU64>();
+        Some(u64::from(unsafe { *long_ptr }).to_be() as i64)
     }
     pub fn float(&self) -> Option<f32> {
         let el = self.element();
@@ -394,9 +395,9 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
     pub fn double(&self) -> Option<f64> {
         let el = self.element();
         ensure_kind(el, TapeTagKind::Double)?;
-        // the value is in the next element because doubles are too big to fit in a single element
-        let value_el = unsafe { *self.element.add(1) };
-        Some(f64::from_bits(value_el.u64()))
+        // see the comment above for longs, doubles are also 64 bits so the same applies
+        let double_ptr = el.ptr::<UnalignedU64>();
+        Some(f64::from_bits(u64::from(unsafe { *double_ptr }).to_be()))
     }
     pub fn byte_array(&self) -> Option<&'a [u8]> {
         let el = self.element();
