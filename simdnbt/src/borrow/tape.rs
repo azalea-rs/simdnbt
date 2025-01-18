@@ -53,6 +53,11 @@ impl<A: Allocator> MainTape<A> {
             self.end = unsafe { self.cur.add(extending_by) };
         }
 
+        unsafe { self.push_unchecked(element) };
+    }
+
+    #[inline]
+    pub unsafe fn push_unchecked(&mut self, element: TapeElement) {
         unsafe { self.cur.write(element) };
         self.cur = unsafe { self.cur.add(1) };
     }
