@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, mem::MaybeUninit};
+use std::mem::MaybeUninit;
 
 use crate::{
     common::{
@@ -34,9 +34,9 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
     ) -> Result<(), NonRootError> {
         let index_of_compound_element = tapes.main.len();
 
-        stack.push(ParsingStackElement::Compound {
-            index_of_compound_element: index_of_compound_element as u32,
-        })?;
+        stack.push(ParsingStackElement::compound(
+            index_of_compound_element as u32,
+        ))?;
         tapes.main.push(TapeElement::new_with_approx_len_and_offset(
             TapeTagKind::Compound,
             // these get overwritten later
@@ -233,10 +233,36 @@ impl<'a: 'tape, 'tape> Iterator for NbtCompoundIter<'a, 'tape> {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub(crate) enum ParsingStackElement {
-    Compound { index_of_compound_element: u32 },
-    ListOfCompounds { index_of_list_element: u32 },
-    ListOfLists { index_of_list_element: u32 },
+pub(crate) struct ParsingStackElement {
+    pub kind: ParsingStackElementKind,
+    pub index: u32,
+}
+#[derive(Debug, Copy, Clone)]
+#[repr(u32)]
+pub(crate) enum ParsingStackElementKind {
+    Compound,
+    ListOfCompounds,
+    ListOfLists,
+}
+impl ParsingStackElement {
+    pub fn compound(index_of_compound_element: u32) -> Self {
+        Self {
+            kind: ParsingStackElementKind::Compound,
+            index: index_of_compound_element,
+        }
+    }
+    pub fn list_of_compounds(index_of_list_element: u32) -> Self {
+        Self {
+            kind: ParsingStackElementKind::ListOfCompounds,
+            index: index_of_list_element,
+        }
+    }
+    pub fn list_of_lists(index_of_list_element: u32) -> Self {
+        Self {
+            kind: ParsingStackElementKind::ListOfLists,
+            index: index_of_list_element,
+        }
+    }
 }
 
 pub struct ParsingStack {
@@ -411,12 +437,7 @@ pub(crate) fn read_tag_in_compound<'a>(
 
 #[inline(always)]
 fn handle_compound_end(tapes: &mut Tapes, stack: &mut ParsingStack) {
-    let ParsingStackElement::Compound {
-        index_of_compound_element,
-    } = stack.pop()
-    else {
-        unsafe { unreachable_unchecked() };
-    };
+    let index_of_compound_element = stack.pop().index;
     let index_after_end_element = tapes.main.len();
 
     unsafe {

@@ -11,6 +11,7 @@ use std::{
 };
 
 use byteorder::ReadBytesExt;
+use compound::ParsingStackElementKind;
 use tape::{UnalignedU16, UnalignedU32, UnalignedU64};
 
 use crate::{
@@ -56,9 +57,7 @@ pub fn read<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
     ));
 
     let mut stack = ParsingStack::new();
-    stack.push(ParsingStackElement::Compound {
-        index_of_compound_element: 0,
-    })?;
+    stack.push(ParsingStackElement::compound(0))?;
 
     read_with_stack(&mut data, &mut tapes, &mut stack)?;
 
@@ -88,9 +87,7 @@ pub fn read_compound<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtCompound<
 
     let mut data = ReaderFromCursor::new(data);
 
-    stack.push(ParsingStackElement::Compound {
-        index_of_compound_element: 0,
-    })?;
+    stack.push(ParsingStackElement::compound(0))?;
 
     tapes.main.push(TapeElement::new_with_approx_len_and_offset(
         TapeTagKind::Compound,
@@ -146,12 +143,10 @@ fn read_with_stack<'a>(
 ) -> Result<(), Error> {
     while !stack.is_empty() {
         let top = stack.peek_mut();
-        match top {
-            ParsingStackElement::Compound { .. } => read_tag_in_compound(data, tapes, stack)?,
-            ParsingStackElement::ListOfCompounds { .. } => {
-                read_compound_in_list(data, tapes, stack)?
-            }
-            ParsingStackElement::ListOfLists { .. } => read_list_in_list(data, tapes, stack)?,
+        match top.kind {
+            ParsingStackElementKind::Compound => read_tag_in_compound(data, tapes, stack)?,
+            ParsingStackElementKind::ListOfCompounds => read_compound_in_list(data, tapes, stack)?,
+            ParsingStackElementKind::ListOfLists => read_list_in_list(data, tapes, stack)?,
         }
     }
 

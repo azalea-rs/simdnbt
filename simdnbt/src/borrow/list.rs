@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, marker::PhantomData, mem};
+use std::{marker::PhantomData, mem};
 
 use crate::{
     common::{
@@ -99,9 +99,9 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                 // length estimate + tape index offset to the end of the list
                 let index_of_list_element = tapes.main.len();
 
-                stack.push(ParsingStackElement::ListOfLists {
-                    index_of_list_element: index_of_list_element as u32,
-                })?;
+                stack.push(ParsingStackElement::list_of_lists(
+                    index_of_list_element as u32,
+                ))?;
                 stack.set_list_length(length);
                 TapeElement::new_with_approx_len_and_offset(
                     TapeTagKind::ListList,
@@ -115,9 +115,9 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                 // length estimate + tape index offset to the end of the compound
                 let index_of_list_element = tapes.main.len();
 
-                stack.push(ParsingStackElement::ListOfCompounds {
-                    index_of_list_element: index_of_list_element as u32,
-                })?;
+                stack.push(ParsingStackElement::list_of_compounds(
+                    index_of_list_element as u32,
+                ))?;
                 stack.set_list_length(length);
                 TapeElement::new_with_approx_len_and_offset(
                     TapeTagKind::CompoundList,
@@ -831,12 +831,7 @@ pub fn read_list_in_list<'a>(
     tapes: &mut Tapes<'a>,
     stack: &mut ParsingStack,
 ) -> Result<(), NonRootError> {
-    let ParsingStackElement::ListOfLists {
-        index_of_list_element,
-    } = stack.peek()
-    else {
-        unsafe { unreachable_unchecked() };
-    };
+    let index_of_list_element = stack.peek().index;
 
     let remaining = stack.remaining_elements_in_list();
 
@@ -864,12 +859,7 @@ pub(crate) fn read_compound_in_list<'a>(
     tapes: &mut Tapes<'a>,
     stack: &mut ParsingStack,
 ) -> Result<(), NonRootError> {
-    let ParsingStackElement::ListOfCompounds {
-        index_of_list_element,
-    } = stack.peek()
-    else {
-        unsafe { unreachable_unchecked() };
-    };
+    let index_of_list_element = stack.peek().index;
 
     let remaining = stack.remaining_elements_in_list();
 
