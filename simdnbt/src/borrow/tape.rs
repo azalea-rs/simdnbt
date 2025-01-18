@@ -29,7 +29,7 @@ impl<A: Allocator> MainTape<A> {
     #[inline]
     pub fn push(&mut self, element: TapeElement) {
         if self.cur == self.end {
-            let old_cap = self.len();
+            let old_cap = self.capacity();
             let extending_by = old_cap;
             let new_cap = old_cap + extending_by;
 
