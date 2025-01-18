@@ -340,9 +340,7 @@ impl ParsingStack {
         unsafe {
             self.stack
                 .get_unchecked_mut(self.depth - 1)
-                .as_mut_ptr()
-                .as_mut()
-                .unwrap_unchecked()
+                .assume_init_mut()
         }
     }
 }

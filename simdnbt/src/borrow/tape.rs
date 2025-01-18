@@ -142,6 +142,7 @@ impl TapeElement {
     }
 
     pub fn new_with_approx_len_and_offset(kind: TapeTagKind, approx_len: u32, offset: u32) -> Self {
+        let approx_len = approx_len.min(0xff_ffff);
         debug_assert!(approx_len < 2u32.pow(24));
         Self(((kind as u64) << 56) | ((approx_len as u64) << 32) | (offset as u64))
     }
