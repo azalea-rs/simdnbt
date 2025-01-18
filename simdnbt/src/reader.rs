@@ -1,6 +1,7 @@
 use std::{
     io::Cursor,
     marker::PhantomData,
+    mem,
     ops::{Deref, DerefMut},
 };
 
@@ -33,14 +34,15 @@ impl<'a> Reader<'a> {
         }
     }
 
+    #[inline]
     pub unsafe fn unchecked_read_type<T>(&mut self) -> T {
         let value = unsafe { self.cur.cast::<T>().read_unaligned() };
-        self.cur = unsafe { self.cur.add(std::mem::size_of::<T>()) };
+        self.cur = unsafe { self.cur.add(mem::size_of::<T>()) };
         value
     }
 
     pub fn read_type<T: Copy>(&mut self) -> Result<T, UnexpectedEofError> {
-        self.ensure_can_read(std::mem::size_of::<T>())?;
+        self.ensure_can_read(mem::size_of::<T>())?;
         Ok(unsafe { self.unchecked_read_type() })
     }
 

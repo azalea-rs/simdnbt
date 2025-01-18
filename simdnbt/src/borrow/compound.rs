@@ -328,12 +328,6 @@ pub(crate) fn read_tag<'a>(
     stack: &mut ParsingStack,
     tag_type: u8,
 ) -> Result<(), NonRootError> {
-    match tag_type {
-        COMPOUND_ID => return NbtCompound::read(data, tapes, stack),
-        LIST_ID => return NbtList::read(data, tapes, stack),
-        _ => {}
-    }
-
     let pushing_element = match tag_type {
         BYTE_ID => {
             let byte = data.read_i8()?;
@@ -376,6 +370,8 @@ pub(crate) fn read_tag<'a>(
 
             TapeElement::new_with_ptr(TapeTagKind::String, string_ptr)
         }
+        COMPOUND_ID => return NbtCompound::read(data, tapes, stack),
+        LIST_ID => return NbtList::read(data, tapes, stack),
         INT_ARRAY_ID => {
             let int_array_ptr = data.cur;
             read_int_array(data)?;

@@ -1,4 +1,4 @@
-use std::{hint::unreachable_unchecked, marker::PhantomData};
+use std::{hint::unreachable_unchecked, marker::PhantomData, mem};
 
 use crate::{
     common::{
@@ -810,7 +810,7 @@ where
     let length = unsafe { u32::from(*ptr) };
     #[cfg(target_endian = "little")]
     let length = length.swap_bytes();
-    let length_in_bytes = length as usize * std::mem::size_of::<T>();
+    let length_in_bytes = length as usize * mem::size_of::<T>();
     let array_be = unsafe { std::slice::from_raw_parts(ptr.add(1) as *const u8, length_in_bytes) };
     Some(RawList::new(array_be))
 }

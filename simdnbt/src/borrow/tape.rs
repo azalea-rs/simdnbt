@@ -226,6 +226,9 @@ impl From<UnalignedU16> for u16 {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum TapeTagKind {
+    // putting this at the start makes it slightly faster
+    EmptyList = 0,
+
     Byte = BYTE_ID,
     Short = SHORT_ID,
     Int = INT_ID,
@@ -238,7 +241,6 @@ pub enum TapeTagKind {
     IntArray = INT_ARRAY_ID,
     LongArray = LONG_ARRAY_ID,
 
-    EmptyList,
     ByteList,
     ShortList,
     IntList,

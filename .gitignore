@@ -5,8 +5,8 @@
 flamegraph.svg
 perf.data
 perf.data.old
-callgrind.out.*
-cachegrind.out.*
+callgrind.out*
+cachegrind.out*
 
 # sometimes i make these files when benchmarking, don't want to accidentally commit them
 benchmark_result.txt
