@@ -8,10 +8,10 @@ use std::{io::Cursor, ops::Deref};
 
 use crate::{
     common::{
-        read_int_array, read_long_array, read_string, read_with_u32_length,
-        slice_into_u8_big_endian, unchecked_extend, unchecked_push, write_string, BYTE_ARRAY_ID,
-        BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
-        LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
+        extend_unchecked, push_unchecked, read_int_array, read_long_array, read_string,
+        read_with_u32_length, slice_into_u8_big_endian, write_string, BYTE_ARRAY_ID, BYTE_ID,
+        COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID,
+        LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     error::NonRootError,
     mutf8::Mutf8String,
@@ -325,29 +325,29 @@ impl NbtTag {
     /// This function is unsafe because it doesn't check that there's enough space in the data.
     /// 4 bytes MUST be reserved before calling this function.
     #[inline]
-    unsafe fn unchecked_write_without_tag_type(&self, data: &mut Vec<u8>) {
+    unsafe fn write_without_tag_type_unchecked(&self, data: &mut Vec<u8>) {
         match self {
             NbtTag::Byte(byte) => unsafe {
-                unchecked_push(data, *byte as u8);
+                push_unchecked(data, *byte as u8);
             },
             NbtTag::Short(short) => unsafe {
-                unchecked_extend(data, &short.to_be_bytes());
+                extend_unchecked(data, &short.to_be_bytes());
             },
             NbtTag::Int(int) => unsafe {
-                unchecked_extend(data, &int.to_be_bytes());
+                extend_unchecked(data, &int.to_be_bytes());
             },
             NbtTag::Long(long) => {
                 data.extend_from_slice(&long.to_be_bytes());
             }
             NbtTag::Float(float) => unsafe {
-                unchecked_extend(data, &float.to_be_bytes());
+                extend_unchecked(data, &float.to_be_bytes());
             },
             NbtTag::Double(double) => {
                 data.extend_from_slice(&double.to_be_bytes());
             }
             NbtTag::ByteArray(byte_array) => {
                 unsafe {
-                    unchecked_extend(data, &(byte_array.len() as u32).to_be_bytes());
+                    extend_unchecked(data, &(byte_array.len() as u32).to_be_bytes());
                 }
                 data.extend_from_slice(byte_array);
             }
@@ -362,13 +362,13 @@ impl NbtTag {
             }
             NbtTag::IntArray(int_array) => {
                 unsafe {
-                    unchecked_extend(data, &(int_array.len() as u32).to_be_bytes());
+                    extend_unchecked(data, &(int_array.len() as u32).to_be_bytes());
                 }
                 data.extend_from_slice(&slice_into_u8_big_endian(int_array));
             }
             NbtTag::LongArray(long_array) => {
                 unsafe {
-                    unchecked_extend(data, &(long_array.len() as u32).to_be_bytes());
+                    extend_unchecked(data, &(long_array.len() as u32).to_be_bytes());
                 }
                 data.extend_from_slice(&slice_into_u8_big_endian(long_array));
             }
@@ -379,8 +379,8 @@ impl NbtTag {
         data.reserve(1 + 4);
         // SAFETY: We just reserved enough space for the tag ID and 4 bytes of tag data.
         unsafe {
-            unchecked_push(data, self.id());
-            self.unchecked_write_without_tag_type(data);
+            push_unchecked(data, self.id());
+            self.write_without_tag_type_unchecked(data);
         }
     }
 

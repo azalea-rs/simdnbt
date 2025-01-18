@@ -1,7 +1,7 @@
 use std::mem::{self, MaybeUninit};
 
 use crate::{
-    common::{read_string, unchecked_push, unchecked_write_string, END_ID, MAX_DEPTH},
+    common::{push_unchecked, read_string, write_string_unchecked, END_ID, MAX_DEPTH},
     error::NonRootError,
     mutf8::Mutf8String,
     reader::Reader,
@@ -84,9 +84,9 @@ impl NbtCompound {
             // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
             // 4 bytes of tag data.
             unsafe {
-                unchecked_push(data, tag.id());
-                unchecked_write_string(data, name);
-                tag.unchecked_write_without_tag_type(data);
+                push_unchecked(data, tag.id());
+                write_string_unchecked(data, name);
+                tag.write_without_tag_type_unchecked(data);
             }
         }
         data.push(END_ID);

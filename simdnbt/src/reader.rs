@@ -24,6 +24,15 @@ impl<'a> Reader<'a> {
         }
     }
 
+    #[inline]
+    pub fn cur_addr(&self) -> usize {
+        self.cur as usize
+    }
+    #[inline]
+    pub fn end_addr(&self) -> usize {
+        self.end as usize
+    }
+
     pub fn ensure_can_read(&self, size: usize) -> Result<(), UnexpectedEofError> {
         let data_addr = self.cur as usize;
         let end_addr = self.end as usize;
@@ -35,7 +44,7 @@ impl<'a> Reader<'a> {
     }
 
     #[inline]
-    pub unsafe fn unchecked_read_type<T>(&mut self) -> T {
+    pub unsafe fn read_type_unchecked<T>(&mut self) -> T {
         let value = unsafe { self.cur.cast::<T>().read_unaligned() };
         self.cur = unsafe { self.cur.add(mem::size_of::<T>()) };
         value
@@ -43,7 +52,7 @@ impl<'a> Reader<'a> {
 
     pub fn read_type<T: Copy>(&mut self) -> Result<T, UnexpectedEofError> {
         self.ensure_can_read(mem::size_of::<T>())?;
-        Ok(unsafe { self.unchecked_read_type() })
+        Ok(unsafe { self.read_type_unchecked() })
     }
 
     #[inline]
@@ -57,10 +66,7 @@ impl<'a> Reader<'a> {
 
     #[inline]
     pub fn read_u16(&mut self) -> Result<u16, UnexpectedEofError> {
-        let value = self.read_type::<u16>();
-        #[cfg(target_endian = "little")]
-        let value = value.map(u16::swap_bytes);
-        value
+        self.read_type::<u16>().map(u16::to_be)
     }
     #[inline]
     pub fn read_i16(&mut self) -> Result<i16, UnexpectedEofError> {
@@ -69,10 +75,7 @@ impl<'a> Reader<'a> {
 
     #[inline]
     pub fn read_u32(&mut self) -> Result<u32, UnexpectedEofError> {
-        let value = self.read_type::<u32>();
-        #[cfg(target_endian = "little")]
-        let value = value.map(u32::swap_bytes);
-        value
+        self.read_type::<u32>().map(u32::to_be)
     }
     #[inline]
     pub fn read_i32(&mut self) -> Result<i32, UnexpectedEofError> {
@@ -81,10 +84,7 @@ impl<'a> Reader<'a> {
 
     #[inline]
     pub fn read_u64(&mut self) -> Result<u64, UnexpectedEofError> {
-        let value = self.read_type::<u64>();
-        #[cfg(target_endian = "little")]
-        let value = value.map(u64::swap_bytes);
-        value
+        self.read_type::<u64>().map(u64::to_be)
     }
     #[inline]
     pub fn read_i64(&mut self) -> Result<i64, UnexpectedEofError> {
@@ -109,10 +109,15 @@ impl<'a> Reader<'a> {
     }
 
     #[inline]
+    pub unsafe fn skip_unchecked(&mut self, size: usize) {
+        self.cur = unsafe { self.cur.add(size) };
+    }
+
+    #[inline]
     pub fn read_slice(&mut self, size: usize) -> Result<&'a [u8], UnexpectedEofError> {
         self.ensure_can_read(size)?;
         let slice = unsafe { std::slice::from_raw_parts(self.cur, size) };
-        self.cur = unsafe { self.cur.add(size) };
+        unsafe { self.skip_unchecked(size) };
         Ok(slice)
     }
 }

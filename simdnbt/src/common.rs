@@ -30,7 +30,7 @@ pub fn read_with_u16_length<'a>(
     width: usize,
 ) -> Result<&'a [u8], UnexpectedEofError> {
     let length = data.read_u16()?;
-    let length_in_bytes = length as usize * width;
+    let length_in_bytes: usize = length as usize * width;
     data.read_slice(length_in_bytes)
 }
 
@@ -47,6 +47,25 @@ pub fn read_with_u32_length<'a>(
 pub fn read_string<'a>(data: &mut Reader<'a>) -> Result<&'a Mutf8Str, UnexpectedEofError> {
     let data = read_with_u16_length(data, 1)?;
     Ok(Mutf8Str::from_slice(data))
+}
+
+pub fn skip_string(data: &mut Reader<'_>) -> Result<(), UnexpectedEofError> {
+    let cur_addr = data.cur_addr();
+    let end_addr = data.end_addr();
+
+    if cur_addr + 2 > end_addr {
+        return Err(UnexpectedEofError);
+    }
+
+    let length = unsafe { data.read_type_unchecked::<u16>() }.to_be();
+    let length_in_bytes: usize = length as usize;
+    if cur_addr + 2 + length_in_bytes > end_addr {
+        return Err(UnexpectedEofError);
+    }
+
+    unsafe { data.skip_unchecked(length_in_bytes) };
+
+    Ok(())
 }
 
 pub fn read_u8_array<'a>(data: &mut Reader<'a>) -> Result<&'a [u8], UnexpectedEofError> {
@@ -79,8 +98,8 @@ pub fn write_with_u32_length(data: &mut Vec<u8>, width: usize, value: &[u8]) {
     let length = value.len() / width;
     data.reserve(4 + value.len());
     unsafe {
-        unchecked_extend(data, &(length as u32).to_be_bytes());
-        unchecked_extend(data, value);
+        extend_unchecked(data, &(length as u32).to_be_bytes());
+        extend_unchecked(data, value);
     }
 }
 
@@ -91,7 +110,7 @@ pub fn write_string(data: &mut Vec<u8>, value: &Mutf8Str) {
     data.reserve(2 + value.len());
     // SAFETY: We reserved enough capacity
     unsafe {
-        unchecked_write_string(data, value);
+        write_string_unchecked(data, value);
     }
 }
 /// Write a string to a Vec<u8> without checking if the Vec has enough capacity.
@@ -101,9 +120,9 @@ pub fn write_string(data: &mut Vec<u8>, value: &Mutf8Str) {
 ///
 /// You must reserve enough capacity (2 + value.len()) in the Vec before calling this function.
 #[inline]
-pub unsafe fn unchecked_write_string(data: &mut Vec<u8>, value: &Mutf8Str) {
-    unchecked_extend(data, &(value.len() as u16).to_be_bytes());
-    unchecked_extend(data, value.as_bytes());
+pub unsafe fn write_string_unchecked(data: &mut Vec<u8>, value: &Mutf8Str) {
+    extend_unchecked(data, &(value.len() as u16).to_be_bytes());
+    extend_unchecked(data, value.as_bytes());
 }
 
 /// Extend a Vec<u8> with a slice of u8 without checking if the Vec has enough capacity.
@@ -114,7 +133,7 @@ pub unsafe fn unchecked_write_string(data: &mut Vec<u8>, value: &Mutf8Str) {
 ///
 /// You must reserve enough capacity in the Vec before calling this function.
 #[inline]
-pub unsafe fn unchecked_extend(data: &mut Vec<u8>, value: &[u8]) {
+pub unsafe fn extend_unchecked(data: &mut Vec<u8>, value: &[u8]) {
     let ptr = data.as_mut_ptr();
     let len = data.len();
     std::ptr::copy_nonoverlapping(value.as_ptr(), ptr.add(len), value.len());
@@ -122,7 +141,7 @@ pub unsafe fn unchecked_extend(data: &mut Vec<u8>, value: &[u8]) {
 }
 
 #[inline]
-pub unsafe fn unchecked_push(data: &mut Vec<u8>, value: u8) {
+pub unsafe fn push_unchecked(data: &mut Vec<u8>, value: u8) {
     let ptr = data.as_mut_ptr();
     let len = data.len();
     std::ptr::write(ptr.add(len), value);

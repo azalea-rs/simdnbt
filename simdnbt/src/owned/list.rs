@@ -1,8 +1,8 @@
 use crate::{
     common::{
         read_i8_array, read_int_array, read_long_array, read_string, read_u8_array,
-        read_with_u32_length, slice_i8_into_u8, slice_into_u8_big_endian, unchecked_extend,
-        unchecked_push, write_string, write_u32, write_with_u32_length, BYTE_ARRAY_ID, BYTE_ID,
+        read_with_u32_length, slice_i8_into_u8, slice_into_u8_big_endian, extend_unchecked,
+        push_unchecked, write_string, write_u32, write_with_u32_length, BYTE_ARRAY_ID, BYTE_ID,
         COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID,
         LONG_ID, SHORT_ID, STRING_ID,
     },
@@ -117,8 +117,8 @@ impl NbtList {
             data.reserve(5);
             // SAFETY: we just reserved 5 bytes
             unsafe {
-                unchecked_push(data, COMPOUND_ID);
-                unchecked_extend(data, &(compounds.len() as u32).to_be_bytes());
+                push_unchecked(data, COMPOUND_ID);
+                extend_unchecked(data, &(compounds.len() as u32).to_be_bytes());
             }
             for compound in compounds {
                 compound.write(data);

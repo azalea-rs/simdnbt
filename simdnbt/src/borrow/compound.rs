@@ -2,10 +2,10 @@ use std::{hint::unreachable_unchecked, mem::MaybeUninit};
 
 use crate::{
     common::{
-        read_int_array, read_long_array, read_string, read_with_u32_length, unchecked_extend,
-        unchecked_push, unchecked_write_string, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID,
-        DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID,
-        MAX_DEPTH, SHORT_ID, STRING_ID,
+        extend_unchecked, push_unchecked, read_int_array, read_long_array, read_string,
+        read_with_u32_length, skip_string, write_string, write_string_unchecked, BYTE_ARRAY_ID,
+        BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
+        LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     error::NonRootError,
     reader::Reader,
@@ -54,8 +54,8 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
             // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
             // 4 bytes of tag data.
             unsafe {
-                unchecked_push(data, tag.id());
-                unchecked_write_string(data, name);
+                push_unchecked(data, tag.id());
+                write_string_unchecked(data, name);
             }
 
             write_tag(tag, data);
@@ -403,7 +403,7 @@ pub(crate) fn read_tag_in_compound<'a>(
 
     let tag_name_ptr = data.cur;
     debug_assert_eq!(tag_name_ptr as u64 >> 56, 0);
-    read_string(data)?;
+    skip_string(data)?;
     tapes.main.push(TapeElement::new(tag_name_ptr as u64));
 
     read_tag(data, tapes, stack, tag_type)
@@ -433,19 +433,19 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
     let el = tag.element();
     match el.kind() {
         TapeTagKind::Byte => unsafe {
-            unchecked_push(data, tag.byte().unwrap() as u8);
+            push_unchecked(data, tag.byte().unwrap() as u8);
         },
         TapeTagKind::Short => unsafe {
-            unchecked_extend(data, &tag.short().unwrap().to_be_bytes());
+            extend_unchecked(data, &tag.short().unwrap().to_be_bytes());
         },
         TapeTagKind::Int => unsafe {
-            unchecked_extend(data, &tag.int().unwrap().to_be_bytes());
+            extend_unchecked(data, &tag.int().unwrap().to_be_bytes());
         },
         TapeTagKind::Long => {
             data.extend_from_slice(&tag.long().unwrap().to_be_bytes());
         }
         TapeTagKind::Float => unsafe {
-            unchecked_extend(data, &tag.float().unwrap().to_be_bytes());
+            extend_unchecked(data, &tag.float().unwrap().to_be_bytes());
         },
         TapeTagKind::Double => {
             data.extend_from_slice(&tag.double().unwrap().to_be_bytes());
@@ -453,7 +453,7 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
         TapeTagKind::ByteArray => {
             let byte_array = tag.byte_array().unwrap();
             unsafe {
-                unchecked_extend(data, &(byte_array.len() as u32).to_be_bytes());
+                extend_unchecked(data, &(byte_array.len() as u32).to_be_bytes());
             }
             data.extend_from_slice(byte_array);
         }
@@ -471,7 +471,7 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
             let int_array =
                 unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i32>(el.ptr()).unwrap() };
             unsafe {
-                unchecked_extend(data, &(int_array.len() as u32).to_be_bytes());
+                extend_unchecked(data, &(int_array.len() as u32).to_be_bytes());
             }
             data.extend_from_slice(int_array.as_big_endian());
         }
@@ -479,7 +479,7 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
             let long_array =
                 unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i64>(el.ptr()).unwrap() };
             unsafe {
-                unchecked_extend(data, &(long_array.len() as u32).to_be_bytes());
+                extend_unchecked(data, &(long_array.len() as u32).to_be_bytes());
             }
             data.extend_from_slice(long_array.as_big_endian());
         }
