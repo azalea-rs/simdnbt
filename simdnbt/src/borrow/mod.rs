@@ -48,22 +48,17 @@ pub fn read<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
     let name = read_string(&mut data)?;
 
     let mut tapes = Tapes::new();
-    let mut stack = ParsingStack::new();
+    tapes.main.push(TapeElement::new_with_approx_len_and_offset(
+        TapeTagKind::Compound,
+        // these get overwritten later
+        0,
+        0,
+    ));
 
+    let mut stack = ParsingStack::new();
     stack.push(ParsingStackElement::Compound {
         index_of_compound_element: 0,
     })?;
-    unsafe {
-        // SAFETY: we just created the MainTape so there's definitely space for an item
-        tapes
-            .main
-            .push_unchecked(TapeElement::new_with_approx_len_and_offset(
-                TapeTagKind::Compound,
-                // these get overwritten later
-                0,
-                0,
-            ))
-    };
 
     read_with_stack(&mut data, &mut tapes, &mut stack)?;
 
@@ -96,17 +91,13 @@ pub fn read_compound<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtCompound<
     stack.push(ParsingStackElement::Compound {
         index_of_compound_element: 0,
     })?;
-    unsafe {
-        // SAFETY: we just created the MainTape so there's definitely space for an item
-        tapes
-            .main
-            .push_unchecked(TapeElement::new_with_approx_len_and_offset(
-                TapeTagKind::Compound,
-                // these get overwritten later
-                0,
-                0,
-            ))
-    };
+
+    tapes.main.push(TapeElement::new_with_approx_len_and_offset(
+        TapeTagKind::Compound,
+        // these get overwritten later
+        0,
+        0,
+    ));
 
     read_with_stack(&mut data, &mut tapes, &mut stack)?;
 
