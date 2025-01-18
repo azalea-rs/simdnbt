@@ -34,68 +34,44 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         stack: &mut ParsingStack,
     ) -> Result<(), NonRootError> {
         let tag_type = data.read_u8()?;
-        match tag_type {
+        let pushing_element = match tag_type {
             END_ID => {
                 // the length is unused for this type of lists
                 data.skip(4)?;
-                tapes
-                    .main
-                    .push(TapeElement::new_with_0(TapeTagKind::EmptyList));
+                TapeElement::new_with_0(TapeTagKind::EmptyList)
             }
             BYTE_ID => {
                 let byte_list_ptr = data.cur;
                 let _ = read_i8_array(data)?;
-                tapes.main.push(TapeElement::new_with_ptr(
-                    TapeTagKind::ByteList,
-                    byte_list_ptr,
-                ));
+                TapeElement::new_with_ptr(TapeTagKind::ByteList, byte_list_ptr)
             }
             SHORT_ID => {
                 let short_list_ptr = data.cur;
                 read_with_u32_length(data, 2)?;
-                tapes.main.push(TapeElement::new_with_ptr(
-                    TapeTagKind::ShortList,
-                    short_list_ptr,
-                ));
+                TapeElement::new_with_ptr(TapeTagKind::ShortList, short_list_ptr)
             }
             INT_ID => {
                 let int_list_ptr = data.cur;
                 read_with_u32_length(data, 4)?;
-                tapes.main.push(TapeElement::new_with_ptr(
-                    TapeTagKind::IntList,
-                    int_list_ptr,
-                ));
+                TapeElement::new_with_ptr(TapeTagKind::IntList, int_list_ptr)
             }
             LONG_ID => {
                 let long_list_ptr = data.cur;
                 read_with_u32_length(data, 8)?;
-                tapes.main.push(TapeElement::new_with_ptr(
-                    TapeTagKind::LongList,
-                    long_list_ptr,
-                ));
+                TapeElement::new_with_ptr(TapeTagKind::LongList, long_list_ptr)
             }
             FLOAT_ID => {
                 let float_list_ptr = data.cur;
                 read_with_u32_length(data, 4)?;
-                tapes.main.push(TapeElement::new_with_ptr(
-                    TapeTagKind::FloatList,
-                    float_list_ptr,
-                ));
+                TapeElement::new_with_ptr(TapeTagKind::FloatList, float_list_ptr)
             }
             DOUBLE_ID => {
                 let double_list_ptr = data.cur;
                 read_with_u32_length(data, 8)?;
-                tapes.main.push(TapeElement::new_with_ptr(
-                    TapeTagKind::DoubleList,
-                    double_list_ptr,
-                ));
+                TapeElement::new_with_ptr(TapeTagKind::DoubleList, double_list_ptr)
             }
             BYTE_ARRAY_ID => {
                 let index_of_element = tapes.extra.elements.len() as u32;
-                tapes.main.push(TapeElement::new_with_u32(
-                    TapeTagKind::ByteArrayList,
-                    index_of_element,
-                ));
 
                 let length = data.read_u32()?;
                 tapes.extra.elements.push(ExtraTapeElement { length });
@@ -103,13 +79,11 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                     let byte_array = read_u8_array(data)?;
                     tapes.extra.elements.push(ExtraTapeElement { byte_array });
                 }
+
+                TapeElement::new_with_u32(TapeTagKind::ByteArrayList, index_of_element)
             }
             STRING_ID => {
                 let index_of_element = tapes.extra.elements.len() as u32;
-                tapes.main.push(TapeElement::new_with_u32(
-                    TapeTagKind::StringList,
-                    index_of_element,
-                ));
 
                 let length = data.read_u32()?;
                 tapes.extra.elements.push(ExtraTapeElement { length });
@@ -117,6 +91,8 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                     let string = read_string(data)?;
                     tapes.extra.elements.push(ExtraTapeElement { string });
                 }
+
+                TapeElement::new_with_u32(TapeTagKind::StringList, index_of_element)
             }
             LIST_ID => {
                 let length = data.read_u32()?;
@@ -127,12 +103,12 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                     index_of_list_element: index_of_list_element as u32,
                 })?;
                 stack.set_list_length(length);
-                tapes.main.push(TapeElement::new_with_approx_len_and_offset(
+                TapeElement::new_with_approx_len_and_offset(
                     TapeTagKind::ListList,
                     length,
                     // can't know the offset until after
                     0,
-                ));
+                )
             }
             COMPOUND_ID => {
                 let length = data.read_u32()?;
@@ -143,41 +119,40 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
                     index_of_list_element: index_of_list_element as u32,
                 })?;
                 stack.set_list_length(length);
-                tapes.main.push(TapeElement::new_with_approx_len_and_offset(
+                TapeElement::new_with_approx_len_and_offset(
                     TapeTagKind::CompoundList,
                     length,
                     // this gets overwritten after the list is fully read
                     0,
-                ));
+                )
             }
             INT_ARRAY_ID => {
                 let index_of_element = tapes.extra.elements.len() as u32;
-                tapes.main.push(TapeElement::new_with_u32(
-                    TapeTagKind::IntArrayList,
-                    index_of_element,
-                ));
                 let length = data.read_u32()?;
                 tapes.extra.elements.push(ExtraTapeElement { length });
                 for _ in 0..length {
                     let int_array = read_int_array(data)?;
                     tapes.extra.elements.push(ExtraTapeElement { int_array });
                 }
+
+                TapeElement::new_with_u32(TapeTagKind::IntArrayList, index_of_element)
             }
             LONG_ARRAY_ID => {
                 let index_of_element = tapes.extra.elements.len() as u32;
-                tapes.main.push(TapeElement::new_with_u32(
-                    TapeTagKind::LongArrayList,
-                    index_of_element,
-                ));
                 let length = data.read_u32()?;
                 tapes.extra.elements.push(ExtraTapeElement { length });
                 for _ in 0..length {
                     let long_array = read_long_array(data)?;
                     tapes.extra.elements.push(ExtraTapeElement { long_array });
                 }
+
+                TapeElement::new_with_u32(TapeTagKind::LongArrayList, index_of_element)
             }
             _ => return Err(NonRootError::unknown_tag_id(tag_type)),
         };
+
+        tapes.main.push(pushing_element);
+
         Ok(())
     }
 
