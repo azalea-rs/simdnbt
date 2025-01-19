@@ -20,9 +20,8 @@ mod traits;
 
 pub use error::{DeserializeError, Error};
 pub use mutf8::Mutf8Str;
-pub use traits::{Deserialize, FromNbtTag, Serialize, ToNbtTag};
-
 pub use simdnbt_derive::*;
+pub use traits::{Deserialize, FromNbtTag, Serialize, ToNbtTag};
 
 #[cfg(test)]
 mod tests {

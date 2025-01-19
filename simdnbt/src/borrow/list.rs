@@ -1,5 +1,11 @@
 use std::{marker::PhantomData, mem};
 
+use super::{
+    compound::{ParsingStack, ParsingStackElement},
+    extra_tapes::{ExtraTapeElement, ExtraTapes},
+    tape::{TapeElement, TapeTagKind, UnalignedU32},
+    NbtCompound, Tapes,
+};
 use crate::{
     common::{
         read_i8_array, read_int_array, read_long_array, read_string, read_u8_array,
@@ -12,13 +18,6 @@ use crate::{
     reader::Reader,
     swap_endianness::SwappableNumber,
     Mutf8Str,
-};
-
-use super::{
-    compound::{ParsingStack, ParsingStackElement},
-    extra_tapes::{ExtraTapeElement, ExtraTapes},
-    tape::{TapeElement, TapeTagKind, UnalignedU32},
-    NbtCompound, Tapes,
 };
 
 /// A list of NBT tags of a single type.
@@ -281,8 +280,9 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         }
     }
 
-    /// Returns whether the list is specifically a list with the `empty` tag type. This will return
-    /// false if the list is any other type (even it has a length of zero).
+    /// Returns whether the list is specifically a list with the `empty` tag
+    /// type. This will return false if the list is any other type (even it
+    /// has a length of zero).
     pub fn empty(&self) -> bool {
         self.element().kind() == TapeTagKind::EmptyList
     }
@@ -365,10 +365,12 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
 
         Some(NbtListList {
             iter: NbtListListIter {
-                current_tape_offset: 0, // it's an iterator, it starts at 0
+                // it's an iterator, it starts at 0
+                current_tape_offset: 0,
                 max_tape_offset: max_tape_offset as usize,
                 approx_length,
-                tape: unsafe { self.element.add(1) }, // the first element is the listlist element so we don't include it
+                // the first element is the listlist element so we don't include it
+                tape: unsafe { self.element.add(1) },
                 extra_tapes: self.extra_tapes,
                 _phantom: PhantomData,
             },
@@ -546,8 +548,9 @@ impl<'a, 'tape> NbtListList<'a, 'tape> {
     pub fn approx_len(&self) -> u32 {
         self.iter.approx_len()
     }
-    /// Get the element at the given index. This is O(n) where n is index, so if you'll be calling
-    /// this more than once you should probably just use the iterator.
+    /// Get the element at the given index. This is O(n) where n is index, so if
+    /// you'll be calling this more than once you should probably just use
+    /// the iterator.
     pub fn get(&self, index: usize) -> Option<NbtList<'a, 'tape>> {
         self.iter.clone().nth(index)
     }

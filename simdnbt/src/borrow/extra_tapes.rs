@@ -14,8 +14,8 @@ impl Debug for ExtraTapes<'_> {
 }
 
 pub union ExtraTapeElement<'a> {
-    /// An indicator for how long the following list is. This is what we point to from
-    /// `TapeTagValue`.
+    /// An indicator for how long the following list is. This is what we point
+    /// to from `TapeTagValue`.
     pub length: u32,
     pub byte_array: &'a [u8],
     pub string: &'a Mutf8Str,

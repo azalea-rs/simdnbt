@@ -127,7 +127,8 @@ fn simdnbt_items_from_nbt(nbt: simdnbt::borrow::BaseNbt) -> Option<Vec<Option<It
                 .and_then(|textures| textures.compounds())
                 .and_then(|textures| textures.first())
                 .and_then(|texture| texture.string("Value"))
-                // the real program does some base64+json decoding here but that's unnecessary for the benchmark
+                // the real program does some base64+json decoding here but that's unnecessary for
+                // the benchmark
                 .map(|value| value.to_string()),
             skyblock_id: item_extra_attributes
                 .and_then(|e| e.string("id"))
@@ -300,7 +301,8 @@ fn graphite_items_from_nbt(nbt: graphite_binary::nbt::NBT) -> Option<Vec<Option<
                 .and_then(|properties| nbt.find(properties, "textures"))
                 .and_then(|textures| nbt.iter(textures)?.next())
                 .and_then(|texture| nbt.find(texture, "Value"))
-                // the real program does some base64+json decoding here but that's unnecessary for the benchmark
+                // the real program does some base64+json decoding here but that's unnecessary for
+                // the benchmark
                 .and_then(|value| value.as_string().cloned()),
             skyblock_id: item_extra_attributes
                 .and_then(|e| nbt.find(e, "id"))

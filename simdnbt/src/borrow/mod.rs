@@ -1,4 +1,5 @@
-//! The borrowed variant of NBT. This is useful if you're only reading data and you can keep a reference to the original buffer.
+//! The borrowed variant of NBT. This is useful if you're only reading data and
+//! you can keep a reference to the original buffer.
 
 mod compound;
 mod extra_tapes;
@@ -14,15 +15,6 @@ use byteorder::ReadBytesExt;
 use compound::ParsingStackElementKind;
 use tape::{UnalignedU16, UnalignedU32, UnalignedU64};
 
-use crate::{
-    common::{
-        read_string, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID,
-        FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
-    },
-    reader::{Reader, ReaderFromCursor},
-    Error, Mutf8Str,
-};
-
 use self::{
     compound::{read_tag_in_compound, ParsingStack, ParsingStackElement},
     extra_tapes::ExtraTapes,
@@ -33,8 +25,17 @@ pub use self::{
     compound::{NbtCompound, NbtCompoundIter},
     list::{NbtCompoundList, NbtCompoundListIter, NbtList, NbtListList, NbtListListIter},
 };
+use crate::{
+    common::{
+        read_string, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID,
+        FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
+    },
+    reader::{Reader, ReaderFromCursor},
+    Error, Mutf8Str,
+};
 
-/// Read a normal root NBT compound. This is either empty or has a name and compound tag.
+/// Read a normal root NBT compound. This is either empty or has a name and
+/// compound tag.
 ///
 /// Returns `Ok(Nbt::None)` if there is no data.
 pub fn read<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
@@ -63,11 +64,11 @@ pub fn read<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
 
     Ok(Nbt::Some(BaseNbt { name, tapes }))
 }
-/// Read a root NBT compound, but without reading the name. This is used in Minecraft when reading
-/// NBT over the network.
+/// Read a root NBT compound, but without reading the name. This is used in
+/// Minecraft when reading NBT over the network.
 ///
-/// This is similar to [`read_tag`], but returns an [`Nbt`] instead (guaranteeing it'll be either
-/// empty or a compound).
+/// This is similar to [`read_tag`], but returns an [`Nbt`] instead
+/// (guaranteeing it'll be either empty or a compound).
 pub fn read_unnamed<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
     let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
     if root_type == END_ID {
@@ -100,8 +101,9 @@ pub fn read_compound<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtCompound<
 
     Ok(BaseNbtCompound { tapes })
 }
-/// Read an NBT tag, without reading its name. This may be any type of tag except for an end tag. If you need to be able to
-/// handle end tags, use [`read_optional_tag`].
+/// Read an NBT tag, without reading its name. This may be any type of tag
+/// except for an end tag. If you need to be able to handle end tags, use
+/// [`read_optional_tag`].
 pub fn read_tag<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtTag<'a>, Error> {
     let mut tapes = Tapes::new();
     let mut stack = ParsingStack::new();
@@ -117,7 +119,8 @@ pub fn read_tag<'a>(data: &mut Cursor<&'a [u8]>) -> Result<BaseNbtTag<'a>, Error
 
     Ok(BaseNbtTag { tapes })
 }
-/// Read any NBT tag, without reading its name. This may be any type of tag, including an end tag.
+/// Read any NBT tag, without reading its name. This may be any type of tag,
+/// including an end tag.
 ///
 /// Returns `Ok(None)` if there is no data.
 pub fn read_optional_tag<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Option<BaseNbtTag<'a>>, Error> {
@@ -242,8 +245,8 @@ impl Debug for BaseNbt<'_> {
     }
 }
 
-/// A nameless NBT container. This only contains a compound tag. This contains a `TagAllocator`,
-/// so it can exist independently from a [`BaseNbt`].
+/// A nameless NBT container. This only contains a compound tag. This contains a
+/// `TagAllocator`, so it can exist independently from a [`BaseNbt`].
 pub struct BaseNbtCompound<'a> {
     tapes: Tapes<'a>,
 }
@@ -710,14 +713,16 @@ mod tests {
     #[test]
     fn list_of_empty_lists() {
         // found from fuzzing
-        // BaseNbt { name: m"", tag: NbtTag::NbtCompound { m"": NbtTag::List(List::List([List::Empty])) } }
+        // BaseNbt { name: m"", tag: NbtTag::NbtCompound { m"":
+        // NbtTag::List(List::List([List::Empty])) } }
         let data = [10, 0, 0, 9, 0, 0, 9, 0, 0, 0, 1, 0, 9, 0, 0, 0, 0];
         let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
         nbt.as_compound().to_owned();
     }
     #[test]
     fn list_of_byte_arrays() {
-        // BaseNbt { name: m"", tag: NbtCompound { values: [(m"", List(List([List::ByteArray([])])))] } }
+        // BaseNbt { name: m"", tag: NbtCompound { values: [(m"",
+        // List(List([List::ByteArray([])])))] } }
         let data = [10, 0, 0, 9, 0, 0, 9, 0, 0, 0, 1, 7, 0, 0, 0, 0, 0];
         let nbt = super::read(&mut Cursor::new(&data)).unwrap().unwrap();
         nbt.as_compound().to_owned();

@@ -260,8 +260,8 @@ fn swap_endianness_64bit(bytes: &mut [u8], num: usize) {
     }
 }
 
-/// Swap the endianness of the given array (unless we're on a big-endian system) in-place depending
-/// on the width of the given type.
+/// Swap the endianness of the given array (unless we're on a big-endian system)
+/// in-place depending on the width of the given type.
 fn swap_endianness_from_type<T: SwappableNumber>(items: &mut [u8]) {
     let item_width = mem::size_of::<T>();
     let length = items.len() / item_width;
@@ -298,7 +298,8 @@ pub fn swap_endianness<T: SwappableNumber>(data: &[u8]) -> Vec<T> {
     let mut vec_u8: Vec<u8> = {
         let ptr = vec_t.as_mut_ptr() as *mut u8;
         mem::forget(vec_t);
-        // SAFETY: the new capacity is correct since we checked that data.len() is a multiple of width_of_t
+        // SAFETY: the new capacity is correct since we checked that data.len() is a
+        // multiple of width_of_t
         unsafe { Vec::from_raw_parts(ptr, 0, data.len()) }
     };
     vec_u8.extend_from_slice(data);

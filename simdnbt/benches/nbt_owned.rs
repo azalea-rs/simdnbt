@@ -1,9 +1,10 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use flate2::read::GzDecoder;
 use std::{
     fs::File,
     io::{Cursor, Read},
 };
+
+use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use flate2::read::GzDecoder;
 
 fn bench_file(filename: &str, c: &mut Criterion) {
     let mut file = File::open(format!("tests/{filename}")).unwrap();

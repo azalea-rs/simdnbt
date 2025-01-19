@@ -166,7 +166,8 @@ impl TapeElement {
     pub fn new_with_ptr<T>(kind: TapeTagKind, ptr: *const T) -> Self {
         Self(((kind as u64) << 56) | ptr as u64)
     }
-    /// Create a new TapeElement with the given kind and everything else set to 0.
+    /// Create a new TapeElement with the given kind and everything else set to
+    /// 0.
     pub fn new_with_0(kind: TapeTagKind) -> Self {
         Self((kind as u64) << 56)
     }
@@ -176,10 +177,12 @@ impl TapeElement {
 }
 
 impl TapeElement {
-    /// Returns how much we should increment the tape index to get to the next tag.
+    /// Returns how much we should increment the tape index to get to the next
+    /// tag.
     ///
     /// # Safety
-    /// The element must be a tag and not something else like a continuation of a long or double.
+    /// The element must be a tag and not something else like a continuation of
+    /// a long or double.
     pub unsafe fn skip_offset(&self) -> usize {
         match self.kind() {
             TapeTagKind::Compound | TapeTagKind::ListList | TapeTagKind::CompoundList => {

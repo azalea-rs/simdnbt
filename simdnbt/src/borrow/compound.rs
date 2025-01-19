@@ -1,5 +1,11 @@
 use std::mem::MaybeUninit;
 
+use super::{
+    extra_tapes::ExtraTapes,
+    list::{self, NbtList},
+    tape::{TapeElement, TapeTagKind, UnalignedU16},
+    NbtTag, Tapes,
+};
 use crate::{
     common::{
         extend_unchecked, push_unchecked, read_int_array, read_long_array, read_string,
@@ -10,13 +16,6 @@ use crate::{
     error::NonRootError,
     reader::Reader,
     Mutf8Str,
-};
-
-use super::{
-    extra_tapes::ExtraTapes,
-    list::{self, NbtList},
-    tape::{TapeElement, TapeTagKind, UnalignedU16},
-    NbtTag, Tapes,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -51,8 +50,8 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
         for (name, tag) in self.iter() {
             // reserve 4 bytes extra so we can avoid reallocating for small tags
             data.reserve(1 + 2 + name.len() + 4);
-            // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
-            // 4 bytes of tag data.
+            // SAFETY: We just reserved enough space for the tag ID, the name length, the
+            // name, and 4 bytes of tag data.
             unsafe {
                 push_unchecked(data, tag.id());
                 write_string_unchecked(data, name);

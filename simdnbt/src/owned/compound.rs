@@ -1,5 +1,6 @@
 use std::mem::{self, MaybeUninit};
 
+use super::{list::NbtList, NbtTag};
 use crate::{
     common::{push_unchecked, read_string, write_string_unchecked, END_ID, MAX_DEPTH},
     error::NonRootError,
@@ -7,8 +8,6 @@ use crate::{
     reader::Reader,
     Mutf8Str, ToNbtTag,
 };
-
-use super::{list::NbtList, NbtTag};
 
 /// A list of named tags. The order of the tags is preserved.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -81,8 +80,8 @@ impl NbtCompound {
         for (name, tag) in &self.values {
             // reserve 4 bytes extra so we can avoid reallocating for small tags
             data.reserve(1 + 2 + name.len() + 4);
-            // SAFETY: We just reserved enough space for the tag ID, the name length, the name, and
-            // 4 bytes of tag data.
+            // SAFETY: We just reserved enough space for the tag ID, the name length, the
+            // name, and 4 bytes of tag data.
             unsafe {
                 push_unchecked(data, tag.id());
                 write_string_unchecked(data, name);

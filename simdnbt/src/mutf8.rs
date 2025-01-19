@@ -9,7 +9,8 @@ use std::{
 
 use simd_cesu8::mutf8;
 
-/// A MUTF-8 string slice. This is how strings are represented internally in NBT.
+/// A MUTF-8 string slice. This is how strings are represented internally in
+/// NBT.
 #[derive(Eq, PartialEq)]
 pub struct Mutf8Str {
     pub(crate) slice: [u8],

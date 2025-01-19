@@ -1,18 +1,17 @@
+use super::{compound::NbtCompound, MAX_DEPTH};
 use crate::{
     common::{
-        read_i8_array, read_int_array, read_long_array, read_string, read_u8_array,
-        read_with_u32_length, slice_i8_into_u8, slice_into_u8_big_endian, extend_unchecked,
-        push_unchecked, write_string, write_u32, write_with_u32_length, BYTE_ARRAY_ID, BYTE_ID,
-        COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID,
-        LONG_ID, SHORT_ID, STRING_ID,
+        extend_unchecked, push_unchecked, read_i8_array, read_int_array, read_long_array,
+        read_string, read_u8_array, read_with_u32_length, slice_i8_into_u8,
+        slice_into_u8_big_endian, write_string, write_u32, write_with_u32_length, BYTE_ARRAY_ID,
+        BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
+        LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
     },
     error::NonRootError,
     mutf8::Mutf8String,
     reader::Reader,
     swap_endianness::swap_endianness,
 };
-
-use super::{compound::NbtCompound, MAX_DEPTH};
 
 /// A list of NBT tags of a single type.
 #[repr(u8)]

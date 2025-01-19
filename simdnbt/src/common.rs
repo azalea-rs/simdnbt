@@ -95,18 +95,21 @@ pub fn write_string(data: &mut Vec<u8>, value: &Mutf8Str) {
     }
 }
 /// Write a string to a Vec<u8> without checking if the Vec has enough capacity.
-/// This is unsafe because it can cause a buffer overflow if the Vec doesn't have enough capacity.
+/// This is unsafe because it can cause a buffer overflow if the Vec doesn't
+/// have enough capacity.
 ///
 /// # Safety
 ///
-/// You must reserve enough capacity (2 + value.len()) in the Vec before calling this function.
+/// You must reserve enough capacity (2 + value.len()) in the Vec before calling
+/// this function.
 #[inline]
 pub unsafe fn write_string_unchecked(data: &mut Vec<u8>, value: &Mutf8Str) {
     extend_unchecked(data, &(value.len() as u16).to_be_bytes());
     extend_unchecked(data, value.as_bytes());
 }
 
-/// Extend a Vec<u8> with a slice of u8 without checking if the Vec has enough capacity.
+/// Extend a Vec<u8> with a slice of u8 without checking if the Vec has enough
+/// capacity.
 ///
 /// This optimization is barely measurable, but it does make it slightly faster!
 ///
@@ -129,15 +132,16 @@ pub unsafe fn push_unchecked(data: &mut Vec<u8>, value: u8) {
     data.set_len(len + 1);
 }
 
-/// Convert a slice of any type into a slice of u8. This will probably return the data as little
-/// endian! Use [`slice_into_u8_big_endian`] to get big endian (the endianness that's used in NBT).
+/// Convert a slice of any type into a slice of u8. This will probably return
+/// the data as little endian! Use [`slice_into_u8_big_endian`] to get big
+/// endian (the endianness that's used in NBT).
 #[inline]
 pub fn slice_into_u8_native_endian<T>(s: &[T]) -> &[u8] {
     unsafe { slice::from_raw_parts(s.as_ptr() as *const u8, mem::size_of_val(s)) }
 }
 
-/// Convert a slice of any type into a Vec<u8>. This will return the data as big endian (the
-/// endianness that's used in NBT).
+/// Convert a slice of any type into a Vec<u8>. This will return the data as big
+/// endian (the endianness that's used in NBT).
 #[inline]
 pub fn slice_into_u8_big_endian<T: SwappableNumber>(s: &[T]) -> Vec<u8> {
     swap_endianness_as_u8::<T>(slice_into_u8_native_endian(s))

@@ -1,11 +1,12 @@
-//! The owned variant of NBT. This is useful if you're writing NBT or if you can't keep a reference
-//! to the original data.
+//! The owned variant of NBT. This is useful if you're writing NBT or if you
+//! can't keep a reference to the original data.
 
 mod compound;
 mod list;
 
 use std::{io::Cursor, ops::Deref};
 
+pub use self::{compound::NbtCompound, list::NbtList};
 use crate::{
     common::{
         extend_unchecked, push_unchecked, read_int_array, read_long_array, read_string,
@@ -19,20 +20,19 @@ use crate::{
     Error, Mutf8Str,
 };
 
-pub use self::{compound::NbtCompound, list::NbtList};
-
-/// Read a normal root NBT compound. This is either empty or has a name and compound tag.
+/// Read a normal root NBT compound. This is either empty or has a name and
+/// compound tag.
 ///
 /// Returns `Ok(Nbt::None)` if there is no data.
 pub fn read(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
     let mut reader = ReaderFromCursor::new(data);
     Nbt::read(&mut reader)
 }
-/// Read a root NBT compound, but without reading the name. This is used in Minecraft when reading
-/// NBT over the network.
+/// Read a root NBT compound, but without reading the name. This is used in
+/// Minecraft when reading NBT over the network.
 ///
-/// This is similar to [`read_tag`], but returns an [`Nbt`] instead (guaranteeing it'll be either
-/// empty or a compound).
+/// This is similar to [`read_tag`], but returns an [`Nbt`] instead
+/// (guaranteeing it'll be either empty or a compound).
 pub fn read_unnamed(data: &mut Cursor<&[u8]>) -> Result<Nbt, Error> {
     let mut reader = ReaderFromCursor::new(data);
     Nbt::read_unnamed(&mut reader)
@@ -42,13 +42,15 @@ pub fn read_compound(data: &mut Cursor<&[u8]>) -> Result<NbtCompound, NonRootErr
     let mut reader = ReaderFromCursor::new(data);
     NbtCompound::read(&mut reader)
 }
-/// Read an NBT tag, without reading its name. This may be any type of tag except for an end tag. If you need to be able to
-/// handle end tags, use [`read_optional_tag`].
+/// Read an NBT tag, without reading its name. This may be any type of tag
+/// except for an end tag. If you need to be able to handle end tags, use
+/// [`read_optional_tag`].
 pub fn read_tag(data: &mut Cursor<&[u8]>) -> Result<NbtTag, NonRootError> {
     let mut reader = ReaderFromCursor::new(data);
     NbtTag::read(&mut reader)
 }
-/// Read any NBT tag, without reading its name. This may be any type of tag, including an end tag.
+/// Read any NBT tag, without reading its name. This may be any type of tag,
+/// including an end tag.
 ///
 /// Returns `Ok(None)` if there is no data.
 pub fn read_optional_tag(data: &mut Cursor<&[u8]>) -> Result<Option<NbtTag>, NonRootError> {
@@ -75,7 +77,8 @@ impl Nbt {
         Self::Some(BaseNbt { name, tag })
     }
 
-    /// Reads NBT from the given data. Returns `Ok(Nbt::None)` if there is no data.
+    /// Reads NBT from the given data. Returns `Ok(Nbt::None)` if there is no
+    /// data.
     fn read(data: &mut Reader<'_>) -> Result<Nbt, Error> {
         let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
         if root_type == END_ID {
@@ -322,8 +325,9 @@ impl NbtTag {
     ///
     /// # Safety
     ///
-    /// This function is unsafe because it doesn't check that there's enough space in the data.
-    /// 4 bytes MUST be reserved before calling this function.
+    /// This function is unsafe because it doesn't check that there's enough
+    /// space in the data. 4 bytes MUST be reserved before calling this
+    /// function.
     #[inline]
     unsafe fn write_without_tag_type_unchecked(&self, data: &mut Vec<u8>) {
         match self {

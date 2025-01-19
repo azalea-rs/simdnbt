@@ -59,7 +59,8 @@ fn items_from_nbt(nbt: BaseNbt) -> Option<Vec<Option<Item>>> {
                 .and_then(|textures| textures.compounds())
                 .and_then(|textures| textures.first())
                 .and_then(|texture| texture.string("Value"))
-                // the real program does some base64+json decoding here but that's unnecessary for the benchmark
+                // the real program does some base64+json decoding here but that's unnecessary for
+                // the benchmark
                 .map(|value| value.to_string()),
             skyblock_id: item_extra_attributes
                 .and_then(|e| e.string("id"))
