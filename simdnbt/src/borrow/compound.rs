@@ -427,7 +427,7 @@ pub(crate) fn read_tag_in_compound<'a>(
     let tag_name_ptr = data.cur;
     debug_assert_eq!(tag_name_ptr as u64 >> 56, 0);
 
-    // read the string in a more efficient way than just calling read_string
+    // read the tag name in a more efficient way than just calling read_string
 
     let mut cur_addr = tag_name_ptr as usize;
     let end_addr = data.end_addr();
@@ -445,7 +445,7 @@ pub(crate) fn read_tag_in_compound<'a>(
     }
     data.cur = cur_addr as *const u8;
 
-    // finished reading the string
+    // finished reading the tag name
 
     tapes.main.push(TapeElement::new(tag_name_ptr as u64));
 

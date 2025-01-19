@@ -47,8 +47,18 @@ impl<'a> Reader<'a> {
     }
 
     pub fn read_type<T: Copy>(&mut self) -> Result<T, UnexpectedEofError> {
-        self.ensure_can_read(mem::size_of::<T>())?;
-        Ok(unsafe { self.read_type_unchecked() })
+        let addr = self.cur;
+
+        // it's faster to add and then check for eof. it does leave our pointer in a bad
+        // state if it fails, but we aren't going to dereference it in that case
+        // anyways.
+        self.cur = unsafe { self.cur.add(mem::size_of::<T>()) };
+        if self.cur > self.end {
+            return Err(UnexpectedEofError);
+        }
+
+        let value = unsafe { addr.cast::<T>().read_unaligned() };
+        Ok(value)
     }
 
     #[inline]
@@ -99,8 +109,11 @@ impl<'a> Reader<'a> {
 
     #[inline]
     pub fn skip(&mut self, size: usize) -> Result<(), UnexpectedEofError> {
-        self.ensure_can_read(size)?;
         self.cur = unsafe { self.cur.add(size) };
+        if self.cur > self.end {
+            return Err(UnexpectedEofError);
+        }
+
         Ok(())
     }
 
