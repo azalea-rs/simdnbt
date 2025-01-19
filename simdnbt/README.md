@@ -54,19 +54,20 @@ nbt.write(&mut buffer);
 
 Use the borrow variant of `Nbt` if possible, and avoid allocating unnecessarily (for example, keep strings as `Cow<str>` if you can).
 
-If you're using the owned variant of simdnbt, switching to a faster allocator like [mimalloc](https://docs.rs/mimalloc/latest/mimalloc/) may help a decent amount (it's ~20% faster on my machine). Setting `RUSTFLAGS='-C target-cpu=native'` when running your code may also help a little bit.
+If you're using the owned variant of Simdnbt, switching to a faster allocator like [mimalloc](https://docs.rs/mimalloc/latest/mimalloc/) may help a decent amount (it's ~20% faster on my machine). Setting `RUSTFLAGS='-C target-cpu=native'` when running your code may sometimes also help a little bit.
 
 ## Implementation details
 
-Simdnbt currently makes use of SIMD instructions for two things:
+The "SIMD" part of the name is there as a reference to simdjson, and isn't usually critical to Simdnbt's decoding speed. Regardless, Simdnbt does actually make use of SIMD instructions for two things:
 
--   swapping the endianness of int arrays
--   checking if a string is plain ascii for faster MUTF-8 to UTF-8 conversion
+- swapping the endianness of int arrays.
+- checking if a string is plain ascii for faster MUTF-8 to UTF-8 conversion.
 
-Simdnbt ~~cheats~~ takes some shortcuts to be this fast:
+Additionally, Simdnbt takes some shortcuts which usually aren't taken by other libraries:
 
-1. it requires a reference to the original data (to avoid cloning)
-2. it doesn't validate/decode the MUTF-8 strings at decode-time
+- `simdnbt::borrow` requires a reference to the original data.
+- it doesn't validate/decode MUTF-8 strings or integer arrays while parsing.
+- compounds aren't sorted, so lookup always does a linear search.
 
 Several ideas are borrowed from simdjson, notably the usage of a [tape](https://github.com/simdjson/simdjson/blob/master/doc/tape.md).
 
@@ -78,24 +79,26 @@ Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crat
 
 | Library                                                                     | Throughput   |
 | --------------------------------------------------------------------------- | ------------ |
-| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 3.9493 GiB/s |
-| [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)   | 825.59 MiB/s |
-| [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                    | 606.68 MiB/s |
-| [graphite_binary](https://docs.rs/graphite_binary/latest/graphite_binary/)  | 363.94 MiB/s |
-| [azalea_nbt](https://docs.rs/azalea-nbt/latest/azalea_nbt/)                 | 330.46 MiB/s |
-| [valence_nbt](https://docs.rs/valence_nbt/latest/valence_nbt/)              | 279.58 MiB/s |
-| [hematite_nbt](https://docs.rs/hematite-nbt/latest/nbt/)                    | 180.22 MiB/s |
-| [fastnbt](https://docs.rs/fastnbt/latest/fastnbt/)                          | 162.92 MiB/s |
+| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 4.6851 GiB/s |
+| [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)   | 836.08 MiB/s |
+| [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                    | 519.15 MiB/s |
+| [graphite_binary](https://docs.rs/graphite_binary/latest/graphite_binary/)  | 334.82 MiB/s |
+| [azalea_nbt](https://docs.rs/azalea-nbt/latest/azalea_nbt/)                 | 327.00 MiB/s |
+| [valence_nbt](https://docs.rs/valence_nbt/latest/valence_nbt/)              | 277.77 MiB/s |
+| [fastnbt](https://docs.rs/fastnbt/latest/fastnbt/)                          | 164.71 MiB/s |
+| [hematite_nbt](https://docs.rs/hematite-nbt/latest/nbt/)                    | 162.55 MiB/s |
 
 And for writing `complex_player.dat`:
 
 | Library         | Throughput   |
 | --------------- | ------------ |
-| simdnbt::owned  | 2.5033 GiB/s |
-| azalea_nbt      | 2.4152 GiB/s |
-| simdnbt::borrow | 2.1317 GiB/s |
-| graphite_binary | 1.8804 GiB/s |
+| azalea_nbt      | 2.5341 GiB/s |
+| simdnbt::owned  | 2.5116 GiB/s |
+| simdnbt::borrow | 2.3300 GiB/s |
+| graphite_binary | 1.8923 GiB/s |
 
-The tables above were made from the [compare benchmark](https://github.com/azalea-rs/simdnbt/tree/master/simdnbt/benches) in this repo.
-Note that the benchmark is somewhat unfair, since `simdnbt::borrow` doesn't fully decode some things like strings and integer arrays until they're used.
+The tables above were made from the [compare benchmark](https://github.com/azalea-rs/simdnbt/tree/master/simdnbt/benches) in this repo, with `cargo bench 'compare/complex_player.dat/'`.
+
+Note that the benchmark is somewhat unfair, since Simdnbt takes a few shortcuts that other libraries don't. See the Implementation Details section above for more info.
+
 Also keep in mind that if you run your own benchmark you'll get different numbers, but the speeds should be about the same relative to each other.
