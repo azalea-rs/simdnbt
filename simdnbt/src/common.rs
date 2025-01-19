@@ -49,25 +49,6 @@ pub fn read_string<'a>(data: &mut Reader<'a>) -> Result<&'a Mutf8Str, Unexpected
     Ok(Mutf8Str::from_slice(data))
 }
 
-pub fn skip_string(data: &mut Reader<'_>) -> Result<(), UnexpectedEofError> {
-    let cur_addr = data.cur_addr();
-    let end_addr = data.end_addr();
-
-    if cur_addr + 2 > end_addr {
-        return Err(UnexpectedEofError);
-    }
-
-    let length = unsafe { data.read_type_unchecked::<u16>() }.to_be();
-    let length_in_bytes: usize = length as usize;
-    if cur_addr + 2 + length_in_bytes > end_addr {
-        return Err(UnexpectedEofError);
-    }
-
-    unsafe { data.skip_unchecked(length_in_bytes) };
-
-    Ok(())
-}
-
 pub fn read_u8_array<'a>(data: &mut Reader<'a>) -> Result<&'a [u8], UnexpectedEofError> {
     read_with_u32_length(data, 1)
 }

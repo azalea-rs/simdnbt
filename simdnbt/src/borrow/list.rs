@@ -34,6 +34,7 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         stack: &mut ParsingStack,
     ) -> Result<(), NonRootError> {
         let tag_type = data.read_u8()?;
+
         let pushing_element = match tag_type {
             END_ID => {
                 // the length is unused for this type of lists

@@ -25,10 +25,6 @@ impl<'a> Reader<'a> {
     }
 
     #[inline]
-    pub fn cur_addr(&self) -> usize {
-        self.cur as usize
-    }
-    #[inline]
     pub fn end_addr(&self) -> usize {
         self.end as usize
     }

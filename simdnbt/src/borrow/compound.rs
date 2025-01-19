@@ -3,9 +3,9 @@ use std::mem::MaybeUninit;
 use crate::{
     common::{
         extend_unchecked, push_unchecked, read_int_array, read_long_array, read_string,
-        read_with_u32_length, skip_string, write_string, write_string_unchecked, BYTE_ARRAY_ID,
-        BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
-        LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
+        read_with_u32_length, write_string, write_string_unchecked, BYTE_ARRAY_ID, BYTE_ID,
+        COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID,
+        LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     error::NonRootError,
     reader::Reader,
@@ -237,7 +237,7 @@ pub(crate) struct ParsingStackElement {
     pub kind: ParsingStackElementKind,
     pub index: u32,
 }
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u32)]
 pub(crate) enum ParsingStackElementKind {
     Compound,
@@ -413,7 +413,7 @@ pub(crate) fn read_tag<'a>(
     Ok(())
 }
 
-#[inline(always)]
+#[inline]
 pub(crate) fn read_tag_in_compound<'a>(
     data: &mut Reader<'a>,
     tapes: &mut Tapes<'a>,
@@ -427,7 +427,27 @@ pub(crate) fn read_tag_in_compound<'a>(
 
     let tag_name_ptr = data.cur;
     debug_assert_eq!(tag_name_ptr as u64 >> 56, 0);
-    skip_string(data)?;
+
+    // read the string in a more efficient way than just calling read_string
+
+    let mut cur_addr = tag_name_ptr as usize;
+    let end_addr = data.end_addr();
+    cur_addr += 2;
+    if cur_addr > end_addr {
+        return Err(NonRootError::unexpected_eof());
+    }
+    // this actually results in an extra instruction since it sets the data.cur
+    // unnecessarily, but for some reason it's faster anyways
+    let length = unsafe { data.read_type_unchecked::<u16>() }.to_be();
+    let length_in_bytes: usize = length as usize;
+    cur_addr += length_in_bytes;
+    if cur_addr > end_addr {
+        return Err(NonRootError::unexpected_eof());
+    }
+    data.cur = cur_addr as *const u8;
+
+    // finished reading the string
+
     tapes.main.push(TapeElement::new(tag_name_ptr as u64));
 
     read_tag(data, tapes, stack, tag_type)

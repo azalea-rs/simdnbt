@@ -181,7 +181,7 @@ impl Mutf8String {
         Mutf8Str::from_slice(self.vec.as_slice())
     }
 
-    /// Try to convert this MUTF-8 string into a UTF-8 string. If the data isn't
+    /// Convert this MUTF-8 string into a UTF-8 string. If the data isn't
     /// valid MUTF-8, it'll return an empty string without erroring.
     #[inline]
     pub fn into_string(self) -> String {
@@ -190,6 +190,17 @@ impl Mutf8String {
             unsafe { String::from_utf8_unchecked(self.vec) }
         } else {
             mutf8::decode(&self.vec).unwrap_or_default().to_string()
+        }
+    }
+
+    /// Try to convert this MUTF-8 string into a UTF-8 string.
+    #[inline]
+    pub fn try_into_string(self) -> Result<String, simd_cesu8::DecodingError> {
+        if is_plain_ascii(&self.vec) {
+            // SAFETY: &[u8] and &str are the same layout.
+            Ok(unsafe { String::from_utf8_unchecked(self.vec) })
+        } else {
+            mutf8::decode(&self.vec).map(|cow| cow.into_owned())
         }
     }
 
