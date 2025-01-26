@@ -26,7 +26,7 @@ pub struct MainTape<A: Allocator = alloc::Global> {
     alloc: A,
 }
 impl<A: Allocator> MainTape<A> {
-    #[inline]
+    #[inline(always)]
     pub fn push(&mut self, element: TapeElement) {
         if self.cur == self.end {
             let old_cap = self.capacity();
