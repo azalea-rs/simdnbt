@@ -541,7 +541,7 @@ impl<'a, 'tape> NbtListList<'a, 'tape> {
     /// Note that due to an internal optimization, this function runs at `O(n)`
     /// if the list has at least 2^24 items. Use [`Self::approx_len`] if you
     /// want to avoid that.
-    pub fn len(self) -> usize {
+    pub fn len(&self) -> usize {
         self.iter.len()
     }
     /// A version of [`Self::len`] that saturates at 2^24.
@@ -603,12 +603,12 @@ impl<'a: 'tape, 'tape> NbtListListIter<'a, 'tape> {
     /// Note that due to an internal optimization, this function runs at `O(n)`
     /// if the list has at least 2^24 items. Use [`Self::approx_len`] if you
     /// want to avoid that.
-    pub fn len(self) -> usize {
+    pub fn len(&self) -> usize {
         let len = self.approx_len();
         if len < 2u32.pow(24) {
             len as usize
         } else {
-            self.count()
+            self.clone().count()
         }
     }
 
@@ -673,7 +673,7 @@ impl<'a, 'tape> NbtCompoundList<'a, 'tape> {
     /// Note that due to an internal optimization, this function runs at `O(n)`
     /// if the list has at least 2^24 items. Use [`Self::approx_len`] if you
     /// want to avoid that.
-    pub fn len(self) -> usize {
+    pub fn len(&self) -> usize {
         self.iter.len()
     }
     /// A version of [`Self::len`] that saturates at 2^24.
@@ -734,12 +734,12 @@ impl<'a: 'tape, 'tape> NbtCompoundListIter<'a, 'tape> {
     /// Note that due to an internal optimization, this function runs at `O(n)`
     /// if the list has at least 2^24 items. Use [`Self::approx_len`] if you
     /// want to avoid that.
-    pub fn len(self) -> usize {
+    pub fn len(&self) -> usize {
         let len = self.approx_len();
         if len < 2u32.pow(24) {
             len as usize
         } else {
-            self.count()
+            self.clone().count()
         }
     }
 
