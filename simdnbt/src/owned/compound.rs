@@ -2,8 +2,9 @@ use std::mem::{self, MaybeUninit};
 
 use super::{list::NbtList, NbtTag};
 use crate::{
-    common::{push_unchecked, read_string, write_string_unchecked, END_ID, MAX_DEPTH},
+    common::{read_string, write_string_unchecked, END_ID, MAX_DEPTH},
     error::NonRootError,
+    fastvec::{FastVec, FastVecFromVec},
     mutf8::Mutf8String,
     reader::Reader,
     Mutf8Str, ToNbtTag,
@@ -77,13 +78,17 @@ impl NbtCompound {
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
+        self.write_fastvec(&mut FastVecFromVec::new(data));
+    }
+
+    pub(crate) fn write_fastvec(&self, data: &mut FastVec<u8>) {
         for (name, tag) in &self.values {
             // reserve 4 bytes extra so we can avoid reallocating for small tags
             data.reserve(1 + 2 + name.len() + 4);
             // SAFETY: We just reserved enough space for the tag ID, the name length, the
             // name, and 4 bytes of tag data.
             unsafe {
-                push_unchecked(data, tag.id());
+                data.push_unchecked(tag.id());
                 write_string_unchecked(data, name);
                 tag.write_without_tag_type_unchecked(data);
             }

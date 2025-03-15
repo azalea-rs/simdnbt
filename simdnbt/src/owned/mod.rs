@@ -9,12 +9,13 @@ use std::{io::Cursor, ops::Deref};
 pub use self::{compound::NbtCompound, list::NbtList};
 use crate::{
     common::{
-        extend_unchecked, push_unchecked, read_int_array, read_long_array, read_string,
-        read_with_u32_length, slice_into_u8_big_endian, write_string, BYTE_ARRAY_ID, BYTE_ID,
-        COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID,
-        LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
+        read_int_array, read_long_array, read_string, read_with_u32_length,
+        slice_into_u8_big_endian, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID,
+        END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH,
+        SHORT_ID, STRING_ID,
     },
     error::NonRootError,
+    fastvec::{FastVec, FastVecFromVec},
     mutf8::Mutf8String,
     reader::{Reader, ReaderFromCursor},
     Error, Mutf8Str,
@@ -205,9 +206,14 @@ impl BaseNbt {
 
     /// Writes the NBT to the given buffer.
     pub fn write(&self, data: &mut Vec<u8>) {
+        self.write_fastvec(&mut FastVecFromVec::new(data));
+    }
+
+    /// Writes the NBT to the given buffer.
+    fn write_fastvec(&self, data: &mut FastVec<u8>) {
         data.push(COMPOUND_ID);
         write_string(data, &self.name);
-        self.tag.write(data);
+        self.tag.write_fastvec(data);
     }
 
     pub fn write_unnamed(&self, data: &mut Vec<u8>) {
@@ -329,61 +335,59 @@ impl NbtTag {
     /// space in the data. 4 bytes MUST be reserved before calling this
     /// function.
     #[inline]
-    unsafe fn write_without_tag_type_unchecked(&self, data: &mut Vec<u8>) {
+    unsafe fn write_without_tag_type_unchecked(&self, data: &mut FastVec<u8>) {
         match self {
             NbtTag::Byte(byte) => unsafe {
-                push_unchecked(data, *byte as u8);
+                data.push_unchecked(*byte as u8);
             },
             NbtTag::Short(short) => unsafe {
-                extend_unchecked(data, &short.to_be_bytes());
+                data.extend_from_slice_unchecked(&short.to_be_bytes());
             },
             NbtTag::Int(int) => unsafe {
-                extend_unchecked(data, &int.to_be_bytes());
+                data.extend_from_slice_unchecked(&int.to_be_bytes());
             },
             NbtTag::Long(long) => {
                 data.extend_from_slice(&long.to_be_bytes());
             }
             NbtTag::Float(float) => unsafe {
-                extend_unchecked(data, &float.to_be_bytes());
+                data.extend_from_slice_unchecked(&float.to_be_bytes());
             },
             NbtTag::Double(double) => {
                 data.extend_from_slice(&double.to_be_bytes());
             }
             NbtTag::ByteArray(byte_array) => {
-                unsafe {
-                    extend_unchecked(data, &(byte_array.len() as u32).to_be_bytes());
-                }
+                data.extend_from_slice_unchecked(&(byte_array.len() as u32).to_be_bytes());
                 data.extend_from_slice(byte_array);
             }
             NbtTag::String(string) => {
                 write_string(data, string);
             }
             NbtTag::List(list) => {
-                list.write(data);
+                list.write_fastvec(data);
             }
             NbtTag::Compound(compound) => {
-                compound.write(data);
+                compound.write_fastvec(data);
             }
             NbtTag::IntArray(int_array) => {
-                unsafe {
-                    extend_unchecked(data, &(int_array.len() as u32).to_be_bytes());
-                }
+                data.extend_from_slice_unchecked(&(int_array.len() as u32).to_be_bytes());
                 data.extend_from_slice(&slice_into_u8_big_endian(int_array));
             }
             NbtTag::LongArray(long_array) => {
-                unsafe {
-                    extend_unchecked(data, &(long_array.len() as u32).to_be_bytes());
-                }
+                data.extend_from_slice_unchecked(&(long_array.len() as u32).to_be_bytes());
                 data.extend_from_slice(&slice_into_u8_big_endian(long_array));
             }
         }
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
+        self.write_fastvec(&mut FastVecFromVec::new(data));
+    }
+
+    fn write_fastvec(&self, data: &mut FastVec<u8>) {
         data.reserve(1 + 4);
         // SAFETY: We just reserved enough space for the tag ID and 4 bytes of tag data.
         unsafe {
-            push_unchecked(data, self.id());
+            data.push_unchecked(self.id());
             self.write_without_tag_type_unchecked(data);
         }
     }

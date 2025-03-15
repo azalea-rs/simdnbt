@@ -8,12 +8,12 @@ use super::{
 };
 use crate::{
     common::{
-        extend_unchecked, push_unchecked, read_int_array, read_long_array, read_string,
-        read_with_u32_length, write_string, write_string_unchecked, BYTE_ARRAY_ID, BYTE_ID,
-        COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID,
-        LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
+        read_int_array, read_long_array, read_string, read_with_u32_length, write_string,
+        write_string_unchecked, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID,
+        INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID,
     },
     error::NonRootError,
+    fastvec::{FastVec, FastVecFromVec},
     reader::Reader,
     Mutf8Str,
 };
@@ -47,13 +47,17 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
+        self.write_fastvec(&mut FastVecFromVec::new(data));
+    }
+
+    pub(crate) fn write_fastvec(&self, data: &mut FastVec<u8>) {
         for (name, tag) in self.iter() {
             // reserve 4 bytes extra so we can avoid reallocating for small tags
             data.reserve(1 + 2 + name.len() + 4);
             // SAFETY: We just reserved enough space for the tag ID, the name length, the
             // name, and 4 bytes of tag data.
             unsafe {
-                push_unchecked(data, tag.id());
+                data.push_unchecked(tag.id());
                 write_string_unchecked(data, name);
             }
 
@@ -467,23 +471,23 @@ fn handle_compound_end(tapes: &mut Tapes, stack: &mut ParsingStack) {
     };
 }
 
-pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
+pub(crate) fn write_tag(tag: NbtTag, data: &mut FastVec<u8>) {
     let el = tag.element();
     match el.kind() {
         TapeTagKind::Byte => unsafe {
-            push_unchecked(data, tag.byte().unwrap() as u8);
+            data.push_unchecked(tag.byte().unwrap() as u8);
         },
         TapeTagKind::Short => unsafe {
-            extend_unchecked(data, &tag.short().unwrap().to_be_bytes());
+            data.extend_from_slice_unchecked(&tag.short().unwrap().to_be_bytes());
         },
         TapeTagKind::Int => unsafe {
-            extend_unchecked(data, &tag.int().unwrap().to_be_bytes());
+            data.extend_from_slice_unchecked(&tag.int().unwrap().to_be_bytes());
         },
         TapeTagKind::Long => {
             data.extend_from_slice(&tag.long().unwrap().to_be_bytes());
         }
         TapeTagKind::Float => unsafe {
-            extend_unchecked(data, &tag.float().unwrap().to_be_bytes());
+            data.extend_from_slice_unchecked(&tag.float().unwrap().to_be_bytes());
         },
         TapeTagKind::Double => {
             data.extend_from_slice(&tag.double().unwrap().to_be_bytes());
@@ -491,7 +495,7 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
         TapeTagKind::ByteArray => {
             let byte_array = tag.byte_array().unwrap();
             unsafe {
-                extend_unchecked(data, &(byte_array.len() as u32).to_be_bytes());
+                data.extend_from_slice_unchecked(&(byte_array.len() as u32).to_be_bytes());
             }
             data.extend_from_slice(byte_array);
         }
@@ -500,16 +504,16 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
             write_string(data, string);
         }
         kind if kind.is_list() => {
-            tag.list().unwrap().write(data);
+            tag.list().unwrap().write_fastvec(data);
         }
         TapeTagKind::Compound => {
-            tag.compound().unwrap().write(data);
+            tag.compound().unwrap().write_fastvec(data);
         }
         TapeTagKind::IntArray => {
             let int_array =
                 unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i32>(el.ptr()).unwrap() };
             unsafe {
-                extend_unchecked(data, &(int_array.len() as u32).to_be_bytes());
+                data.extend_from_slice_unchecked(&(int_array.len() as u32).to_be_bytes());
             }
             data.extend_from_slice(int_array.as_big_endian());
         }
@@ -517,7 +521,7 @@ pub(crate) fn write_tag(tag: NbtTag, data: &mut Vec<u8>) {
             let long_array =
                 unsafe { list::u32_prefixed_list_to_rawlist_unchecked::<i64>(el.ptr()).unwrap() };
             unsafe {
-                extend_unchecked(data, &(long_array.len() as u32).to_be_bytes());
+                data.extend_from_slice_unchecked(&(long_array.len() as u32).to_be_bytes());
             }
             data.extend_from_slice(long_array.as_big_endian());
         }

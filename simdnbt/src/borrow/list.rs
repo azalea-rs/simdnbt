@@ -14,6 +14,7 @@ use crate::{
         LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
     },
     error::NonRootError,
+    fastvec::{FastVec, FastVecFromVec},
     raw_list::RawList,
     reader::Reader,
     swap_endianness::SwappableNumber,
@@ -156,14 +157,18 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
         Ok(())
     }
 
-    pub fn write(&self, data: &mut Vec<u8>) {
+    pub fn write(self, data: &mut Vec<u8>) {
+        self.write_fastvec(&mut FastVecFromVec::new(data));
+    }
+
+    pub(crate) fn write_fastvec(&self, data: &mut FastVec<u8>) {
         let el = self.element();
 
         data.push(self.id());
 
         match el.kind() {
             TapeTagKind::EmptyList => {
-                data.extend(&0u32.to_be_bytes());
+                data.extend_from_slice(&0u32.to_be_bytes());
             }
             TapeTagKind::ByteList => {
                 write_with_u32_length(data, 1, slice_i8_into_u8(self.bytes().unwrap()));
@@ -228,14 +233,14 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             TapeTagKind::ListList => {
                 let lists = self.lists().unwrap();
                 for list in lists {
-                    list.write(data);
+                    list.write_fastvec(data);
                 }
             }
             TapeTagKind::CompoundList => {
                 let compounds = self.compounds().unwrap();
                 write_u32(data, compounds.clone().len() as u32);
                 for compound in compounds {
-                    compound.write(data);
+                    compound.write_fastvec(data);
                 }
             }
             TapeTagKind::IntArrayList => {

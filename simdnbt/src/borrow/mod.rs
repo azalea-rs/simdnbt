@@ -30,6 +30,7 @@ use crate::{
         read_string, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID,
         FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
     },
+    fastvec::{FastVec, FastVecFromVec},
     reader::{Reader, ReaderFromCursor},
     Error, Mutf8Str,
 };
@@ -332,9 +333,13 @@ impl PartialEq for BaseNbt<'_> {
 
 impl BaseNbt<'_> {
     pub fn write(&self, data: &mut Vec<u8>) {
+        self.write_fastvec(&mut FastVecFromVec::new(data));
+    }
+
+    fn write_fastvec(&self, data: &mut FastVec<u8>) {
         data.push(COMPOUND_ID);
         write_string(data, self.name);
-        self.as_compound().write(data);
+        self.as_compound().write_fastvec(data);
         data.push(END_ID);
     }
 }

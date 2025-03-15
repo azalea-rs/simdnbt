@@ -1,13 +1,13 @@
 use super::{compound::NbtCompound, MAX_DEPTH};
 use crate::{
     common::{
-        extend_unchecked, push_unchecked, read_i8_array, read_int_array, read_long_array,
-        read_string, read_u8_array, read_with_u32_length, slice_i8_into_u8,
-        slice_into_u8_big_endian, write_string, write_u32, write_with_u32_length, BYTE_ARRAY_ID,
-        BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID,
-        LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
+        read_i8_array, read_int_array, read_long_array, read_string, read_u8_array,
+        read_with_u32_length, slice_i8_into_u8, slice_into_u8_big_endian, write_string, write_u32,
+        write_with_u32_length, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID,
+        INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
     },
     error::NonRootError,
+    fastvec::{FastVec, FastVecFromVec},
     mutf8::Mutf8String,
     reader::Reader,
     swap_endianness::swap_endianness,
@@ -111,16 +111,20 @@ impl NbtList {
     }
 
     pub fn write(&self, data: &mut Vec<u8>) {
+        self.write_fastvec(&mut FastVecFromVec::new(data));
+    }
+
+    pub(crate) fn write_fastvec(&self, data: &mut FastVec<u8>) {
         // fast path for compound since it's very common to have lists of compounds
         if let NbtList::Compound(compounds) = self {
             data.reserve(5);
             // SAFETY: we just reserved 5 bytes
             unsafe {
-                push_unchecked(data, COMPOUND_ID);
-                extend_unchecked(data, &(compounds.len() as u32).to_be_bytes());
+                data.push_unchecked(COMPOUND_ID);
+                data.extend_from_slice_unchecked(&(compounds.len() as u32).to_be_bytes());
             }
             for compound in compounds {
-                compound.write(data);
+                compound.write_fastvec(data);
             }
             return;
         }
@@ -128,7 +132,7 @@ impl NbtList {
         data.push(self.id());
         match self {
             NbtList::Empty => {
-                data.extend(&0u32.to_be_bytes());
+                data.extend_from_slice(&0u32.to_be_bytes());
             }
             NbtList::Byte(bytes) => {
                 write_with_u32_length(data, 1, slice_i8_into_u8(bytes));
@@ -163,7 +167,7 @@ impl NbtList {
             NbtList::List(lists) => {
                 write_u32(data, lists.len() as u32);
                 for list in lists {
-                    list.write(data);
+                    list.write_fastvec(data);
                 }
             }
             NbtList::Compound(_) => {

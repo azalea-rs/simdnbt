@@ -2,6 +2,7 @@ use std::{mem, slice};
 
 use crate::{
     error::UnexpectedEofError,
+    fastvec::FastVec,
     raw_list::RawList,
     reader::Reader,
     swap_endianness::{swap_endianness_as_u8, SwappableNumber},
@@ -75,19 +76,19 @@ pub fn slice_i8_into_u8(s: &[i8]) -> &[u8] {
 }
 
 #[inline(always)]
-pub fn write_with_u32_length(data: &mut Vec<u8>, width: usize, value: &[u8]) {
+pub fn write_with_u32_length(data: &mut FastVec<u8>, width: usize, value: &[u8]) {
     let length = value.len() / width;
     data.reserve(4 + value.len());
     unsafe {
-        extend_unchecked(data, &(length as u32).to_be_bytes());
-        extend_unchecked(data, value);
+        data.extend_from_slice_unchecked(&(length as u32).to_be_bytes());
+        data.extend_from_slice_unchecked(value);
     }
 }
 
-pub fn write_u32(data: &mut Vec<u8>, value: u32) {
+pub fn write_u32(data: &mut FastVec<u8>, value: u32) {
     data.extend_from_slice(&value.to_be_bytes());
 }
-pub fn write_string(data: &mut Vec<u8>, value: &Mutf8Str) {
+pub fn write_string(data: &mut FastVec<u8>, value: &Mutf8Str) {
     data.reserve(2 + value.len());
     // SAFETY: We reserved enough capacity
     unsafe {
@@ -103,33 +104,9 @@ pub fn write_string(data: &mut Vec<u8>, value: &Mutf8Str) {
 /// You must reserve enough capacity (2 + value.len()) in the Vec before calling
 /// this function.
 #[inline]
-pub unsafe fn write_string_unchecked(data: &mut Vec<u8>, value: &Mutf8Str) {
-    extend_unchecked(data, &(value.len() as u16).to_be_bytes());
-    extend_unchecked(data, value.as_bytes());
-}
-
-/// Extend a Vec<u8> with a slice of u8 without checking if the Vec has enough
-/// capacity.
-///
-/// This optimization is barely measurable, but it does make it slightly faster!
-///
-/// # Safety
-///
-/// You must reserve enough capacity in the Vec before calling this function.
-#[inline]
-pub unsafe fn extend_unchecked(data: &mut Vec<u8>, value: &[u8]) {
-    let ptr = data.as_mut_ptr();
-    let len = data.len();
-    std::ptr::copy_nonoverlapping(value.as_ptr(), ptr.add(len), value.len());
-    data.set_len(len + value.len());
-}
-
-#[inline]
-pub unsafe fn push_unchecked(data: &mut Vec<u8>, value: u8) {
-    let ptr = data.as_mut_ptr();
-    let len = data.len();
-    std::ptr::write(ptr.add(len), value);
-    data.set_len(len + 1);
+pub unsafe fn write_string_unchecked(data: &mut FastVec<u8>, value: &Mutf8Str) {
+    data.extend_from_slice_unchecked(&(value.len() as u16).to_be_bytes());
+    data.extend_from_slice_unchecked(value.as_bytes());
 }
 
 /// Convert a slice of any type into a slice of u8. This will probably return
