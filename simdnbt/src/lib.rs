@@ -11,6 +11,7 @@ compile_error!("simdnbt only supports 64-bit platforms");
 pub mod borrow;
 mod common;
 mod error;
+mod fastvec;
 mod mutf8;
 pub mod owned;
 pub mod raw_list;

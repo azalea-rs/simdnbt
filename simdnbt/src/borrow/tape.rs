@@ -1,121 +1,19 @@
 use std::{
-    alloc::{self, Allocator, Layout},
     fmt::{self, Debug},
     mem,
-    ptr::NonNull,
 };
 
-use crate::common::{
-    BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LONG_ARRAY_ID,
-    LONG_ID, SHORT_ID, STRING_ID,
+use crate::{
+    common::{
+        BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
+        LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
+    },
+    fastvec::FastVec,
 };
-
-const DEFAULT_CAPACITY: usize = 1024;
 
 // this is faster than a Vec mainly because we store a `cur` pointer which
 // allows us to avoid having to add the start+length when pushing
-#[derive(Debug)]
-pub struct MainTape<A: Allocator = alloc::Global> {
-    /// The next address we'll be writing to.
-    cur: NonNull<TapeElement>,
-    /// The last (probably uninitialized) element in the tape.
-    end: NonNull<TapeElement>,
-    /// The start of the tape.
-    ptr: NonNull<u8>,
-
-    alloc: A,
-}
-impl<A: Allocator> MainTape<A> {
-    #[inline(always)]
-    pub fn push(&mut self, element: TapeElement) {
-        if self.cur == self.end {
-            self.grow()
-        }
-
-        unsafe { self.push_unchecked(element) };
-    }
-
-    #[inline]
-    pub unsafe fn push_unchecked(&mut self, element: TapeElement) {
-        unsafe { self.cur.write(element) };
-        self.cur = unsafe { self.cur.add(1) };
-    }
-
-    fn grow(&mut self) {
-        let old_cap = self.capacity();
-        let extending_by = old_cap;
-        let new_cap = old_cap + extending_by;
-
-        let element_size = mem::size_of::<TapeElement>();
-        let old_cap_bytes = old_cap * element_size;
-        let new_cap_bytes = new_cap * element_size;
-        let new_ptr = unsafe {
-            self.alloc.grow(
-                self.ptr,
-                Layout::from_size_align_unchecked(old_cap_bytes, element_size),
-                Layout::from_size_align_unchecked(new_cap_bytes, element_size),
-            )
-        };
-        let new_ptr = new_ptr.expect("allocation failed");
-
-        self.ptr = new_ptr.cast();
-        // update cur in case the ptr changed
-        self.cur = NonNull::new(self.ptr.as_ptr() as *mut TapeElement).unwrap();
-        self.cur = unsafe { self.cur.add(old_cap) };
-        // and end has to be updated anyways since we're updating the capacity
-        self.end = unsafe { self.cur.add(extending_by) };
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        unsafe { self.cur.offset_from(self.ptr.cast()) as usize }
-    }
-    #[inline]
-    fn capacity(&self) -> usize {
-        unsafe { self.end.offset_from(self.ptr.cast()) as usize }
-    }
-
-    #[inline]
-    pub unsafe fn get_unchecked_mut(&mut self, index: usize) -> &mut TapeElement {
-        debug_assert!(index < self.len());
-        self.ptr.cast::<TapeElement>().add(index).as_mut()
-    }
-
-    #[inline]
-    pub fn as_ptr(&self) -> *const TapeElement {
-        self.ptr.cast().as_ptr()
-    }
-}
-impl Default for MainTape {
-    fn default() -> Self {
-        let element_size = mem::size_of::<TapeElement>();
-        let ptr = unsafe {
-            // this is faster than Layout::array
-            alloc::alloc(Layout::from_size_align_unchecked(
-                DEFAULT_CAPACITY * element_size,
-                element_size,
-            ))
-        };
-        let ptr = NonNull::new(ptr as *mut TapeElement).expect("allocation failed");
-        let end = unsafe { ptr.add(DEFAULT_CAPACITY) };
-        Self {
-            cur: ptr,
-            end,
-            ptr: ptr.cast(),
-            alloc: alloc::Global,
-        }
-    }
-}
-impl<A: Allocator> Drop for MainTape<A> {
-    fn drop(&mut self) {
-        unsafe {
-            self.alloc.deallocate(
-                self.ptr.cast(),
-                Layout::array::<TapeElement>(self.capacity()).unwrap(),
-            )
-        };
-    }
-}
+pub type MainTape = FastVec<TapeElement>;
 
 #[derive(Clone, Copy)]
 pub struct TapeElement(u64);

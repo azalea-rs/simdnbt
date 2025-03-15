@@ -157,14 +157,16 @@ fn read_with_stack<'a>(
     Ok(())
 }
 
-#[derive(Default)]
 pub(crate) struct Tapes<'a> {
     main: MainTape,
     extra: ExtraTapes<'a>,
 }
 impl Tapes<'_> {
     fn new() -> Self {
-        Self::default()
+        Self {
+            main: MainTape::with_capacity(1024),
+            extra: ExtraTapes::default(),
+        }
     }
 }
 impl Debug for Tapes<'_> {
