@@ -46,6 +46,7 @@ pub fn read<'a>(data: &mut Cursor<&'a [u8]>) -> Result<Nbt<'a>, Error> {
     if root_type != COMPOUND_ID {
         return Err(Error::InvalidRootType(root_type));
     }
+    // our Reader type is faster than Cursor
     let mut data = ReaderFromCursor::new(data);
     let name = read_string(&mut data)?;
 

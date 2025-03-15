@@ -46,6 +46,7 @@ impl<'a> Reader<'a> {
         value
     }
 
+    #[inline]
     pub fn read_type<T: Copy>(&mut self) -> Result<T, UnexpectedEofError> {
         let addr = self.cur;
 

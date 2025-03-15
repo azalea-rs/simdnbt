@@ -54,7 +54,7 @@ nbt.write(&mut buffer);
 
 Use the borrow variant of `Nbt` if possible, and avoid allocating unnecessarily (for example, keep strings as `Cow<str>` if you can).
 
-If you're using the owned variant of Simdnbt, switching to a faster allocator like [mimalloc](https://docs.rs/mimalloc/latest/mimalloc/) may help a decent amount (it's ~20% faster on my machine). Setting `RUSTFLAGS='-C target-cpu=native'` when running your code may sometimes also help a little bit.
+If you're using the owned variant of Simdnbt, switching to a faster allocator like [mimalloc](https://docs.rs/mimalloc/latest/mimalloc/) may help a decent amount (it's ~20% faster on my machine). Setting `RUSTFLAGS='-C target-cpu=native'` when running your code may also help or hurt performance.
 
 ## Implementation details
 

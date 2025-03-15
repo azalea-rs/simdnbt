@@ -29,28 +29,7 @@ impl<A: Allocator> MainTape<A> {
     #[inline(always)]
     pub fn push(&mut self, element: TapeElement) {
         if self.cur == self.end {
-            let old_cap = self.capacity();
-            let extending_by = old_cap;
-            let new_cap = old_cap + extending_by;
-
-            let element_size = mem::size_of::<TapeElement>();
-            let old_cap_bytes = old_cap * element_size;
-            let new_cap_bytes = new_cap * element_size;
-            let new_ptr = unsafe {
-                self.alloc.grow(
-                    self.ptr,
-                    Layout::from_size_align_unchecked(old_cap_bytes, element_size),
-                    Layout::from_size_align_unchecked(new_cap_bytes, element_size),
-                )
-            };
-            let new_ptr = new_ptr.expect("allocation failed");
-
-            self.ptr = new_ptr.cast();
-            // update cur in case the ptr changed
-            self.cur = NonNull::new(self.ptr.as_ptr() as *mut TapeElement).unwrap();
-            self.cur = unsafe { self.cur.add(old_cap) };
-            // and end has to be updated anyways since we're updating the capacity
-            self.end = unsafe { self.cur.add(extending_by) };
+            self.grow()
         }
 
         unsafe { self.push_unchecked(element) };
@@ -60,6 +39,31 @@ impl<A: Allocator> MainTape<A> {
     pub unsafe fn push_unchecked(&mut self, element: TapeElement) {
         unsafe { self.cur.write(element) };
         self.cur = unsafe { self.cur.add(1) };
+    }
+
+    fn grow(&mut self) {
+        let old_cap = self.capacity();
+        let extending_by = old_cap;
+        let new_cap = old_cap + extending_by;
+
+        let element_size = mem::size_of::<TapeElement>();
+        let old_cap_bytes = old_cap * element_size;
+        let new_cap_bytes = new_cap * element_size;
+        let new_ptr = unsafe {
+            self.alloc.grow(
+                self.ptr,
+                Layout::from_size_align_unchecked(old_cap_bytes, element_size),
+                Layout::from_size_align_unchecked(new_cap_bytes, element_size),
+            )
+        };
+        let new_ptr = new_ptr.expect("allocation failed");
+
+        self.ptr = new_ptr.cast();
+        // update cur in case the ptr changed
+        self.cur = NonNull::new(self.ptr.as_ptr() as *mut TapeElement).unwrap();
+        self.cur = unsafe { self.cur.add(old_cap) };
+        // and end has to be updated anyways since we're updating the capacity
+        self.end = unsafe { self.cur.add(extending_by) };
     }
 
     #[inline]

@@ -13,6 +13,7 @@ impl Debug for ExtraTapes<'_> {
     }
 }
 
+// (note that this is a union, not a struct)
 pub union ExtraTapeElement<'a> {
     /// An indicator for how long the following list is. This is what we point
     /// to from `TapeTagValue`.

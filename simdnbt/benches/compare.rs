@@ -74,6 +74,18 @@ fn bench_read_file(filename: &str, c: &mut Criterion) {
             input_stream.set_position(0);
         })
     });
+    group.bench_function("crab_parse", |b| {
+        b.iter(|| {
+            black_box(crab_nbt::Nbt::read(&mut input_stream).unwrap());
+            input_stream.set_position(0);
+        })
+    });
+    group.bench_function("ussr_borrow_parse", |b| {
+        b.iter(|| {
+            black_box(ussr_nbt::borrow::Nbt::read(&mut input_stream).unwrap());
+            input_stream.set_position(0);
+        })
+    });
 
     let nbt = azalea_nbt::Nbt::read(&mut Cursor::new(&input)).unwrap();
     group.bench_function("azalea_write", |b| {

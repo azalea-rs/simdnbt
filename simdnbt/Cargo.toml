@@ -26,6 +26,8 @@ hematite-nbt = { version = "0.5.2", default-features = false }
 shen-nbt5 = "0.4.6"
 
 mimalloc = "0.1.43"
+crab_nbt = "0.2.9"
+ussr-nbt = "0.2.1"
 
 [features]
 default = ["derive"]
