@@ -10,6 +10,7 @@ cachegrind.out*
 
 # sometimes i make these files when benchmarking, don't want to accidentally commit them
 benchmark_result.txt
+bench_results.txt
 valgrind.txt
 
 # thanks rust

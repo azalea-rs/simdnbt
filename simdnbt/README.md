@@ -77,25 +77,27 @@ Simdnbt is the fastest NBT parser in Rust.
 
 Here's a benchmark comparing Simdnbt against a few of the other fastest NBT crates for decoding [`complex_player.dat`](https://github.com/azalea-rs/simdnbt/blob/master/simdnbt/tests/complex_player.dat):
 
-| Library                                                                     | Throughput   |
-| --------------------------------------------------------------------------- | ------------ |
-| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html) | 4.6851 GiB/s |
-| [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)   | 836.08 MiB/s |
-| [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                    | 519.15 MiB/s |
-| [graphite_binary](https://docs.rs/graphite_binary/latest/graphite_binary/)  | 334.82 MiB/s |
-| [azalea_nbt](https://docs.rs/azalea-nbt/latest/azalea_nbt/)                 | 327.00 MiB/s |
-| [valence_nbt](https://docs.rs/valence_nbt/latest/valence_nbt/)              | 277.77 MiB/s |
-| [fastnbt](https://docs.rs/fastnbt/latest/fastnbt/)                          | 164.71 MiB/s |
-| [hematite_nbt](https://docs.rs/hematite-nbt/latest/nbt/)                    | 162.55 MiB/s |
+| Library                                                                        | Throughput   |
+| ------------------------------------------------------------------------------ | ------------ |
+| [simdnbt::borrow](https://docs.rs/simdnbt/latest/simdnbt/borrow/index.html)    | 4.3000 GiB/s |
+| [ussr_nbt::borrow](https://docs.rs/ussr-nbt/latest/ussr_nbt/borrow/index.html) | 1.2167 GiB/s |
+| [simdnbt::owned](https://docs.rs/simdnbt/latest/simdnbt/owned/index.html)      | 828.09 MiB/s |
+| [shen_nbt5](https://docs.rs/shen-nbt5/latest/shen_nbt5/)                       | 540.46 MiB/s |
+| [graphite_binary](https://docs.rs/graphite_binary/latest/graphite_binary/)     | 333.47 MiB/s |
+| [azalea_nbt](https://docs.rs/azalea-nbt/latest/azalea_nbt/)                    | 328.62 MiB/s |
+| [valence_nbt](https://docs.rs/valence_nbt/latest/valence_nbt/)                 | 275.88 MiB/s |
+| [crab_nbt](https://docs.rs/crab_nbt/latest/crab_nbt/)                          | 223.31 MiB/s |
+| [hematite_nbt](https://docs.rs/hematite-nbt/latest/nbt/)                       | 161.77 MiB/s |
+| [fastnbt](https://docs.rs/fastnbt/latest/fastnbt/)                             | 160.98 MiB/s |
 
 And for writing `complex_player.dat`:
 
 | Library         | Throughput   |
 | --------------- | ------------ |
-| azalea_nbt      | 2.5341 GiB/s |
-| simdnbt::owned  | 2.5116 GiB/s |
-| simdnbt::borrow | 2.3300 GiB/s |
-| graphite_binary | 1.8923 GiB/s |
+| simdnbt::owned  | 2.6633 GiB/s |
+| simdnbt::borrow | 2.4228 GiB/s |
+| azalea_nbt      | 2.1755 GiB/s |
+| graphite_binary | 1.8010 GiB/s |
 
 The tables above were made from the [compare benchmark](https://github.com/azalea-rs/simdnbt/tree/master/simdnbt/benches) in this repo, with `cargo bench 'compare/complex_player.dat/'`.
 

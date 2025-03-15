@@ -10,10 +10,10 @@ repository = "https://github.com/azalea-rs/simdnbt"
 
 [dependencies]
 byteorder = "1.5.0"
-flate2 = "^1.0.35"
+flate2 = "^1.1.0"
 simd_cesu8 = "1.0.1"
 simdnbt-derive = { version = "0.7.0", path = "../simdnbt-derive", optional = true }
-thiserror = "2.0.11"
+thiserror = "2.0.12"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
