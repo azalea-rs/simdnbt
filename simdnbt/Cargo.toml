@@ -17,6 +17,7 @@ thiserror = "2.0.12"
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
+mimalloc = "0.1.43"
 
 graphite_binary = "0.1.0"
 valence_nbt = { version = "0.8.0", features = ["binary"] }
@@ -24,8 +25,6 @@ fastnbt = "2.5.0"
 azalea-nbt = { git = "https://github.com/azalea-rs/azalea", rev = "84e036ce3752ecf57904b0f5aff1f33d43e95a32" }
 hematite-nbt = { version = "0.5.2", default-features = false }
 shen-nbt5 = "0.4.6"
-
-mimalloc = "0.1.43"
 crab_nbt = "0.2.9"
 ussr-nbt = "0.2.1"
 
