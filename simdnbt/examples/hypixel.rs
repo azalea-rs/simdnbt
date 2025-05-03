@@ -1,51 +1,52 @@
-use std::{collections::HashMap, hint::black_box, io::Cursor};
+use std::{borrow::Cow, collections::HashMap, hint::black_box, io::Cursor};
 
 use simdnbt::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Item {
+pub struct Item<'a> {
     pub id: i16,
     #[simdnbt(rename = "Damage")]
-    pub damage: i16,
+    pub damage: Option<i16>,
     #[simdnbt(rename = "Count")]
     pub count: i8,
 
-    pub tag: ItemTag,
+    pub tag: ItemTag<'a>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct ItemTag {
+pub struct ItemTag<'a> {
     #[simdnbt(rename = "SkullOwner")]
-    pub skull_owner: Option<SkullOwner>,
+    pub skull_owner: Option<SkullOwner<'a>>,
     #[simdnbt(rename = "ExtraAttributes")]
-    pub extra_attributes: ExtraAttributes,
-    pub display: ItemDisplay,
+    pub extra_attributes: Option<ExtraAttributes<'a>>,
+    pub display: Option<ItemDisplay>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct ExtraAttributes {
-    pub id: Option<String>,
-    pub modifier: Option<String>,
+pub struct ExtraAttributes<'a> {
+    pub id: Option<Cow<'a, str>>,
+    pub modifier: Option<Cow<'a, str>>,
 
     pub ench: Option<simdnbt::owned::NbtCompound>,
     pub enchantments: Option<HashMap<String, i32>>,
-    pub timestamp: Option<String>,
+    pub timestamp: Option<Cow<'a, str>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct SkullOwner {
-    pub properties: Properties,
+pub struct SkullOwner<'a> {
+    #[simdnbt(rename = "Properties")]
+    pub properties: Properties<'a>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Properties {
-    pub textures: Vec<Texture>,
+pub struct Properties<'a> {
+    pub textures: Vec<Texture<'a>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Texture {
+pub struct Texture<'a> {
     #[simdnbt(rename = "Value")]
-    pub value: String,
+    pub value: Cow<'a, str>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -59,29 +60,22 @@ pub struct ItemDisplay {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct Base {
+pub struct Base<'a> {
     #[simdnbt(rename = "i")]
-    pub items: Vec<Option<Item>>,
+    pub items: Vec<Option<Item<'a>>>,
 }
 
 fn main() {
     let input = black_box(include_bytes!("../tests/hypixel.nbt"));
 
     for _ in 0..1 {
-        let nbt = simdnbt::borrow::read(&mut Cursor::new(input));
-        let nbt = black_box(nbt.unwrap().unwrap());
-
-        let data = Base::from_nbt(&nbt).unwrap();
+        let (_, data) = Base::read(&mut Cursor::new(input)).unwrap();
 
         // roundtrip
         let mut new_nbt_bytes = Vec::new();
         data.clone().to_nbt().write(&mut new_nbt_bytes);
-        let new_nbt = simdnbt::borrow::read(&mut Cursor::new(&new_nbt_bytes[..]))
-            .unwrap()
-            .unwrap();
-        let new_data = Base::from_nbt(&new_nbt).unwrap();
-        assert_eq!(data, new_data);
 
-        // println!("data: {:?}", data.items);
+        let (_, new_data) = Base::read(&mut Cursor::new(&new_nbt_bytes)).unwrap();
+        assert_eq!(data, new_data);
     }
 }

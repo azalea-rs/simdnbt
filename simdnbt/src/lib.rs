@@ -9,20 +9,21 @@
 compile_error!("simdnbt only supports 64-bit platforms");
 
 pub mod borrow;
-mod common;
+pub mod common;
 mod error;
 mod fastvec;
 mod mutf8;
 pub mod owned;
 pub mod raw_list;
-mod reader;
+pub mod reader;
 pub mod swap_endianness;
 mod traits;
+pub mod validate;
 
 pub use error::{DeserializeError, Error};
 pub use mutf8::Mutf8Str;
 pub use simdnbt_derive::*;
-pub use traits::{Deserialize, FromNbtTag, Serialize, ToNbtTag};
+pub use traits::{Deserialize, Serialize, ToNbtTag};
 
 #[cfg(test)]
 mod tests {

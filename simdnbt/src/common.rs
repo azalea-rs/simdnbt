@@ -1,3 +1,5 @@
+#![doc(hidden)]
+
 use std::{mem, slice};
 
 use crate::{

@@ -566,7 +566,7 @@ impl<'a, 'tape> NbtListList<'a, 'tape> {
         self.iter.clone().last()
     }
 
-    pub fn is_empty(self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.approx_len() == 0
     }
 }
@@ -622,7 +622,7 @@ impl<'a: 'tape, 'tape> NbtListListIter<'a, 'tape> {
         self.approx_length
     }
 
-    pub fn is_empty(self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.approx_len() == 0
     }
 }
@@ -698,7 +698,7 @@ impl<'a, 'tape> NbtCompoundList<'a, 'tape> {
         self.iter.clone().last()
     }
 
-    pub fn is_empty(self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.approx_len() == 0
     }
 }
@@ -753,7 +753,7 @@ impl<'a: 'tape, 'tape> NbtCompoundListIter<'a, 'tape> {
         self.approx_length
     }
 
-    pub fn is_empty(self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.approx_len() == 0
     }
 }

@@ -1,3 +1,5 @@
+#![doc(hidden)]
+
 use std::{
     io::Cursor,
     marker::PhantomData,
@@ -7,6 +9,8 @@ use std::{
 
 use crate::error::UnexpectedEofError;
 
+/// An internal type for efficiently reading bytes, and is sometimes faster than
+/// `Cursor<&[u8]>`.
 pub struct Reader<'a> {
     pub cur: *const u8,
     /// pointer to after the last byte (so remaining=end-cur)
@@ -69,6 +73,15 @@ impl<'a> Reader<'a> {
     #[inline]
     pub fn read_i8(&mut self) -> Result<i8, UnexpectedEofError> {
         self.read_u8().map(|x| x as i8)
+    }
+
+    #[inline]
+    pub fn peek_u8(&self) -> Result<u8, UnexpectedEofError> {
+        let addr = self.cur;
+        if addr >= self.end {
+            return Err(UnexpectedEofError);
+        }
+        Ok(unsafe { addr.read_unaligned() })
     }
 
     #[inline]

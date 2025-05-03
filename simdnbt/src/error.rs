@@ -18,7 +18,9 @@ pub enum Error {
 
 // these two structs exist to optimize errors, since Error is an entire 2 bytes
 // which are often unnecessary
-pub(crate) struct UnexpectedEofError;
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct UnexpectedEofError;
 impl From<UnexpectedEofError> for Error {
     fn from(_: UnexpectedEofError) -> Self {
         Error::UnexpectedEof
@@ -78,10 +80,30 @@ impl Debug for NonRootError {
 
 #[derive(Error, Debug)]
 pub enum DeserializeError {
-    #[error("Missing field")]
-    MissingField,
+    #[error(transparent)]
+    Nbt(#[from] Error),
+
+    #[error("Missing field {0}")]
+    MissingField(&'static str),
     #[error("Mismatched type for {0}")]
-    MismatchedFieldType(String),
+    MismatchedFieldType(&'static str),
+    #[error("Unexpected list type ID {0}")]
+    MismatchedListType(u8),
     #[error("Unknown field {0:?}")]
-    UnknownField(String),
+    UnknownField(Box<str>),
+    #[error("Nbt is empty")]
+    Empty,
+}
+
+impl From<UnexpectedEofError> for DeserializeError {
+    #[inline]
+    fn from(_: UnexpectedEofError) -> Self {
+        DeserializeError::Nbt(Error::UnexpectedEof)
+    }
+}
+impl From<NonRootError> for DeserializeError {
+    #[inline]
+    fn from(e: NonRootError) -> Self {
+        DeserializeError::Nbt(Error::from(e))
+    }
 }

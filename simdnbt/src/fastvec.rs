@@ -133,14 +133,9 @@ impl<T, A: Allocator> FastVec<T, A> {
         self.ptr.cast().as_ptr()
     }
 
-    pub fn to_vec(self) -> Vec<T> {
-        let vec = unsafe {
-            Vec::from_raw_parts(
-                self.ptr.cast().as_ptr() as *mut T,
-                self.len(),
-                self.capacity(),
-            )
-        };
+    pub fn into_vec(self) -> Vec<T> {
+        let vec =
+            unsafe { Vec::from_raw_parts(self.ptr.cast().as_ptr(), self.len(), self.capacity()) };
         // the allocation was moved so don't drop it
         mem::forget(self);
         vec
@@ -193,7 +188,7 @@ impl<T, A: Allocator> FastVec<T, A> {
             cur: ptr.add(len),
             end,
             ptr: ptr.cast(),
-            alloc: alloc,
+            alloc,
         }
     }
 }
@@ -256,7 +251,7 @@ impl<T> From<Vec<T>> for FastVec<T> {
 }
 impl<T> From<FastVec<T>> for Vec<T> {
     fn from(fastvec: FastVec<T>) -> Self {
-        fastvec.to_vec()
+        fastvec.into_vec()
     }
 }
 
@@ -279,7 +274,7 @@ impl<T> Drop for FastVecFromVec<'_, T> {
     fn drop(&mut self) {
         // we intentionally don't drop the fastvec since the allocation is moved into
         // the vec
-        *self.original = unsafe { ManuallyDrop::take(&mut self.fastvec).to_vec() };
+        *self.original = unsafe { ManuallyDrop::take(&mut self.fastvec).into_vec() };
     }
 }
 

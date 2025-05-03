@@ -26,10 +26,7 @@ fn main() {
     let mut buf = Vec::new();
     nbt.write(&mut buf);
 
-    let nbt = simdnbt::borrow::read(&mut Cursor::new(&buf[..]))
-        .unwrap()
-        .unwrap();
-    let rewritten = TrimMaterialElement::from_nbt(&nbt).unwrap();
+    let (_, rewritten) = TrimMaterialElement::read(&mut Cursor::new(&buf)).unwrap();
 
     assert_eq!(original, rewritten);
 }

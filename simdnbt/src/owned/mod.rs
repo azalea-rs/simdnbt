@@ -272,7 +272,7 @@ impl NbtTag {
     }
 
     #[inline(always)]
-    fn read_with_type(
+    pub(crate) fn read_with_type(
         data: &mut Reader<'_>,
         tag_type: u8,
         depth: usize,

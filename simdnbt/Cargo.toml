@@ -53,7 +53,7 @@ name = "compare"
 
 [[bench]]
 harness = false
-name = "compare_hypixel"
+name = "compare_derive"
 
 [[bench]]
 harness = false

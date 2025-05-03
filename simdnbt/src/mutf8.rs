@@ -11,7 +11,7 @@ use simd_cesu8::mutf8;
 
 /// A MUTF-8 string slice. This is how strings are represented internally in
 /// NBT.
-#[derive(Eq, PartialEq)]
+#[derive(Eq, PartialEq, Hash)]
 pub struct Mutf8Str {
     pub(crate) slice: [u8],
 }
@@ -115,7 +115,7 @@ impl Mutf8Str {
     /// Convert a slice of bytes into a Mutf8Str. This is safe because it's only
     /// checked to be valid MUTF-8 while being converted to UTF-8.
     #[inline]
-    pub fn from_slice(slice: &[u8]) -> &Mutf8Str {
+    pub const fn from_slice(slice: &[u8]) -> &Mutf8Str {
         // SAFETY: &[u8] and &Mutf8Str are the same layout.
         unsafe { mem::transmute::<&[u8], &Mutf8Str>(slice) }
     }
@@ -255,6 +255,16 @@ impl From<&Mutf8Str> for String {
     #[inline]
     fn from(s: &Mutf8Str) -> Self {
         s.to_str().into_owned()
+    }
+}
+impl PartialEq<str> for Mutf8Str {
+    /// A fast but somewhat incorrect way to compare MUTF-8 strings to UTF-8.
+    ///
+    /// This just compares the underlying bytes, so if the MUTF-8 encodes
+    /// differently then it'll return the wrong answer.
+    #[inline]
+    fn eq(&self, other: &str) -> bool {
+        self.as_bytes() == other.as_bytes()
     }
 }
 
