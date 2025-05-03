@@ -56,9 +56,7 @@ Use the borrow variant of `Nbt` if possible, and avoid allocating unnecessarily 
 
 If you're using the owned variant of Simdnbt, switching to a faster allocator like [mimalloc](https://docs.rs/mimalloc/latest/mimalloc/) may help a decent amount (it's ~20% faster on my machine).
 
-Using `RUSTFLAGS="-Cllvm-args=-enable-dfa-jump-thread"` makes Simdnbt about 4% faster in exchange for potentially slightly longer compile times and compiler instability.
-
-Setting `RUSTFLAGS='-C target-cpu=native'` when running your code may help or hurt performance, depending on your computer and program.
+Some compiler flags to try are `RUSTFLAGS='-C llvm-args=-enable-dfa-jump-thread'` and `RUSTFLAGS='-C target-cpu=native'`. They may help or hurt performance, depending on your computer, your code, and whether LLVM feels like cooperating.
 
 ## Implementation details
 
