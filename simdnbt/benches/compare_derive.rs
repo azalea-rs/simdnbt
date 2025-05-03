@@ -40,7 +40,9 @@ fn bench_read_file(filename: &str, c: &mut Criterion) {
     });
     group.bench_function("simdnbt_validate_parse", |b| {
         b.iter(|| {
-            simdnbt::validate::read(&mut input_stream).unwrap();
+            simdnbt::validate::NbtValidator::new()
+                .read(&mut input_stream)
+                .unwrap();
             input_stream.set_position(0);
         })
     });
@@ -76,10 +78,10 @@ pub struct Item<'a> {
 #[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct ItemTag<'a> {
     #[simdnbt(rename = "SkullOwner")]
-    pub skull_owner: Option<SkullOwner<'a>>,
+    pub skull_owner: Option<Box<SkullOwner<'a>>>,
     #[simdnbt(rename = "ExtraAttributes")]
-    pub extra_attributes: Option<ExtraAttributes<'a>>,
-    pub display: Option<ItemDisplay<'a>>,
+    pub extra_attributes: Option<Box<ExtraAttributes<'a>>>,
+    pub display: Option<Box<ItemDisplay<'a>>>,
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]

@@ -70,7 +70,6 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     let where_clause = &generics.where_clause;
 
     let struct_attrs = attrs::parse_struct_attrs(&input.attrs);
-    let deny_unknown_fields = struct_attrs.deny_unknown_fields;
 
     // let extra_checks = if struct_attrs.deny_unknown_fields {
     //     quote! {
@@ -162,17 +161,31 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         let nbt_name = &field_data.nbt_name;
         update_partial_inner.extend(if field_data.is_flatten {
             quote! {
-                if <#field_type>::update_partial(&mut partial.#index, tag_name, tag_type, data)? {
+                if <#field_type>::update_partial(&mut partial.#index, validator, tag_name, tag_type, data)? {
                 } else
             }
         } else {
             quote! {
                 if <#field_type>::type_matches(tag_type) && tag_name == #nbt_name {
-                    partial.#index = Some(simdnbt::Deserialize::read_value_direct_with_explicit_type(data, tag_type)?);
+                    partial.#index = Some(simdnbt::Deserialize::read_value_direct_with_explicit_type(data, validator, tag_type)?);
                 } else
             }
         });
     }
+
+    let on_unknown_field = if struct_attrs.deny_unknown_fields {
+        quote! {
+            return Err(simdnbt::DeserializeError::UnknownField(
+                tag_name.to_str().into(),
+            ));
+        }
+    } else {
+        quote! {
+            // skip the field
+            validator.internal_read_tag(data, tag_type)?;
+            continue;
+        }
+    };
 
     let output = quote! {
         impl #generics simdnbt::Deserialize<#data_lifetime> for #ident #generics #where_clause {
@@ -180,7 +193,7 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
             type Partial<'PARTIAL> = (#partial_type_inner);
 
             #[inline]
-            fn read_value_direct(data: &mut simdnbt::reader::Reader<#data_lifetime>) -> Result<Self, simdnbt::DeserializeError> {
+            fn read_value_direct(data: &mut simdnbt::reader::Reader<#data_lifetime>, validator: &mut simdnbt::validate::NbtValidator) -> Result<Self, simdnbt::DeserializeError> {
                 let mut partial = Self::Partial::default();
 
                 loop {
@@ -190,20 +203,11 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                     }
                     let tag_name = simdnbt::common::read_string(data)?;
 
-                    let matched = Self::update_partial(&mut partial, tag_name, tag_type, data)?;
+                    let matched = Self::update_partial(&mut partial, validator, tag_name, tag_type, data)?;
 
                     if !matched {
                         let field_name = #name_to_field_if_statements {
-                            if #deny_unknown_fields {
-                                return Err(simdnbt::DeserializeError::UnknownField(
-                                    tag_name.to_str().into(),
-                                ));
-                            }
-
-                            // skip the field
-                            simdnbt::validate::internal_read_tag(data, tag_type)?;
-
-                            continue;
+                            #on_unknown_field
                         };
 
                         return Err(simdnbt::DeserializeError::MismatchedFieldType(field_name));
@@ -216,6 +220,7 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
             #[inline]
             fn update_partial(
                 partial: &mut Self::Partial<'_>,
+                validator: &mut simdnbt::validate::NbtValidator,
                 tag_name: &simdnbt::Mutf8Str,
                 tag_type: u8,
                 data: &mut simdnbt::reader::Reader<#data_lifetime>,

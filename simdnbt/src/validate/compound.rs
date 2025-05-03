@@ -48,6 +48,11 @@ impl ParsingStack {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.depth = 0;
+        // the other two fields are reset as they're used
+    }
+
     #[inline]
     pub fn push(&mut self, state: ParsingStackElementKind) -> Result<(), NonRootError> {
         unsafe { self.stack.get_unchecked_mut(self.depth).write(state) };

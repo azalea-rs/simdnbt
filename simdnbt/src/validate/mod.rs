@@ -21,105 +21,119 @@ use crate::{
     Error,
 };
 
-/// Read a normal root NBT compound. This is either empty or has a name and
-/// compound tag.
-pub fn read(data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-    let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-    if root_type == END_ID {
-        return Ok(());
-    }
-    if root_type != COMPOUND_ID {
-        return Err(Error::InvalidRootType(root_type));
-    }
-    // our Reader type is faster than Cursor
-    let mut data = ReaderFromCursor::new(data);
-    read_string(&mut data)?;
-
-    let mut stack = ParsingStack::new();
-    stack.push(ParsingStackElementKind::Compound)?;
-
-    read_with_stack(&mut data, &mut stack)?;
-
-    Ok(())
+pub struct NbtValidator {
+    stack: ParsingStack,
 }
-/// Read a root NBT compound, but without reading the name. This is used in
-/// Minecraft when reading NBT over the network.
-///
-/// This is similar to [`read_tag`], but only allows the data to be empty or a
-/// compound.
-pub fn read_unnamed(data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-    let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-    if root_type == END_ID {
-        return Ok(());
-    }
-    if root_type != COMPOUND_ID {
-        return Err(Error::InvalidRootType(root_type));
-    }
-    read_compound(data)?;
-    Ok(())
-}
-/// Read a compound tag. This may have any number of items.
-pub fn read_compound(data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-    let mut stack = ParsingStack::new();
-    let mut data = ReaderFromCursor::new(data);
-    stack.push(ParsingStackElementKind::Compound)?;
-    read_with_stack(&mut data, &mut stack)?;
-    Ok(())
-}
-/// Read an NBT tag, without reading its name. This may be any type of tag
-/// except for an end tag. If you need to be able to handle end tags, use
-/// [`read_optional_tag`].
-pub fn read_tag(data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-    let mut stack = ParsingStack::new();
-
-    let mut data = ReaderFromCursor::new(data);
-
-    let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-    if tag_type == END_ID {
-        return Err(Error::InvalidRootType(0));
-    }
-    compound::read_tag(&mut data, &mut stack, tag_type)?;
-    read_with_stack(&mut data, &mut stack)?;
-
-    Ok(())
-}
-
-#[doc(hidden)]
-pub fn internal_read_tag(data: &mut Reader, tag_type: u8) -> Result<(), Error> {
-    let mut stack = ParsingStack::new();
-    compound::read_tag(data, &mut stack, tag_type)?;
-    read_with_stack(data, &mut stack)?;
-    Ok(())
-}
-
-/// Read any NBT tag, without reading its name. This may be any type of tag,
-/// including an end tag.
-pub fn read_optional_tag(data: &mut Cursor<&[u8]>) -> Result<(), Error> {
-    let mut stack = ParsingStack::new();
-
-    let mut data = ReaderFromCursor::new(data);
-
-    let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
-    if tag_type == END_ID {
-        return Ok(());
-    }
-    compound::read_tag(&mut data, &mut stack, tag_type)?;
-    read_with_stack(&mut data, &mut stack)?;
-
-    Ok(())
-}
-
-fn read_with_stack<'a>(data: &mut Reader<'a>, stack: &mut ParsingStack) -> Result<(), Error> {
-    while !stack.is_empty() {
-        let top = stack.peek();
-        match top {
-            ParsingStackElementKind::Compound => read_tag_in_compound(data, stack)?,
-            ParsingStackElementKind::ListOfCompounds => read_compound_in_list(data, stack)?,
-            ParsingStackElementKind::ListOfLists => read_list_in_list(data, stack)?,
+impl NbtValidator {
+    pub fn new() -> Self {
+        Self {
+            stack: ParsingStack::new(),
         }
     }
 
-    Ok(())
+    /// Read a normal root NBT compound. This is either empty or has a name and
+    /// compound tag.
+    pub fn read(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        if root_type == END_ID {
+            return Ok(());
+        }
+        if root_type != COMPOUND_ID {
+            return Err(Error::InvalidRootType(root_type));
+        }
+        // our Reader type is faster than Cursor
+        let mut data = ReaderFromCursor::new(data);
+        read_string(&mut data)?;
+
+        self.stack.clear();
+        self.stack.push(ParsingStackElementKind::Compound)?;
+
+        self.read_with_stack(&mut data)?;
+
+        Ok(())
+    }
+
+    #[doc(hidden)]
+    pub fn internal_read_tag(&mut self, data: &mut Reader, tag_type: u8) -> Result<(), Error> {
+        self.stack.clear();
+        compound::read_tag(data, &mut self.stack, tag_type)?;
+        self.read_with_stack(data)?;
+        Ok(())
+    }
+
+    /// Read a root NBT compound, but without reading the name. This is used in
+    /// Minecraft when reading NBT over the network.
+    ///
+    /// This is similar to [`read_tag`], but only allows the data to be empty or
+    /// a compound.
+    pub fn read_unnamed(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        let root_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        if root_type == END_ID {
+            return Ok(());
+        }
+        if root_type != COMPOUND_ID {
+            return Err(Error::InvalidRootType(root_type));
+        }
+        self.read_compound(data)?;
+        Ok(())
+    }
+    /// Read a compound tag. This may have any number of items.
+    pub fn read_compound(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        self.stack.clear();
+        let mut data = ReaderFromCursor::new(data);
+        self.stack.push(ParsingStackElementKind::Compound)?;
+        self.read_with_stack(&mut data)?;
+        Ok(())
+    }
+    /// Read an NBT tag, without reading its name. This may be any type of tag
+    /// except for an end tag. If you need to be able to handle end tags, use
+    /// [`read_optional_tag`].
+    pub fn read_tag(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        self.stack.clear();
+
+        let mut data = ReaderFromCursor::new(data);
+
+        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        if tag_type == END_ID {
+            return Err(Error::InvalidRootType(0));
+        }
+        compound::read_tag(&mut data, &mut self.stack, tag_type)?;
+        self.read_with_stack(&mut data)?;
+
+        Ok(())
+    }
+
+    /// Read any NBT tag, without reading its name. This may be any type of tag,
+    /// including an end tag.
+    pub fn read_optional_tag(&mut self, data: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        let mut stack = ParsingStack::new();
+
+        let mut data = ReaderFromCursor::new(data);
+
+        let tag_type = data.read_u8().map_err(|_| Error::UnexpectedEof)?;
+        if tag_type == END_ID {
+            return Ok(());
+        }
+        compound::read_tag(&mut data, &mut stack, tag_type)?;
+        self.read_with_stack(&mut data)?;
+
+        Ok(())
+    }
+
+    fn read_with_stack<'a>(&mut self, data: &mut Reader<'a>) -> Result<(), Error> {
+        while !self.stack.is_empty() {
+            let top = self.stack.peek();
+            match top {
+                ParsingStackElementKind::Compound => read_tag_in_compound(data, &mut self.stack)?,
+                ParsingStackElementKind::ListOfCompounds => {
+                    read_compound_in_list(data, &mut self.stack)?
+                }
+                ParsingStackElementKind::ListOfLists => read_list_in_list(data, &mut self.stack)?,
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -134,10 +148,11 @@ mod tests {
 
     #[test]
     fn hello_world() {
-        super::read(&mut Cursor::new(include_bytes!(
-            "../../tests/hello_world.nbt"
-        )))
-        .unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(include_bytes!(
+                "../../tests/hello_world.nbt"
+            )))
+            .unwrap();
     }
 
     #[test]
@@ -147,7 +162,9 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        super::read(&mut Cursor::new(&decoded_src)).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&decoded_src))
+            .unwrap();
     }
 
     #[test]
@@ -157,21 +174,26 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        super::read(&mut Cursor::new(&decoded_src)).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&decoded_src))
+            .unwrap();
     }
 
     #[test]
     fn read_hypixel() {
         let src = include_bytes!("../../tests/hypixel.nbt").to_vec();
-        super::read(&mut Cursor::new(&src[..])).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&src[..]))
+            .unwrap();
     }
 
     #[test]
     fn inttest_1023() {
-        super::read(&mut Cursor::new(include_bytes!(
-            "../../tests/inttest1023.nbt"
-        )))
-        .unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(include_bytes!(
+                "../../tests/inttest1023.nbt"
+            )))
+            .unwrap();
     }
 
     #[test]
@@ -188,7 +210,9 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        super::read(&mut Cursor::new(&data)).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&data))
+            .unwrap();
     }
 
     #[test]
@@ -205,7 +229,9 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        super::read(&mut Cursor::new(&data)).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&data))
+            .unwrap();
     }
 
     #[test]
@@ -222,7 +248,9 @@ mod tests {
         }
         data.write_u8(END_ID).unwrap();
 
-        super::read(&mut Cursor::new(&data)).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&data))
+            .unwrap();
     }
 
     #[test]
@@ -234,7 +262,7 @@ mod tests {
         data.write_u16::<BE>(0).unwrap(); // first element name length
                                           // eof
 
-        let res = super::read(&mut Cursor::new(&data));
+        let res = super::NbtValidator::new().read(&mut Cursor::new(&data));
         assert_eq!(res, Err(Error::UnexpectedEof));
     }
 
@@ -251,14 +279,18 @@ mod tests {
         decoded_src_as_tag.extend_from_slice(&decoded_src);
         decoded_src_as_tag.push(END_ID);
 
-        super::read_tag(&mut Cursor::new(&decoded_src_as_tag)).unwrap();
+        super::NbtValidator::new()
+            .read_tag(&mut Cursor::new(&decoded_src_as_tag))
+            .unwrap();
     }
 
     #[test]
     fn byte_array() {
         // found from fuzzing
         let data = [10, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0];
-        super::read(&mut Cursor::new(&data)).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&data))
+            .unwrap();
     }
     #[test]
     fn list_of_empty_lists() {
@@ -266,14 +298,18 @@ mod tests {
         // BaseNbt { name: m"", tag: NbtTag::NbtCompound { m"":
         // NbtTag::List(List::List([List::Empty])) } }
         let data = [10, 0, 0, 9, 0, 0, 9, 0, 0, 0, 1, 0, 9, 0, 0, 0, 0];
-        super::read(&mut Cursor::new(&data)).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&data))
+            .unwrap();
     }
     #[test]
     fn list_of_byte_arrays() {
         // BaseNbt { name: m"", tag: NbtCompound { values: [(m"",
         // List(List([List::ByteArray([])])))] } }
         let data = [10, 0, 0, 9, 0, 0, 9, 0, 0, 0, 1, 7, 0, 0, 0, 0, 0];
-        super::read(&mut Cursor::new(&data)).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&data))
+            .unwrap();
     }
 
     #[test]
@@ -283,6 +319,8 @@ mod tests {
         let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
         let mut decoded_src = Vec::new();
         decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
-        super::read(&mut Cursor::new(&decoded_src)).unwrap();
+        super::NbtValidator::new()
+            .read(&mut Cursor::new(&decoded_src))
+            .unwrap();
     }
 }

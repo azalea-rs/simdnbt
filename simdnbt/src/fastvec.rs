@@ -28,7 +28,7 @@ impl<T, A: Allocator> FastVec<T, A> {
             // this is faster than Layout::array
             alloc::alloc(Layout::from_size_align_unchecked(
                 capacity * element_size,
-                element_size,
+                Self::alignment(),
             ))
         };
         let ptr = NonNull::new(ptr as *mut T).expect("allocation failed");
@@ -39,6 +39,11 @@ impl<T, A: Allocator> FastVec<T, A> {
             ptr: ptr.cast(),
             alloc,
         }
+    }
+
+    #[inline]
+    fn alignment() -> usize {
+        mem::align_of::<T>()
     }
 
     #[inline(always)]
@@ -72,8 +77,8 @@ impl<T, A: Allocator> FastVec<T, A> {
         let new_ptr = unsafe {
             self.alloc.grow(
                 self.ptr,
-                Layout::from_size_align_unchecked(old_cap_bytes, element_size),
-                Layout::from_size_align_unchecked(new_cap_bytes, element_size),
+                Layout::from_size_align_unchecked(old_cap_bytes, Self::alignment()),
+                Layout::from_size_align_unchecked(new_cap_bytes, Self::alignment()),
             )
         };
         let new_ptr = new_ptr.expect("allocation failed");
@@ -99,8 +104,8 @@ impl<T, A: Allocator> FastVec<T, A> {
         let new_ptr = unsafe {
             self.alloc.grow(
                 self.ptr,
-                Layout::from_size_align_unchecked(old_cap_bytes, element_size),
-                Layout::from_size_align_unchecked(new_cap_bytes, element_size),
+                Layout::from_size_align_unchecked(old_cap_bytes, Self::alignment()),
+                Layout::from_size_align_unchecked(new_cap_bytes, Self::alignment()),
             )
         };
         let new_ptr = new_ptr.expect("allocation failed");
@@ -202,9 +207,20 @@ impl<T> FastVec<T, alloc::Global> {
         Self::with_capacity_in(capacity, alloc::Global)
     }
 
+    /// Create a new FastVec with the default capacity of 1.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub unsafe fn from_raw_parts(ptr: *mut T, len: usize, capacity: usize) -> Self {
         Self::from_raw_parts_in(ptr, len, capacity, alloc::Global)
     }
+}
+
+/// A [`FastVec`] that allows having a capacity of 0.
+pub enum OptionalFastVec<T> {
+    Empty,
+    FastVec(FastVec<T>),
 }
 
 const DEFAULT_CAPACITY: usize = 1;
@@ -216,7 +232,7 @@ impl<T> Default for FastVec<T> {
             // this is faster than Layout::array
             alloc::alloc(Layout::from_size_align_unchecked(
                 DEFAULT_CAPACITY * element_size,
-                element_size,
+                Self::alignment(),
             ))
         };
         let ptr = NonNull::new(ptr as *mut T).expect("allocation failed");

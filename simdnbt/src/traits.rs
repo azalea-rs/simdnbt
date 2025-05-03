@@ -4,9 +4,11 @@ use byteorder::ReadBytesExt;
 
 use crate::{
     common::{self, read_string},
+    fastvec::{FastVec, OptionalFastVec},
     mutf8::Mutf8String,
     owned,
     reader::{Reader, ReaderFromCursor},
+    validate::NbtValidator,
     DeserializeError, Error, Mutf8Str,
 };
 
@@ -25,22 +27,27 @@ pub trait Deserialize<'a>: Sized {
         let mut data = ReaderFromCursor::new(data);
         let name = read_string(&mut data)?;
 
+        let mut validator = NbtValidator::new();
+
         Ok((
             name,
-            Self::read_value_direct_with_explicit_type(&mut data, root_type)?,
+            Self::read_value_direct_with_explicit_type(&mut data, &mut validator, root_type)?,
         ))
     }
 
-    fn read_value_direct(data: &mut Reader<'a>) -> Result<Self, DeserializeError>;
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError>;
 
     #[inline]
     fn read_value_direct_with_explicit_type(
         data: &mut Reader<'a>,
+        validator: &mut NbtValidator,
         type_id: u8,
     ) -> Result<Self, DeserializeError> {
         debug_assert_eq!(type_id, Self::NBT_TYPE_ID);
-
-        Self::read_value_direct(data)
+        Self::read_value_direct(data, validator)
     }
 
     #[inline]
@@ -51,6 +58,7 @@ pub trait Deserialize<'a>: Sized {
     #[inline]
     fn update_partial(
         _partial: &mut Self::Partial<'_>,
+        _validator: &mut NbtValidator,
         _name: &Mutf8Str,
         _tag_type: u8,
         _data: &mut Reader<'a>,
@@ -89,7 +97,10 @@ impl<'a, K: From<&'a Mutf8Str> + Eq + Hash, V: Deserialize<'a>> Deserialize<'a> 
     const NBT_TYPE_ID: u8 = common::COMPOUND_ID;
     type Partial<'b> = HashMap<K, V>;
 
-    fn read_value_direct(data: &mut Reader<'a>) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         let mut map = HashMap::new();
 
         loop {
@@ -102,7 +113,7 @@ impl<'a, K: From<&'a Mutf8Str> + Eq + Hash, V: Deserialize<'a>> Deserialize<'a> 
             if !V::type_matches(tag_type) {
                 return Err(DeserializeError::MismatchedFieldType("HashMap"));
             }
-            let value = V::read_value_direct_with_explicit_type(data, tag_type)?;
+            let value = V::read_value_direct_with_explicit_type(data, validator, tag_type)?;
 
             map.insert(name.into(), value);
         }
@@ -114,8 +125,11 @@ impl<'a, K: From<&'a Mutf8Str> + Eq + Hash, V: Deserialize<'a>> Deserialize<'a> 
     const NBT_TYPE_ID: u8 = common::COMPOUND_ID;
     type Partial<'b> = HashMap<K, V>;
 
-    fn read_value_direct(data: &mut Reader<'a>) -> Result<Self, DeserializeError> {
-        let mut map = Vec::new();
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
+        let mut map = FastVec::new();
 
         loop {
             let tag_type = data.read_u8()?;
@@ -127,12 +141,12 @@ impl<'a, K: From<&'a Mutf8Str> + Eq + Hash, V: Deserialize<'a>> Deserialize<'a> 
             if !V::type_matches(tag_type) {
                 return Err(DeserializeError::MismatchedFieldType("HashMap"));
             }
-            let value = V::read_value_direct_with_explicit_type(data, tag_type)?;
+            let value = V::read_value_direct_with_explicit_type(data, validator, tag_type)?;
 
             map.push((name.into(), value));
         }
 
-        Ok(map)
+        Ok(map.into())
     }
 }
 impl<K: Into<Mutf8String> + Eq + Hash, V: ToNbtTag> Serialize for HashMap<K, V> {
@@ -152,12 +166,16 @@ impl Deserialize<'_> for owned::NbtCompound {
 
     type Partial<'b> = owned::NbtCompound;
 
-    fn read_value_direct(data: &mut Reader<'_>) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader<'_>,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         owned::NbtCompound::read(data).map_err(Into::into)
     }
 
     fn update_partial(
         partial: &mut Self::Partial<'_>,
+        _validator: &mut NbtValidator,
         name: &Mutf8Str,
         tag_type: u8,
         data: &mut Reader<'_>,
@@ -188,12 +206,16 @@ impl Deserialize<'_> for owned::NbtTag {
 
     type Partial<'b> = ();
 
-    fn read_value_direct(_data: &mut Reader<'_>) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        _data: &mut Reader<'_>,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         unimplemented!("can't deserialize an NbtTag without the type being known")
     }
 
     fn read_value_direct_with_explicit_type(
         data: &mut Reader<'_>,
+        _validator: &mut NbtValidator,
         type_id: u8,
     ) -> Result<Self, DeserializeError> {
         let tag = owned::NbtTag::read_with_type(data, type_id, 0).map_err(Error::from)?;
@@ -211,7 +233,10 @@ impl Deserialize<'_> for i8 {
     const NBT_TYPE_ID: u8 = common::BYTE_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_i8().map_err(Into::into)
     }
 }
@@ -225,7 +250,10 @@ impl Deserialize<'_> for i16 {
     const NBT_TYPE_ID: u8 = common::SHORT_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_i16().map_err(Into::into)
     }
 }
@@ -239,7 +267,10 @@ impl Deserialize<'_> for i32 {
     const NBT_TYPE_ID: u8 = common::INT_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_i32().map_err(Into::into)
     }
 }
@@ -253,7 +284,10 @@ impl Deserialize<'_> for i64 {
     const NBT_TYPE_ID: u8 = common::LONG_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_i64().map_err(Into::into)
     }
 }
@@ -267,7 +301,10 @@ impl Deserialize<'_> for f32 {
     const NBT_TYPE_ID: u8 = common::FLOAT_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_f32().map_err(Into::into)
     }
 }
@@ -281,7 +318,10 @@ impl Deserialize<'_> for f64 {
     const NBT_TYPE_ID: u8 = common::DOUBLE_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_f64().map_err(Into::into)
     }
 }
@@ -295,7 +335,10 @@ impl Deserialize<'_> for String {
     const NBT_TYPE_ID: u8 = common::STRING_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         let str = common::read_string(data)?;
         Ok(str.to_string())
     }
@@ -304,7 +347,10 @@ impl<'a> Deserialize<'a> for &'a Mutf8Str {
     const NBT_TYPE_ID: u8 = common::STRING_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader<'a>) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         common::read_string(data).map_err(Into::into)
     }
 }
@@ -312,7 +358,10 @@ impl<'a> Deserialize<'a> for Cow<'a, str> {
     const NBT_TYPE_ID: u8 = common::STRING_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader<'a>) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         common::read_string(data)
             .map_err(Into::into)
             .map(|s| s.to_str())
@@ -351,7 +400,10 @@ impl Deserialize<'_> for u8 {
     const NBT_TYPE_ID: u8 = common::BYTE_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_u8().map_err(Into::into)
     }
 }
@@ -365,7 +417,10 @@ impl Deserialize<'_> for u16 {
     const NBT_TYPE_ID: u8 = common::SHORT_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_u16().map_err(Into::into)
     }
 }
@@ -379,7 +434,10 @@ impl Deserialize<'_> for u32 {
     const NBT_TYPE_ID: u8 = common::INT_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_u32().map_err(Into::into)
     }
 }
@@ -393,7 +451,10 @@ impl Deserialize<'_> for u64 {
     const NBT_TYPE_ID: u8 = common::LONG_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader,
+        _validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         data.read_u64().map_err(Into::into)
     }
 }
@@ -417,7 +478,10 @@ impl<'a, T: Deserialize<'a>> Deserialize<'a> for Option<T> {
     const NBT_TYPE_ID: u8 = T::NBT_TYPE_ID;
     type Partial<'b> = Option<T>;
 
-    fn read_value_direct(data: &mut Reader<'a>) -> Result<Self, DeserializeError> {
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         // empty compounds also count as None
         if Self::NBT_TYPE_ID == common::COMPOUND_ID {
             let next_tag_type = data.peek_u8()?;
@@ -427,9 +491,10 @@ impl<'a, T: Deserialize<'a>> Deserialize<'a> for Option<T> {
             }
         }
 
-        Ok(Some(T::read_value_direct(data)?))
+        Ok(Some(T::read_value_direct(data, validator)?))
     }
 
+    #[inline]
     fn try_flatten_with_option(other: Option<Self>) -> Option<Self> {
         Some(other.flatten())
     }
@@ -456,28 +521,85 @@ impl<T: Serialize> ToNbtTag for Vec<Option<T>> {
     }
 }
 
-impl<'a, T: Deserialize<'a>> Deserialize<'a> for Vec<T> {
+impl<'a, T: Deserialize<'a>> Deserialize<'a> for Box<T> {
+    const NBT_TYPE_ID: u8 = T::NBT_TYPE_ID;
+    type Partial<'b> = T::Partial<'b>;
+
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
+        T::read_value_direct(data, validator).map(Box::new)
+    }
+
+    fn update_partial(
+        partial: &mut Self::Partial<'_>,
+        validator: &mut NbtValidator,
+        name: &Mutf8Str,
+        tag_type: u8,
+        data: &mut Reader<'a>,
+    ) -> Result<bool, DeserializeError> {
+        T::update_partial(partial, validator, name, tag_type, data)
+    }
+
+    fn from_partial(partial: Self::Partial<'_>) -> Result<Self, DeserializeError> {
+        T::from_partial(partial).map(Box::new)
+    }
+}
+
+impl<'a, T: Deserialize<'a>> Deserialize<'a> for OptionalFastVec<T> {
     const NBT_TYPE_ID: u8 = common::LIST_ID;
     type Partial<'b> = ();
 
-    fn read_value_direct(data: &mut Reader<'a>) -> Result<Self, DeserializeError> {
+    #[inline(always)]
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
         let tag_type = data.read_u8()?;
         let list_length = data.read_i32()?;
         if tag_type == common::END_ID || list_length <= 0 {
-            return Ok(Vec::new());
+            return Ok(OptionalFastVec::Empty);
         }
         if !T::type_matches(tag_type) {
             return Err(DeserializeError::MismatchedListType(tag_type));
         }
 
-        let mut vec = Vec::with_capacity(list_length.min(128) as usize);
+        let mut vec = FastVec::with_capacity((list_length as usize).next_power_of_two().min(128));
         for _ in 0..list_length {
-            vec.push(T::read_value_direct_with_explicit_type(data, tag_type)?);
+            let value = T::read_value_direct_with_explicit_type(data, validator, tag_type)?;
+            vec.push(value);
         }
 
-        Ok(vec)
+        Ok(OptionalFastVec::FastVec(vec))
     }
 }
+impl<'a, T: Deserialize<'a>> Deserialize<'a> for Vec<T> {
+    const NBT_TYPE_ID: u8 = common::LIST_ID;
+    type Partial<'b> = ();
+
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
+        OptionalFastVec::<T>::read_value_direct(data, validator).map(|v| match v {
+            OptionalFastVec::Empty => Vec::new(),
+            OptionalFastVec::FastVec(v) => v.into(),
+        })
+    }
+}
+impl<'a, T: Deserialize<'a>> Deserialize<'a> for Box<[T]> {
+    const NBT_TYPE_ID: u8 = common::LIST_ID;
+    type Partial<'b> = ();
+
+    fn read_value_direct(
+        data: &mut Reader<'a>,
+        validator: &mut NbtValidator,
+    ) -> Result<Self, DeserializeError> {
+        Vec::<T>::read_value_direct(data, validator).map(|v| v.into_boxed_slice())
+    }
+}
+
 impl<T: Serialize> ToNbtTag for Vec<T> {
     fn to_nbt_tag(self) -> owned::NbtTag {
         owned::NbtTag::List(owned::NbtList::Compound(
