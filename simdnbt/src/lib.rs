@@ -20,7 +20,7 @@ pub mod swap_endianness;
 mod traits;
 
 pub use error::{DeserializeError, Error};
-pub use mutf8::Mutf8Str;
+pub use mutf8::{Mutf8Str, Mutf8String};
 pub use simdnbt_derive::*;
 pub use traits::{Deserialize, FromNbtTag, Serialize, ToNbtTag};
 
