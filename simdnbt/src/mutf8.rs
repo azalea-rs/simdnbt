@@ -81,7 +81,7 @@ impl Mutf8Str {
     // we can't implement FromStr on Cow<Mutf8Str>
     #[allow(clippy::should_implement_trait)]
     #[inline]
-    pub fn from_str(s: &str) -> Cow<Mutf8Str> {
+    pub fn from_str(s: &str) -> Cow<'_, Mutf8Str> {
         match mutf8::encode(s) {
             Cow::Borrowed(slice) => Cow::Borrowed(Mutf8Str::from_slice(slice)),
             Cow::Owned(vec) => Cow::Owned(Mutf8String { vec }),
@@ -91,7 +91,7 @@ impl Mutf8Str {
     /// Try to convert this MUTF-8 string into a UTF-8 string. If the data isn't
     /// valid MUTF-8, it'll return an empty string without erroring.
     #[inline]
-    pub fn to_str(&self) -> Cow<str> {
+    pub fn to_str(&self) -> Cow<'_, str> {
         // fast check to skip if none of the bytes have the top bit set.
         // note that this allows some valid utf8 but invalid mutf8 through as
         // null bytes aren't allowed in mutf8.
@@ -107,7 +107,7 @@ impl Mutf8Str {
     }
 
     #[inline]
-    pub fn to_string_lossy(&self) -> Cow<str> {
+    pub fn to_string_lossy(&self) -> Cow<'_, str> {
         mutf8::decode_lossy(&self.slice)
     }
 
