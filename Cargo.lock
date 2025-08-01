@@ -738,8 +738,7 @@ checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 [[package]]
 name = "simd_cesu8"
 version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7c14f02c32cc4ef5068b0e15bee4513942f59165add7778a518b4d507b3b97ab"
+source = "git+https://github.com/EightFactorial/simd_cesu8#546354e0c62ffd08de95cfedc4a09ed7683adac4"
 dependencies = [
  "rustc_version",
  "simdutf8",
@@ -747,7 +746,7 @@ dependencies = [
 
 [[package]]
 name = "simdnbt"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "azalea-nbt",
  "byteorder",

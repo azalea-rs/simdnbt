@@ -24,8 +24,7 @@ pub struct Mutf8String {
 #[inline]
 fn is_plain_ascii(slice: &[u8]) -> bool {
     let mut is_plain_ascii = true;
-    let chunks_32_exact = slice.array_chunks::<32>();
-    let mut remainder = chunks_32_exact.remainder();
+    let (chunks_32_exact, mut remainder) = slice.as_chunks::<32>();
     if remainder.len() > 16 {
         let chunk;
         (chunk, remainder) = remainder.split_first_chunk::<16>().unwrap();

@@ -9,3 +9,6 @@ debug = false
 [profile.bench]
 lto = true
 debug = true
+
+[patch.crates-io]
+simd_cesu8 = { git = 'https://github.com/EightFactorial/simd_cesu8' }

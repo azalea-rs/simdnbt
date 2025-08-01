@@ -1,6 +1,5 @@
 #![doc = include_str!("../README.md")]
 #![feature(portable_simd)]
-#![feature(array_chunks)]
 #![allow(internal_features)]
 #![feature(core_intrinsics)]
 #![feature(allocator_api)]
