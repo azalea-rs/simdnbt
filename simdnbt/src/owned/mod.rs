@@ -810,4 +810,13 @@ mod tests {
 
         assert_ne!(nbt, modified_nbt);
     }
+
+    #[test]
+    fn write_compound() {
+        let nbt = BaseNbt {
+            name: "".into(),
+            tag: NbtCompound { values: vec![] },
+        };
+        BaseNbt::write_unnamed(&nbt, &mut Vec::new());
+    }
 }

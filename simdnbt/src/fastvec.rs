@@ -271,10 +271,13 @@ impl<'orig, T> FastVecFromVec<'orig, T> {
     }
 }
 impl<T> Drop for FastVecFromVec<'_, T> {
+    /// Move the FastVec contents back into the original Vec.
     fn drop(&mut self) {
-        // we intentionally don't drop the fastvec since the allocation is moved into
-        // the vec
-        *self.original = unsafe { ManuallyDrop::take(&mut self.fastvec).into_vec() };
+        // we intentionally don't drop anything here
+        unsafe {
+            let new_vec = ManuallyDrop::take(&mut self.fastvec).into_vec();
+            (self.original as *mut Vec<T>).write(new_vec);
+        }
     }
 }
 

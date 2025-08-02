@@ -1,9 +1,10 @@
 use std::{
     fs::File,
+    hint::black_box,
     io::{Cursor, Read},
 };
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use flate2::read::GzDecoder;
 
 fn bench_read_file(filename: &str, c: &mut Criterion) {
