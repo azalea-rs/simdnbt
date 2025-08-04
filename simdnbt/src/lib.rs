@@ -1,7 +1,5 @@
 #![doc = include_str!("../README.md")]
 #![feature(portable_simd)]
-#![allow(internal_features)]
-#![feature(core_intrinsics)]
 #![feature(allocator_api)]
 
 #[cfg(not(target_pointer_width = "64"))]
