@@ -629,13 +629,29 @@ impl From<NbtCompound> for BaseNbt {
         }
     }
 }
-
 impl From<Nbt> for NbtTag {
     fn from(value: Nbt) -> Self {
         match value {
             Nbt::Some(nbt) => NbtTag::Compound(nbt.tag),
             Nbt::None => NbtTag::Compound(NbtCompound::new()),
         }
+    }
+}
+impl From<NbtTag> for NbtCompound {
+    fn from(tag: NbtTag) -> Self {
+        NbtCompound {
+            values: vec![(Mutf8String::from(""), tag)],
+        }
+    }
+}
+impl From<NbtList> for NbtTag {
+    fn from(list: NbtList) -> Self {
+        NbtTag::List(list)
+    }
+}
+impl From<&str> for NbtTag {
+    fn from(value: &str) -> Self {
+        NbtTag::String(Mutf8String::from(value))
     }
 }
 
