@@ -1,12 +1,12 @@
 use std::{mem, slice};
 
 use crate::{
+    Mutf8Str,
     error::UnexpectedEofError,
     fastvec::FastVec,
     raw_list::RawList,
     reader::Reader,
-    swap_endianness::{swap_endianness_as_u8, SwappableNumber},
-    Mutf8Str,
+    swap_endianness::{SwappableNumber, swap_endianness_as_u8},
 };
 
 pub const END_ID: u8 = 0;
@@ -105,8 +105,10 @@ pub fn write_string(data: &mut FastVec<u8>, value: &Mutf8Str) {
 /// this function.
 #[inline]
 pub unsafe fn write_string_unchecked(data: &mut FastVec<u8>, value: &Mutf8Str) {
-    data.extend_from_slice_unchecked(&(value.len() as u16).to_be_bytes());
-    data.extend_from_slice_unchecked(value.as_bytes());
+    unsafe {
+        data.extend_from_slice_unchecked(&(value.len() as u16).to_be_bytes());
+        data.extend_from_slice_unchecked(value.as_bytes());
+    }
 }
 
 /// Convert a slice of any type into a slice of u8. This will probably return

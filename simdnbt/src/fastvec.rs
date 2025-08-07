@@ -125,7 +125,7 @@ impl<T, A: Allocator> FastVec<T, A> {
     #[inline]
     pub unsafe fn get_unchecked_mut(&mut self, index: usize) -> &mut T {
         debug_assert!(index < self.len());
-        self.ptr.cast::<T>().add(index).as_mut()
+        unsafe { self.ptr.cast::<T>().add(index).as_mut() }
     }
 
     #[inline]
@@ -183,9 +183,10 @@ impl<T, A: Allocator> FastVec<T, A> {
         }
 
         let ptr = NonNull::new(ptr).expect("null pointer");
+        let cur = unsafe { ptr.add(len) };
         let end = unsafe { ptr.add(capacity) };
         Self {
-            cur: ptr.add(len),
+            cur,
             end,
             ptr: ptr.cast(),
             alloc,
@@ -203,7 +204,7 @@ impl<T> FastVec<T, alloc::Global> {
     }
 
     pub unsafe fn from_raw_parts(ptr: *mut T, len: usize, capacity: usize) -> Self {
-        Self::from_raw_parts_in(ptr, len, capacity, alloc::Global)
+        unsafe { Self::from_raw_parts_in(ptr, len, capacity, alloc::Global) }
     }
 }
 

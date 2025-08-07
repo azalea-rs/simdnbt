@@ -3,22 +3,23 @@
 
 mod compound;
 mod list;
+#[cfg(feature = "serde")]
+mod serde_impl;
 
 use std::{io::Cursor, ops::Deref};
 
 pub use self::{compound::NbtCompound, list::NbtList};
 use crate::{
+    Error, Mutf8Str,
     common::{
-        read_int_array, read_long_array, read_string, read_with_u32_length,
-        slice_into_u8_big_endian, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID,
-        END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH,
-        SHORT_ID, STRING_ID,
+        BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
+        LIST_ID, LONG_ARRAY_ID, LONG_ID, MAX_DEPTH, SHORT_ID, STRING_ID, read_int_array,
+        read_long_array, read_string, read_with_u32_length, slice_into_u8_big_endian, write_string,
     },
     error::NonRootError,
     fastvec::{FastVec, FastVecFromVec},
     mutf8::Mutf8String,
     reader::{Reader, ReaderFromCursor},
-    Error, Mutf8Str,
 };
 
 /// Read a normal root NBT compound. This is either empty or has a name and
@@ -356,7 +357,9 @@ impl NbtTag {
                 data.extend_from_slice(&double.to_be_bytes());
             }
             NbtTag::ByteArray(byte_array) => {
-                data.extend_from_slice_unchecked(&(byte_array.len() as u32).to_be_bytes());
+                unsafe {
+                    data.extend_from_slice_unchecked(&(byte_array.len() as u32).to_be_bytes());
+                }
                 data.extend_from_slice(byte_array);
             }
             NbtTag::String(string) => {
@@ -369,11 +372,15 @@ impl NbtTag {
                 compound.write_fastvec(data);
             }
             NbtTag::IntArray(int_array) => {
-                data.extend_from_slice_unchecked(&(int_array.len() as u32).to_be_bytes());
+                unsafe {
+                    data.extend_from_slice_unchecked(&(int_array.len() as u32).to_be_bytes());
+                }
                 data.extend_from_slice(&slice_into_u8_big_endian(int_array));
             }
             NbtTag::LongArray(long_array) => {
-                data.extend_from_slice_unchecked(&(long_array.len() as u32).to_be_bytes());
+                unsafe {
+                    data.extend_from_slice_unchecked(&(long_array.len() as u32).to_be_bytes());
+                }
                 data.extend_from_slice(&slice_into_u8_big_endian(long_array));
             }
         }
@@ -659,7 +666,7 @@ impl From<&str> for NbtTag {
 mod tests {
     use std::io::Read;
 
-    use byteorder::{WriteBytesExt, BE};
+    use byteorder::{BE, WriteBytesExt};
     use flate2::read::GzDecoder;
 
     use super::*;

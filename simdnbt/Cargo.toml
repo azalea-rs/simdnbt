@@ -1,7 +1,7 @@
 [package]
 name = "simdnbt"
 version = "0.7.2"
-edition = "2021"
+edition = "2024"
 description = "an unnecessarily fast nbt decoder"
 license = "MIT"
 repository = "https://github.com/azalea-rs/simdnbt"
@@ -11,6 +11,7 @@ repository = "https://github.com/azalea-rs/simdnbt"
 [dependencies]
 byteorder = "1.5.0"
 flate2 = "^1.1.2"
+serde = { version = "1.0.219", optional = true }
 simd_cesu8 = { version = "1.0.1", git = "https://github.com/EightFactorial/simd_cesu8" }
 simdnbt-derive = { version = "0.7.0", path = "../simdnbt-derive", optional = true }
 thiserror = "2.0.12"
@@ -29,9 +30,9 @@ crab_nbt = "0.2.11"
 ussr-nbt = "0.2.1"
 
 [features]
-default = ["derive"]
+default = ["derive", "serde"]
 derive = ["dep:simdnbt-derive"]
-
+serde = ["dep:serde"]
 
 [profile.release]
 lto = true

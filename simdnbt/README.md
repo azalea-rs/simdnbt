@@ -50,6 +50,11 @@ let mut buffer = Vec::new();
 nbt.write(&mut buffer);
 ```
 
+### Serde support
+
+There are experimental `serde::Serialize` implementations for the `owned` variants of the NBT types.
+It requires the `serde` feature, which is enabled by default.
+
 ## Performance guide
 
 Use the borrow variant of `Nbt` if possible, and avoid allocating unnecessarily (for example, keep strings as `Cow<str>` if you can).

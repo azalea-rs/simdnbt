@@ -762,6 +762,7 @@ dependencies = [
  "graphite_binary",
  "hematite-nbt",
  "mimalloc",
+ "serde",
  "shen-nbt5",
  "simd_cesu8",
  "simdnbt-derive",
