@@ -1,6 +1,6 @@
 [package]
 name = "simdnbt"
-version = "0.7.2"
+version = "0.8.0"
 edition = "2024"
 description = "an unnecessarily fast nbt decoder"
 license = "MIT"
@@ -13,7 +13,7 @@ byteorder = "1.5.0"
 flate2 = "^1.1.2"
 serde = { version = "1.0.219", optional = true }
 simd_cesu8 = { version = "1.1.0" }
-simdnbt-derive = { version = "0.7.0", path = "../simdnbt-derive", optional = true }
+simdnbt-derive = { version = "0.8.0", path = "../simdnbt-derive", optional = true }
 thiserror = "2.0.15"
 
 [dev-dependencies]
