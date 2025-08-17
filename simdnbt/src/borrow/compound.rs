@@ -1,4 +1,7 @@
-use std::mem::MaybeUninit;
+use std::{
+    fmt::{self, Debug},
+    mem::MaybeUninit,
+};
 
 use super::{
     NbtTag, Tapes,
@@ -18,7 +21,7 @@ use crate::{
     reader::Reader,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct NbtCompound<'a: 'tape, 'tape> {
     pub(crate) element: *const TapeElement, // includes the initial compound element
     pub(crate) extra_tapes: &'tape ExtraTapes<'a>,
@@ -192,7 +195,11 @@ impl<'a: 'tape, 'tape> NbtCompound<'a, 'tape> {
         }
     }
 }
-
+impl Debug for NbtCompound<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.to_owned().fmt(f)
+    }
+}
 impl PartialEq for NbtCompound<'_, '_> {
     fn eq(&self, other: &Self) -> bool {
         self.iter().eq(other.iter())

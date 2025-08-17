@@ -1,4 +1,8 @@
-use std::{marker::PhantomData, mem};
+use std::{
+    fmt::{self, Debug},
+    marker::PhantomData,
+    mem,
+};
 
 use super::{
     NbtCompound, Tapes,
@@ -22,7 +26,7 @@ use crate::{
 };
 
 /// A list of NBT tags of a single type.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 pub struct NbtList<'a: 'tape, 'tape> {
     pub(crate) element: *const TapeElement, // the initial list element
     pub(crate) extra_tapes: &'tape ExtraTapes<'a>,
@@ -532,6 +536,11 @@ impl PartialEq for NbtList<'_, '_> {
             }
             _ => unreachable!("this is an NbtList, no other kinds should be possible"),
         }
+    }
+}
+impl Debug for NbtList<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.to_owned().fmt(f)
     }
 }
 

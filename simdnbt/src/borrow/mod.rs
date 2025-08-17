@@ -241,14 +241,17 @@ impl<'a> BaseNbt<'a> {
     pub fn long_array(&self, name: &str) -> Option<Vec<i64>> {
         self.as_compound().long_array(name)
     }
+
+    pub fn to_owned(&self) -> crate::owned::BaseNbt {
+        crate::owned::BaseNbt::new(self.name.to_owned(), self.as_compound().to_owned())
+    }
 }
 
 impl Debug for BaseNbt<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BaseNbt").finish()
+        self.to_owned().fmt(f)
     }
 }
-
 /// A nameless NBT container. This only contains a compound tag. This contains a
 /// `TagAllocator`, so it can exist independently from a [`BaseNbt`].
 pub struct BaseNbtCompound<'a> {
@@ -287,7 +290,7 @@ impl<'a> From<&'a BaseNbtTag<'a>> for NbtTag<'a, '_> {
     }
 }
 /// Either a complete NBT container, or nothing.
-#[derive(Debug, PartialEq, Default)]
+#[derive(PartialEq, Default)]
 pub enum Nbt<'a> {
     Some(BaseNbt<'a>),
     #[default]
@@ -322,6 +325,14 @@ impl<'a> Nbt<'a> {
         !self.is_some()
     }
 }
+impl Debug for Nbt<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Nbt::Some(nbt) => write!(f, "Nbt::Some({nbt:?})"),
+            Nbt::None => write!(f, "Nbt::None"),
+        }
+    }
+}
 
 impl PartialEq for BaseNbt<'_> {
     fn eq(&self, other: &Self) -> bool {
@@ -344,7 +355,6 @@ impl BaseNbt<'_> {
     }
 }
 
-#[derive(Debug)]
 pub struct NbtTag<'a: 'tape, 'tape> {
     element: *const TapeElement,
     extra_tapes: &'tape ExtraTapes<'a>,
@@ -480,6 +490,11 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
             TapeTagKind::LongArray => crate::owned::NbtTag::LongArray(self.long_array().unwrap()),
             _ => unreachable!(),
         }
+    }
+}
+impl Debug for NbtTag<'_, '_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.to_owned().fmt(f)
     }
 }
 
