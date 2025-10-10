@@ -25,6 +25,14 @@ impl NbtCompound {
         Self { values }
     }
 
+    pub fn wrap_if_needed(tag: NbtTag) -> Self {
+        if let NbtTag::Compound(compound) = tag {
+            compound
+        } else {
+            Self::from_values(vec![(Mutf8String::from(""), tag)])
+        }
+    }
+
     pub(crate) fn read(data: &mut Reader<'_>) -> Result<Self, NonRootError> {
         Self::read_with_depth(data, 0)
     }
