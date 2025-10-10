@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, mem};
 
-use crate::swap_endianness::{swap_endianness, swap_endianness_as_u8, SwappableNumber};
+use crate::swap_endianness::{SwappableNumber, swap_endianness, swap_endianness_as_u8};
 
 /// A list of numbers that's kept as big-endian in memory.
 

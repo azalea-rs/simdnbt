@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug};
 
-use crate::{raw_list::RawList, Mutf8Str};
+use crate::{Mutf8Str, raw_list::RawList};
 
 #[derive(Default)]
 pub struct ExtraTapes<'a> {

@@ -15,24 +15,24 @@ use byteorder::ReadBytesExt;
 use compound::ParsingStackElementKind;
 use tape::{UnalignedU16, UnalignedU32, UnalignedU64};
 
-use self::{
-    compound::{read_tag_in_compound, ParsingStack, ParsingStackElement},
-    extra_tapes::ExtraTapes,
-    list::{read_compound_in_list, read_list_in_list},
-    tape::{MainTape, TapeElement, TapeTagKind},
-};
 pub use self::{
     compound::{NbtCompound, NbtCompoundIter},
     list::{NbtCompoundList, NbtCompoundListIter, NbtList, NbtListList, NbtListListIter},
 };
+use self::{
+    compound::{ParsingStack, ParsingStackElement, read_tag_in_compound},
+    extra_tapes::ExtraTapes,
+    list::{read_compound_in_list, read_list_in_list},
+    tape::{MainTape, TapeElement, TapeTagKind},
+};
 use crate::{
+    Error, Mutf8Str,
     common::{
-        read_string, write_string, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID,
-        FLOAT_ID, INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
+        BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
+        LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID, read_string, write_string,
     },
     fastvec::{FastVec, FastVecFromVec},
     reader::{Reader, ReaderFromCursor},
-    Error, Mutf8Str,
 };
 
 /// Read a normal root NBT compound. This is either empty or has a name and
@@ -484,11 +484,7 @@ impl<'a: 'tape, 'tape> NbtTag<'a, 'tape> {
 }
 
 fn ensure_kind(el: TapeElement, other: TapeTagKind) -> Option<()> {
-    if el.kind() != other {
-        None
-    } else {
-        Some(())
-    }
+    if el.kind() != other { None } else { Some(()) }
 }
 
 impl PartialEq for NbtTag<'_, '_> {
@@ -520,7 +516,7 @@ impl PartialEq for NbtTag<'_, '_> {
 mod tests {
     use std::io::Read;
 
-    use byteorder::{WriteBytesExt, BE};
+    use byteorder::{BE, WriteBytesExt};
     use flate2::read::GzDecoder;
 
     use super::*;
@@ -685,7 +681,7 @@ mod tests {
         data.write_u16::<BE>(0).unwrap(); // root name length
         data.write_u8(COMPOUND_ID).unwrap(); // first element type
         data.write_u16::<BE>(0).unwrap(); // first element name length
-                                          // eof
+        // eof
 
         let res = super::read(&mut Cursor::new(&data));
         assert_eq!(res, Err(Error::UnexpectedEof));

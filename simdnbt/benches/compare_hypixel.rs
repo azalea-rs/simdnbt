@@ -5,7 +5,7 @@ use std::{
     io::{Cursor, Read},
 };
 
-use criterion::{criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{Criterion, Throughput, criterion_group, criterion_main};
 use flate2::read::GzDecoder;
 
 pub fn bench_read_file(filename: &str, c: &mut Criterion) {
