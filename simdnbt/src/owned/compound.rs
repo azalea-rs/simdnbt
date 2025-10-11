@@ -1,13 +1,13 @@
 use std::mem::{self, MaybeUninit};
 
-use super::{list::NbtList, NbtTag};
+use super::{NbtTag, list::NbtList};
 use crate::{
-    common::{read_string, write_string_unchecked, END_ID, MAX_DEPTH},
+    Mutf8Str, ToNbtTag,
+    common::{END_ID, MAX_DEPTH, read_string, write_string_unchecked},
     error::NonRootError,
     fastvec::{FastVec, FastVecFromVec},
     mutf8::Mutf8String,
     reader::Reader,
-    Mutf8Str, ToNbtTag,
 };
 
 /// A list of named tags. The order of the tags is preserved.

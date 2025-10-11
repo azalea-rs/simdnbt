@@ -1,24 +1,24 @@
 use std::{marker::PhantomData, mem};
 
 use super::{
+    NbtCompound, Tapes,
     compound::{ParsingStack, ParsingStackElement},
     extra_tapes::{ExtraTapeElement, ExtraTapes},
     tape::{TapeElement, TapeTagKind, UnalignedU32},
-    NbtCompound, Tapes,
 };
 use crate::{
+    Mutf8Str,
     common::{
-        read_i8_array, read_int_array, read_long_array, read_string, read_u8_array,
-        read_with_u32_length, slice_i8_into_u8, write_string, write_u32, write_with_u32_length,
         BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
-        LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
+        LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID, read_i8_array, read_int_array,
+        read_long_array, read_string, read_u8_array, read_with_u32_length, slice_i8_into_u8,
+        write_string, write_u32, write_with_u32_length,
     },
     error::NonRootError,
     fastvec::{FastVec, FastVecFromVec},
     raw_list::RawList,
     reader::Reader,
     swap_endianness::SwappableNumber,
-    Mutf8Str,
 };
 
 /// A list of NBT tags of a single type.

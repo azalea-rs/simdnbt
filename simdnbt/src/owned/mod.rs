@@ -645,9 +645,18 @@ impl From<Nbt> for NbtTag {
     }
 }
 impl From<NbtTag> for NbtCompound {
+    /// Convert `NbtTag` to `NbtCompound`.
+    ///
+    /// Non-compound tags and compounds tags with only one empty string key are
+    /// wrapped in a compound with an empty string key
     fn from(tag: NbtTag) -> Self {
-        NbtCompound {
-            values: vec![(Mutf8String::from(""), tag)],
+        match tag {
+            NbtTag::Compound(compound) if !(compound.len() == 1 && compound.contains("")) => {
+                compound
+            }
+            tag => NbtCompound {
+                values: vec![(Mutf8String::from(""), tag)],
+            },
         }
     }
 }
@@ -670,6 +679,7 @@ mod tests {
     use flate2::read::GzDecoder;
 
     use super::*;
+    use crate::ToNbtTag;
 
     #[test]
     fn hello_world() {
@@ -841,5 +851,23 @@ mod tests {
             tag: NbtCompound { values: vec![] },
         };
         BaseNbt::write_unnamed(&nbt, &mut Vec::new());
+    }
+
+    #[test]
+    fn test_convert_tag_to_compound() {
+        assert_eq!(
+            NbtCompound::from(1i32.to_nbt_tag()),
+            NbtCompound::from_values(vec![(Mutf8String::from(""), 1i32.to_nbt_tag())])
+        );
+
+        let compound =
+            NbtCompound::from_values(vec![(Mutf8String::from("key"), 1i32.to_nbt_tag())]);
+        assert_eq!(NbtCompound::from(compound.clone().to_nbt_tag()), compound);
+
+        let compound = NbtCompound::from_values(vec![(Mutf8String::from(""), 1i32.to_nbt_tag())]);
+        assert_eq!(
+            NbtCompound::from(compound.clone().to_nbt_tag()),
+            NbtCompound::from_values(vec![(Mutf8String::from(""), compound.to_nbt_tag())])
+        )
     }
 }

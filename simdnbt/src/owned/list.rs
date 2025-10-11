@@ -1,10 +1,10 @@
-use super::{compound::NbtCompound, MAX_DEPTH};
+use super::{MAX_DEPTH, NbtTag, compound::NbtCompound};
 use crate::{
     common::{
-        read_i8_array, read_int_array, read_long_array, read_string, read_u8_array,
-        read_with_u32_length, slice_i8_into_u8, slice_into_u8_big_endian, write_string, write_u32,
-        write_with_u32_length, BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID,
-        INT_ARRAY_ID, INT_ID, LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID,
+        BYTE_ARRAY_ID, BYTE_ID, COMPOUND_ID, DOUBLE_ID, END_ID, FLOAT_ID, INT_ARRAY_ID, INT_ID,
+        LIST_ID, LONG_ARRAY_ID, LONG_ID, SHORT_ID, STRING_ID, read_i8_array, read_int_array,
+        read_long_array, read_string, read_u8_array, read_with_u32_length, slice_i8_into_u8,
+        slice_into_u8_big_endian, write_string, write_u32, write_with_u32_length,
     },
     error::NonRootError,
     fastvec::{FastVec, FastVecFromVec},
@@ -456,5 +456,79 @@ impl From<Vec<Vec<i32>>> for NbtList {
 impl From<Vec<Vec<i64>>> for NbtList {
     fn from(long_arrays: Vec<Vec<i64>>) -> Self {
         NbtList::LongArray(long_arrays)
+    }
+}
+
+impl From<Vec<NbtTag>> for NbtList {
+    /// Convert NBT tags to NBT list.
+    /// Items of heterogeneous lists are wrapped in NBT compounds.
+    fn from(tags: Vec<NbtTag>) -> Self {
+        macro_rules! match_homogeneous_list {
+            ($tags:expr, $( $variant:ident => $into_fn:ident),+ $(,)?) => {
+                match $tags.first() {
+                    $(
+                    Some(NbtTag::$variant(_)) => $tags
+                        .into_iter()
+                        .map(|tag| tag.$into_fn())
+                        .collect::<Option<Vec<_>>>()
+                        .map(NbtList::from),
+                    )+
+                    None => None
+                }
+            }
+        }
+
+        let homogeneous_list = match_homogeneous_list!(
+            tags.clone(),
+            Byte => into_byte,
+            Short => into_short,
+            Int => into_int,
+            Long => into_long,
+            Float => into_float,
+            Double => into_double,
+            ByteArray => into_byte_array,
+            String => into_string,
+            List => into_list,
+            Compound => into_compound,
+            IntArray => into_int_array,
+            LongArray => into_long_array
+        );
+
+        if let Some(homogeneous) = homogeneous_list {
+            homogeneous
+        } else {
+            NbtList::from(
+                tags.into_iter()
+                    .map(Into::into)
+                    .collect::<Vec<NbtCompound>>(),
+            )
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ToNbtTag;
+
+    #[test]
+    fn test_nbt_list_from_homogeneous_tags() {
+        let tags: Vec<NbtTag> = (0..5).map(|x| x.to_nbt_tag()).collect();
+
+        let list: NbtList = tags.into();
+
+        assert_eq!(list, NbtList::Int((0..5).collect()))
+    }
+
+    #[test]
+    fn test_nbt_list_from_heterogeneous_tags() {
+        let tags = vec![1i8.to_nbt_tag(), 1i16.to_nbt_tag()];
+
+        let list: NbtList = tags.into();
+
+        assert_eq!(
+            list,
+            NbtList::Compound(vec![1i8.to_nbt_tag().into(), 1i16.to_nbt_tag().into()])
+        );
     }
 }
