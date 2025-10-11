@@ -460,6 +460,8 @@ impl From<Vec<Vec<i64>>> for NbtList {
 }
 
 impl From<Vec<NbtTag>> for NbtList {
+    /// Convert NBT tags to NBT list.
+    /// Items of heterogeneous lists are wrapped in NBT compounds.
     fn from(tags: Vec<NbtTag>) -> Self {
         macro_rules! match_homogeneous_list {
             ($tags:expr, $( $variant:ident => $into_fn:ident),+ $(,)?) => {
@@ -497,8 +499,8 @@ impl From<Vec<NbtTag>> for NbtList {
         } else {
             NbtList::from(
                 tags.into_iter()
-                    .map(NbtCompound::wrap_if_needed)
-                    .collect::<Vec<_>>(),
+                    .map(Into::into)
+                    .collect::<Vec<NbtCompound>>(),
             )
         }
     }
@@ -526,10 +528,7 @@ mod tests {
 
         assert_eq!(
             list,
-            NbtList::Compound(vec![
-                NbtCompound::wrap_if_needed(1i8.to_nbt_tag()),
-                NbtCompound::wrap_if_needed(1i16.to_nbt_tag())
-            ])
+            NbtList::Compound(vec![1i8.to_nbt_tag().into(), 1i16.to_nbt_tag().into()])
         );
     }
 }
