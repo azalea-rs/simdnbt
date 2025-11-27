@@ -355,6 +355,7 @@ impl BaseNbt<'_> {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct NbtTag<'a: 'tape, 'tape> {
     element: *const TapeElement,
     extra_tapes: &'tape ExtraTapes<'a>,
