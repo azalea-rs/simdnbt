@@ -32,7 +32,7 @@ impl Parse for FieldAttrs {
                 "flatten" => {
                     attrs.flatten = true;
                 }
-                _ => todo!(),
+                attr => panic!("unknown attribute '{attr}'"),
             }
         }
 
@@ -53,7 +53,7 @@ impl Parse for UnitAttrs {
 
                     attrs.rename = Some(rename.value());
                 }
-                _ => todo!(),
+                attr => panic!("unknown attribute '{attr}'"),
             }
         }
 
@@ -71,7 +71,7 @@ impl Parse for StructAttrs {
                 "deny_unknown_fields" => {
                     attrs.deny_unknown_fields = true;
                 }
-                _ => todo!(),
+                attr => panic!("unknown attribute '{attr}'"),
             }
         }
 
