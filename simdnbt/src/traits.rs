@@ -338,3 +338,14 @@ impl ToNbtTag for crate::owned::NbtList {
         crate::owned::NbtTag::List(self)
     }
 }
+
+impl FromNbtTag for () {
+    fn from_nbt_tag(_: crate::borrow::NbtTag) -> Option<Self> {
+        Some(())
+    }
+}
+impl ToNbtTag for () {
+    fn to_nbt_tag(self) -> crate::owned::NbtTag {
+        crate::owned::NbtTag::Compound(crate::owned::NbtCompound::new())
+    }
+}

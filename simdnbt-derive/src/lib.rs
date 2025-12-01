@@ -10,11 +10,12 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 
     let ident = input.ident;
 
-    let mut field_deserializers = Vec::<proc_macro2::TokenStream>::new();
+    let field_deserializer;
 
     match input.data {
         syn::Data::Struct(syn::DataStruct { fields, .. }) => match fields {
             syn::Fields::Named(syn::FieldsNamed { named, .. }) => {
+                let mut field_deserializers = Vec::<proc_macro2::TokenStream>::new();
                 for field in named {
                     let struct_field_name = field.ident.unwrap();
 
@@ -39,8 +40,22 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
                         });
                     }
                 }
+                field_deserializer = quote! {
+                    Self {
+                        #(#field_deserializers),*
+                    };
+                }
             }
-            syn::Fields::Unnamed(_) => todo!(),
+            syn::Fields::Unnamed(unnamed) => {
+                assert!(
+                    unnamed.unnamed.len() == 1,
+                    "Unnamed structs must only have one field",
+                );
+
+                field_deserializer = quote! {
+                    Self(simdnbt::Deserialize::from_compound(nbt)?)
+                };
+            }
             syn::Fields::Unit => todo!(),
         },
         syn::Data::Enum(_) => todo!(),
@@ -65,9 +80,7 @@ pub fn deserialize_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     let output = quote! {
         impl #generics simdnbt::Deserialize for #ident #generics #where_clause {
             fn from_compound(mut nbt: simdnbt::borrow::NbtCompound) -> Result<Self, simdnbt::DeserializeError> {
-                let value = Self {
-                    #(#field_deserializers),*
-                };
+                let value = #field_deserializer;
                 #extra_checks
                 Ok(value)
             }
