@@ -460,7 +460,8 @@ impl From<Vec<Vec<i64>>> for NbtList {
 }
 
 impl From<Vec<NbtTag>> for NbtList {
-    /// Convert NBT tags to NBT list.
+    /// Convert a Vec of `NbtTag` into an `NbtList`.
+    ///
     /// Items of heterogeneous lists are wrapped in NBT compounds.
     fn from(tags: Vec<NbtTag>) -> Self {
         macro_rules! match_homogeneous_list {
@@ -503,6 +504,11 @@ impl From<Vec<NbtTag>> for NbtList {
                     .collect::<Vec<NbtCompound>>(),
             )
         }
+    }
+}
+impl<const N: usize, T: Into<NbtTag>> From<[T; N]> for NbtList {
+    fn from(tags: [T; N]) -> Self {
+        NbtList::from(tags.into_iter().map(Into::into).collect::<Vec<_>>())
     }
 }
 

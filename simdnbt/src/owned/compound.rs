@@ -281,3 +281,9 @@ impl IntoIterator for NbtCompound {
         self.values.into_iter()
     }
 }
+
+impl<const N: usize, K: Into<Mutf8String>> From<[(K, NbtTag); N]> for NbtCompound {
+    fn from(a: [(K, NbtTag); N]) -> Self {
+        Self::from_values(a.into_iter().map(|(k, v)| (k.into(), v)).collect())
+    }
+}

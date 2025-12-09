@@ -661,13 +661,49 @@ impl From<NbtTag> for NbtCompound {
     }
 }
 impl From<NbtList> for NbtTag {
-    fn from(list: NbtList) -> Self {
-        NbtTag::List(list)
+    fn from(l: NbtList) -> Self {
+        Self::List(l)
+    }
+}
+impl From<NbtCompound> for NbtTag {
+    fn from(c: NbtCompound) -> Self {
+        Self::Compound(c)
+    }
+}
+impl<const N: usize, T: Into<NbtTag>> From<[T; N]> for NbtTag {
+    fn from(value: [T; N]) -> Self {
+        NbtList::from(value).into()
     }
 }
 impl From<&str> for NbtTag {
-    fn from(value: &str) -> Self {
-        NbtTag::String(Mutf8String::from(value))
+    fn from(s: &str) -> Self {
+        Self::String(Mutf8String::from(s))
+    }
+}
+impl From<i32> for NbtTag {
+    fn from(i: i32) -> Self {
+        Self::Int(i)
+    }
+}
+impl From<i64> for NbtTag {
+    fn from(i: i64) -> Self {
+        Self::Long(i)
+    }
+}
+impl From<f32> for NbtTag {
+    fn from(f: f32) -> Self {
+        Self::Float(f)
+    }
+}
+impl From<f64> for NbtTag {
+    fn from(f: f64) -> Self {
+        Self::Double(f)
+    }
+}
+
+impl<const N: usize, K: Into<Mutf8String>> From<[(K, NbtTag); N]> for NbtTag {
+    fn from(a: [(K, NbtTag); N]) -> Self {
+        NbtCompound::from(a).into()
     }
 }
 
