@@ -10,19 +10,19 @@ repository = "https://github.com/azalea-rs/simdnbt"
 
 [dependencies]
 byteorder = "1.5.0"
-flate2 = "^1.1.2"
-serde = { version = "1.0.219", optional = true }
+flate2 = "^1.1.5"
+serde = { version = "1.0.228", optional = true }
 simd_cesu8 = { version = "1.1.0" }
 simdnbt-derive = { version = "0.9.0", path = "../simdnbt-derive", optional = true }
-thiserror = "2.0.15"
+thiserror = "2.0.17"
 
 [dev-dependencies]
-criterion = { version = "0.7.0", features = ["html_reports"] }
-mimalloc = "0.1.47"
+criterion = { version = "0.8.1", features = ["html_reports"] }
+mimalloc = "0.1.48"
 
 graphite_binary = "0.1.0"
 valence_nbt = { version = "0.8.0", features = ["binary"] }
-fastnbt = "2.5.0"
+fastnbt = "2.6.0"
 azalea-nbt = { git = "https://github.com/azalea-rs/azalea", rev = "84e036ce3752ecf57904b0f5aff1f33d43e95a32" }
 hematite-nbt = { version = "0.5.2", default-features = false }
 shen-nbt5 = "0.4.6"
