@@ -9,9 +9,9 @@ repository = "https://github.com/azalea-rs/simdnbt"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-proc-macro2 = "1.0.100"
-quote = "1.0.40"
-syn = "2.0.106"
+proc-macro2 = "1.0.104"
+quote = "1.0.42"
+syn = "2.0.113"
 
 [lib]
 proc-macro = true
