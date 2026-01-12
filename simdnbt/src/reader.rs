@@ -51,20 +51,18 @@ impl<'a> Reader<'a> {
         let addr = self.cur;
 
         #[cfg(miri)]
-        {
-            if self.cur as usize + mem::size_of::<T>() > self.end as usize {
-                return Err(UnexpectedEofError);
-            }
+        if self.cur as usize + mem::size_of::<T>() > self.end as usize {
+            return Err(UnexpectedEofError);
         }
+
         // SAFETY: This could leave our pointer in an invalid state, but this is fine
         // because we never dereference it if there's an error.
         self.cur = unsafe { self.cur.add(mem::size_of::<T>()) };
+
         #[cfg(not(miri))]
-        {
-            // it's faster to add and then check for eof
-            if self.cur > self.end {
-                return Err(UnexpectedEofError);
-            }
+        // it's faster to add and then check for eof
+        if self.cur > self.end {
+            return Err(UnexpectedEofError);
         }
 
         let value = unsafe { addr.cast::<T>().read_unaligned() };

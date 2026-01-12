@@ -43,14 +43,33 @@ impl NbtCompound {
         };
         let mut tags_buffer_len: usize = 0;
 
+        let mut error = None;
+
         let mut values = Vec::with_capacity(capacity);
         loop {
-            let tag_type = data.read_u8().map_err(|_| NonRootError::unexpected_eof())?;
+            let Ok(tag_type) = data.read_u8() else {
+                error = Some(NonRootError::unexpected_eof());
+                // don't return immediately, because we still need to drop the things in
+                // tags_buffer
+                break;
+            };
             if tag_type == END_ID {
                 break;
             }
-            let tag_name = read_string(data)?.to_owned();
-            let tag = NbtTag::read_with_type(data, tag_type, depth)?;
+            let tag_name = match read_string(data).map(|s| s.to_owned()) {
+                Ok(s) => s,
+                Err(err) => {
+                    error = Some(err.into());
+                    break;
+                }
+            };
+            let tag = match NbtTag::read_with_type(data, tag_type, depth) {
+                Ok(n) => n,
+                Err(err) => {
+                    error = Some(err);
+                    break;
+                }
+            };
 
             tags_buffer[tags_buffer_len] = MaybeUninit::new((tag_name, tag));
             tags_buffer_len += 1;
@@ -65,6 +84,10 @@ impl NbtCompound {
 
         for i in 0..tags_buffer_len {
             values.push(unsafe { tags_buffer.get_unchecked(i).assume_init_read() });
+        }
+
+        if let Some(error) = error {
+            return Err(error);
         }
 
         Ok(Self { values })
