@@ -6,7 +6,10 @@ mod list;
 #[cfg(feature = "serde")]
 mod serde_impl;
 
-use std::{io::Cursor, ops::Deref};
+use std::{
+    io::Cursor,
+    ops::{Deref, DerefMut},
+};
 
 pub use self::{compound::NbtCompound, list::NbtList};
 use crate::{
@@ -241,6 +244,12 @@ impl Deref for BaseNbt {
 
     fn deref(&self) -> &Self::Target {
         &self.tag
+    }
+}
+
+impl DerefMut for BaseNbt {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.tag
     }
 }
 
