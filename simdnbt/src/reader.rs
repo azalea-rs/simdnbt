@@ -7,6 +7,17 @@ use std::{
 
 use crate::error::UnexpectedEofError;
 
+#[cfg(target_arch = "aarch64")]
+#[inline]
+fn untagged(ptr: *const u8) -> *const u8 {
+    ptr.map_addr(|addr| addr & 0xff_ffff_ffff_ffff)
+}
+#[cfg(not(target_arch = "aarch64"))]
+#[inline]
+fn untagged(ptr: *const u8) -> *const u8 {
+    ptr
+}
+
 pub struct Reader<'a> {
     pub cur: *const u8,
     /// pointer to after the last byte (so remaining=end-cur)
@@ -17,9 +28,10 @@ pub struct Reader<'a> {
 
 impl<'a> Reader<'a> {
     pub fn new(data: &'a [u8]) -> Reader<'a> {
+        let start = untagged(data.as_ptr());
         Self {
-            cur: data.as_ptr(),
-            end: unsafe { data.as_ptr().add(data.len()) },
+            cur: start,
+            end: unsafe { start.add(data.len()) },
             _marker: PhantomData,
         }
     }
@@ -162,7 +174,8 @@ impl<'a, 'cursor> ReaderFromCursor<'a, 'cursor> {
 impl Drop for ReaderFromCursor<'_, '_> {
     fn drop(&mut self) {
         self.original_cursor.set_position(
-            (self.reader.cur as usize - self.original_cursor.get_ref().as_ptr() as usize) as u64,
+            (self.reader.cur as usize - untagged(self.original_cursor.get_ref().as_ptr()) as usize)
+                as u64,
         );
     }
 }

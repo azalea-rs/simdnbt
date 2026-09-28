@@ -583,6 +583,27 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "aarch64")]
+    fn read_complex_player_through_tagged_pointer() {
+        let src = include_bytes!("../../tests/complex_player.dat").to_vec();
+        let mut src_slice = src.as_slice();
+        let mut decoded_src_decoder = GzDecoder::new(&mut src_slice);
+        let mut decoded_src = Vec::new();
+        decoded_src_decoder.read_to_end(&mut decoded_src).unwrap();
+        let tagged_ptr = decoded_src.as_ptr().map_addr(|addr| addr | (0x2a << 56));
+        let tagged_src = unsafe { std::slice::from_raw_parts(tagged_ptr, decoded_src.len()) };
+
+        let mut cursor = Cursor::new(tagged_src);
+        let nbt = super::read(&mut cursor).unwrap().unwrap();
+        assert_eq!(cursor.position(), decoded_src.len() as u64);
+
+        let expected = super::read(&mut Cursor::new(&decoded_src[..]))
+            .unwrap()
+            .unwrap();
+        assert_eq!(nbt.to_owned(), expected.to_owned());
+    }
+
+    #[test]
     fn read_hypixel() {
         let src = include_bytes!("../../tests/hypixel.nbt").to_vec();
         let _nbt = super::read(&mut Cursor::new(&src[..])).unwrap().unwrap();
