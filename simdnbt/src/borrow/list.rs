@@ -224,18 +224,21 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             }
             TapeTagKind::ByteArrayList => {
                 let byte_arrays = self.byte_arrays().unwrap();
+                write_u32(data, byte_arrays.len() as u32);
                 for array in byte_arrays.iter() {
                     write_with_u32_length(data, 1, array);
                 }
             }
             TapeTagKind::StringList => {
                 let strings = self.strings().unwrap();
+                write_u32(data, strings.len() as u32);
                 for string in strings.iter() {
                     write_string(data, string);
                 }
             }
             TapeTagKind::ListList => {
                 let lists = self.lists().unwrap();
+                write_u32(data, lists.len() as u32);
                 for list in lists {
                     list.write_fastvec(data);
                 }
@@ -249,12 +252,14 @@ impl<'a, 'tape> NbtList<'a, 'tape> {
             }
             TapeTagKind::IntArrayList => {
                 let int_arrays = self.int_arrays().unwrap();
+                write_u32(data, int_arrays.len() as u32);
                 for array in int_arrays.iter() {
                     write_with_u32_length(data, 4, array.as_big_endian());
                 }
             }
             TapeTagKind::LongArrayList => {
                 let long_arrays = self.long_arrays().unwrap();
+                write_u32(data, long_arrays.len() as u32);
                 for array in long_arrays.iter() {
                     write_with_u32_length(data, 8, array.as_big_endian());
                 }
