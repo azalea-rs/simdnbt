@@ -782,4 +782,43 @@ mod tests {
 
         assert_eq!(nbt.as_compound().len(), nbt.as_compound().iter().count());
     }
+
+    #[test]
+    fn read_write_lists() {
+        use crate::owned::{self, NbtCompound, NbtList, NbtTag};
+
+        let lists = [
+            NbtList::String(vec!["a".into(), "bc".into()]),
+            NbtList::String(vec![]),
+            NbtList::ByteArray(vec![vec![1, 2, 3], vec![]]),
+            NbtList::ByteArray(vec![]),
+            NbtList::List(vec![NbtList::Int(vec![1, 2]), NbtList::Empty]),
+            NbtList::List(vec![]),
+            NbtList::IntArray(vec![vec![1, 2], vec![3]]),
+            NbtList::IntArray(vec![]),
+            NbtList::LongArray(vec![vec![1, 2], vec![3]]),
+            NbtList::LongArray(vec![]),
+        ];
+
+        for list in lists {
+            let original = owned::BaseNbt::new(
+                "",
+                NbtCompound::from_values(vec![
+                    ("list".into(), NbtTag::List(list)),
+                    ("after".into(), NbtTag::Int(7)),
+                ]),
+            );
+            let mut original_bytes = Vec::new();
+            original.write(&mut original_bytes);
+
+            let nbt = super::read(&mut Cursor::new(&original_bytes))
+                .unwrap()
+                .unwrap();
+            let mut out = Vec::new();
+            nbt.write(&mut out);
+
+            let nbt = owned::read(&mut Cursor::new(&out)).unwrap().unwrap();
+            assert_eq!(nbt, original);
+        }
+    }
 }
